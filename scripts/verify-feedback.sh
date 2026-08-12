@@ -24,6 +24,7 @@ log "Go-only Feedback ServiceをJDKなしで検証します"
 node_major=$(node -p 'Number(process.versions.node.split(".")[0])')
 (( node_major >= 22 )) || fail "Node.js 22以上が必要です"
 
+bash scripts/check-feedback-container-platforms.sh
 bash scripts/verify-feedback-go.sh
 
 if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then

@@ -1,4 +1,4 @@
-FROM docker.io/library/node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine AS build
 
 WORKDIR /repo
 COPY package.json package-lock.json ./
@@ -22,6 +22,10 @@ ARG VITE_FEEDBACK_ADMIN_OIDC_SCOPE
 ARG FEEDBACK_ADMIN_APPLICATION
 ARG FEEDBACK_ADMIN_ENVIRONMENT
 ARG FEEDBACK_ADMIN_WORKSPACE
+ARG CSP_CONNECT_SRC_EXTRA="http://localhost:8090 http://localhost:8081"
+
+COPY apps/feedback-admin/nginx.conf /tmp/default.conf
+RUN sed -i "s|__CSP_CONNECT_SRC_EXTRA__|${CSP_CONNECT_SRC_EXTRA}|g" /tmp/default.conf
 
 RUN export VITE_FEEDBACK_ADMIN_APPLICATION_KEY="$FEEDBACK_ADMIN_APPLICATION" \
     VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY="$FEEDBACK_ADMIN_ENVIRONMENT" \
@@ -33,8 +37,6 @@ RUN export VITE_FEEDBACK_ADMIN_APPLICATION_KEY="$FEEDBACK_ADMIN_APPLICATION" \
 
 FROM docker.io/library/nginx:1.27-alpine
 
-ARG CSP_CONNECT_SRC_EXTRA="http://localhost:8090 http://localhost:8081"
-COPY apps/feedback-admin/nginx.conf /etc/nginx/conf.d/default.conf
-RUN sed -i "s|__CSP_CONNECT_SRC_EXTRA__|${CSP_CONNECT_SRC_EXTRA}|g" /etc/nginx/conf.d/default.conf
+COPY --from=build /tmp/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/feedback-admin/dist /usr/share/nginx/html
 EXPOSE 80

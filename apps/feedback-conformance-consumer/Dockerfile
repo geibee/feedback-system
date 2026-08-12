@@ -1,4 +1,4 @@
-FROM docker.io/library/node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine AS build
 
 WORKDIR /repo
 COPY package.json package-lock.json ./

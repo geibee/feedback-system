@@ -60,7 +60,8 @@ describe("packed Feedback SDK", () => {
 
     expect(await screen.findByRole("button", { name: "#7" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Feedback" }));
-    fireEvent.change(screen.getByLabelText("Comment"), { target: { value: "packed package post" } });
+    fireEvent.click(screen.getByText("Order"), { clientX: 320, clientY: 240 });
+    fireEvent.change(await screen.findByLabelText("Comment"), { target: { value: "packed package post" } });
     fireEvent.click(screen.getByRole("button", { name: "Post" }));
     await waitFor(() => expect(posted).toHaveBeenCalledOnce());
   });

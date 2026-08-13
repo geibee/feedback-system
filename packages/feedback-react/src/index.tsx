@@ -31,6 +31,13 @@ export type FeedbackMessages = {
   unavailable: string;
   loading: string;
   launcher: string;
+  browseThreads: string;
+  noThreads: string;
+  selectTarget: string;
+  capturing: string;
+  cancel: string;
+  target: string;
+  reviewPerspective: string;
   close: string;
   submit: string;
   reply: string;
@@ -51,6 +58,13 @@ export const defaultFeedbackMessages: FeedbackMessages = {
   unavailable: "フィードバック機能を一時的に利用できません",
   loading: "フィードバック機能を準備しています",
   launcher: "フィードバック",
+  browseThreads: "他の人の投稿を見る",
+  noThreads: "まだフィードバックはありません。",
+  selectTarget: "コメントしたい箇所をクリックしてください",
+  capturing: "投稿時点の画面を取得しています…",
+  cancel: "キャンセル",
+  target: "対象",
+  reviewPerspective: "レビュー観点",
   close: "閉じる",
   submit: "投稿する",
   reply: "返信する",

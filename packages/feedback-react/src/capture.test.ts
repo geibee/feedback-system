@@ -11,8 +11,11 @@ describe("DOM evidence provider", () => {
     root.append(masked, excluded);
     document.body.appendChild(root);
     let resolveBlob: ((value: Blob) => void) | undefined;
-    const render = async (_root: HTMLElement, options: { filter(node: Node): boolean }) => {
+    const render = async (_root: HTMLElement, options: { width: number; height: number; style: Record<string, string>; filter(node: Node): boolean }) => {
       expect(options.filter(excluded)).toBe(false);
+      expect(options.width).toBeGreaterThanOrEqual(0);
+      expect(options.height).toBeGreaterThanOrEqual(0);
+      expect(options.style).toMatchObject({ transformOrigin: "top left" });
       return await new Promise<Blob>((resolve) => { resolveBlob = resolve; });
     };
 

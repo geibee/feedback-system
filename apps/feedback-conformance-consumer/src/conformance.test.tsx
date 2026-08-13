@@ -65,7 +65,8 @@ describe("consumer 2 conformance", () => {
 
     expect(await screen.findByRole("button", { name: "#11" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
-    fireEvent.change(screen.getByLabelText("Comment"), { target: { value: "Check reorder threshold" } });
+    fireEvent.click(document.querySelector('[data-feedback-key="inventory-card"]')!, { clientX: 320, clientY: 240 });
+    fireEvent.change(await screen.findByLabelText("Comment"), { target: { value: "Check reorder threshold" } });
     fireEvent.click(screen.getByRole("button", { name: "Post" }));
     await waitFor(() => expect(posted).toHaveLength(1));
 

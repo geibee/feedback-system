@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryFeedbackTelemetry, type FeedbackHostAdapter, type FeedbackTransport } from "@feedback/core";
 import { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay";
@@ -47,6 +47,7 @@ const thread = {
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.stubGlobal("crypto", { randomUUID: () => "00000000-0000-4000-8000-000000000001" });
+  window.localStorage.clear();
 });
 
 afterEach(() => cleanup());
@@ -86,7 +87,8 @@ describe("FeedbackOverlay", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "フィードバック" }));
-    fireEvent.change(screen.getByLabelText("コメント"), { target: { value: "確認してください" } });
+    fireEvent.click(document.body, { clientX: 320, clientY: 240 });
+    fireEvent.change(await screen.findByLabelText("コメント"), { target: { value: "確認してください" } });
     fireEvent.click(screen.getByRole("button", { name: "投稿する" }));
 
     await waitFor(() => expect(posted).toHaveLength(1));
@@ -112,7 +114,8 @@ describe("FeedbackOverlay", () => {
       </FeedbackProvider>
     );
     fireEvent.click(await screen.findByRole("button", { name: "フィードバック" }));
-    fireEvent.change(screen.getByLabelText("コメント"), { target: { value: "再試行" } });
+    fireEvent.click(document.body, { clientX: 320, clientY: 240 });
+    fireEvent.change(await screen.findByLabelText("コメント"), { target: { value: "再試行" } });
     fireEvent.click(screen.getByRole("button", { name: "投稿する" }));
     await waitFor(() => expect(attempts).toHaveLength(1));
     fireEvent.click(screen.getByRole("button", { name: "投稿する" }));
@@ -166,7 +169,7 @@ describe("FeedbackOverlay", () => {
 
     expect((await screen.findByRole("status")).textContent).toContain("投稿できません");
     expect(screen.queryByRole("button", { name: "フィードバック" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "#1" }));
+    fireEvent.click(screen.getByRole("button", { name: /#1/ }));
     expect(await screen.findByRole("heading", { name: /#1/ })).toBeTruthy();
   });
 
@@ -188,7 +191,223 @@ describe("FeedbackOverlay", () => {
       </FeedbackProvider>
     );
     fireEvent.click(await screen.findByRole("button", { name: "フィードバック" }));
-    expect(screen.queryByLabelText("投稿者名") !== null).toBe(expected);
+    fireEvent.click(document.body, { clientX: 320, clientY: 240 });
+    await screen.findByRole("dialog", { name: "フィードバックの投稿" });
+    expect(screen.queryByRole("textbox", { name: /投稿者名/ }) !== null).toBe(expected);
+  });
+
+  it("対象選択時に証跡を取得し、投稿者名と画面に割り当てたレビュー観点を投稿する", async () => {
+    const posted: Array<Record<string, unknown>> = [];
+    const captureEvidence = vi.fn(async () => ({
+      bytes: new Uint8Array([1, 2, 3]),
+      contentType: "image/png" as const,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      pixelRatio: 1,
+      capturedAt: "2026-08-13T00:00:00Z"
+    }));
+    const assignedSession = {
+      ...session,
+      perspectives: [
+        ...session.perspectives,
+        { code: "future", label: "将来確認", status: "future" as const, guidance: "次回確認します" }
+      ],
+      scopes: [{ ...session.scopes[0], perspectiveCodes: ["usability"] }]
+    };
+    const transport = createTransport(async (path, options) => {
+      if (path.endsWith("/threads") && options?.method === "POST") {
+        posted.push(options.body as Record<string, unknown>);
+        return { value: thread, etag: '"1"' };
+      }
+      if (path.endsWith("/threads")) return { value: { items: [] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    }, {
+      session: assignedSession,
+      participantPolicy: { mode: "prompt", storage: "host" }
+    });
+    const adapter = createAdapter({
+      captureEvidence,
+      getParticipantName: () => "山田 太郎",
+      setParticipantName: vi.fn()
+    });
+    render(
+      <FeedbackProvider adapter={adapter} transport={transport}>
+        <button type="button" data-feedback-key="orders.save">保存</button>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "フィードバック" }));
+    const target = screen.getByRole("button", { name: "保存" });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 100, y: 100, left: 100, top: 100, right: 300, bottom: 140, width: 200, height: 40,
+      toJSON: () => ({})
+    });
+    fireEvent.click(target, { clientX: 200, clientY: 120 });
+
+    const composer = await screen.findByRole("dialog", { name: "フィードバックの投稿" });
+    expect(captureEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      target: expect.objectContaining({ kind: "ui-element", elementKey: "orders.save", relativeX: .5, relativeY: .5 })
+    }));
+    expect(within(composer).getByText(/1280×720/)).toBeTruthy();
+    expect(within(composer).getByRole("radio", { name: /使いやすさ/ })).toBeTruthy();
+    expect(within(composer).queryByRole("radio", { name: /将来確認/ })).toBeNull();
+    expect((within(composer).getByRole("textbox", { name: /投稿者名/ }) as HTMLInputElement).value).toBe("山田 太郎");
+    fireEvent.change(within(composer).getByRole("textbox", { name: "コメント" }), {
+      target: { value: "保存動作を確認してください" }
+    });
+    fireEvent.click(within(composer).getByRole("button", { name: "投稿する" }));
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({
+      perspectiveCode: "usability",
+      participantName: "山田 太郎",
+      body: "保存動作を確認してください",
+      target: { kind: "ui-element", elementKey: "orders.save" },
+      evidence: { contentType: "image/png", dataBase64: "AQID" }
+    });
+  });
+
+  it("右クリックメニューから対象を保持して投稿画面を開く", async () => {
+    const transport = createTransport(async (path) => {
+      if (path.endsWith("/threads")) return { value: { items: [] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport} features={{ contextMenu: true, evidenceCapture: false }}>
+        <button type="button" data-feedback-key="orders.save">保存</button>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+    const target = await screen.findByRole("button", { name: "保存" });
+    const contextMenuEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 160, clientY: 120 });
+    fireEvent(target, contextMenuEvent);
+
+    expect(contextMenuEvent.defaultPrevented).toBe(true);
+    const menu = screen.getByRole("menu", { name: "フィードバックメニュー" });
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "フィードバックを残す" }));
+    const composer = await screen.findByRole("dialog", { name: "フィードバックの投稿" });
+    expect(within(composer).getByText("orders.save")).toBeTruthy();
+  });
+
+  it("他の人の投稿を画面ごとに一覧表示し、選択したスレッドへ遷移する", async () => {
+    const navigate = vi.fn();
+    const otherThread = {
+      ...thread,
+      location: {
+        ...thread.location,
+        pageKey: "orders.list",
+        routeTemplate: "/orders",
+        pathParameters: {}
+      },
+      messages: [{
+        id: "30000000-0000-4000-8000-000000000001",
+        threadId: thread.id,
+        author: thread.reporter,
+        body: "一覧の表示を確認してください",
+        createdAt: thread.createdAt,
+        version: 1
+      }]
+    };
+    const transport = createTransport(async (path) => {
+      if (path === `/threads/${thread.id}`) return { value: otherThread, etag: '"1"' };
+      if (path.endsWith("/threads")) return { value: { items: [otherThread] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter({ navigate })} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "他の人の投稿を見る 1" }));
+    const list = screen.getByRole("dialog", { name: "他の人の投稿を見る" });
+    expect(within(list).getByRole("heading", { name: "orders.list" })).toBeTruthy();
+    expect(within(list).getByText("一覧の表示を確認してください")).toBeTruthy();
+    fireEvent.click(within(list).getByRole("button", { name: /#1 使いやすさ/ }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(otherThread.location, otherThread.id));
+    expect(await screen.findByRole("dialog", { name: "フィードバックスレッド" })).toBeTruthy();
+  });
+
+  it("cursorがある場合は全pageを取得して投稿件数へ反映する", async () => {
+    const secondThread = { ...thread, id: "20000000-0000-4000-8000-000000000002", displayNumber: 2 };
+    const transport = createTransport(async (path) => {
+      if (path.includes("?cursor=next-page")) {
+        return { value: { items: [secondThread], nextCursor: null }, etag: null };
+      }
+      if (path.endsWith("/threads")) {
+        return { value: { items: [thread], nextCursor: "next-page" }, etag: null };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    expect(await screen.findByRole("button", { name: "他の人の投稿を見る 2" })).toBeTruthy();
+  });
+
+  it("screen座標とDOM内座標へ番号付きpinを配置する", async () => {
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 800 });
+    const domThread = {
+      ...thread,
+      id: "20000000-0000-4000-8000-000000000002",
+      displayNumber: 2,
+      target: {
+        schemaVersion: "1" as const,
+        kind: "ui-element" as const,
+        elementKey: "orders.save",
+        relativeX: .25,
+        relativeY: .5
+      }
+    };
+    const transport = createTransport(async (path) => {
+      if (path.endsWith("/threads")) return { value: { items: [thread, domThread] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <button type="button" data-feedback-key="orders.save">保存</button>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+    const owner = screen.getByRole("button", { name: "保存" });
+    vi.spyOn(owner, "getBoundingClientRect").mockReturnValue({
+      x: 100, y: 200, left: 100, top: 200, right: 300, bottom: 240, width: 200, height: 40,
+      toJSON: () => ({})
+    });
+    fireEvent(window, new Event("resize"));
+
+    const screenPin = await screen.findByRole("button", { name: /#1/ });
+    const domPin = await screen.findByRole("button", { name: /#2/ });
+    expect(screenPin.parentElement?.getAttribute("x")).toBe("496");
+    expect(screenPin.parentElement?.getAttribute("y")).toBe("376");
+    expect(domPin.parentElement?.getAttribute("x")).toBe("146");
+    expect(domPin.parentElement?.getAttribute("y")).toBe("196");
+  });
+
+  it("レビュー案内で対象画面と観点を確認できる", async () => {
+    const transport = createTransport(async (path) => {
+      if (path.endsWith("/threads")) return { value: { items: [] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport} features={{ autoIntroduction: true }}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    const guide = await screen.findByRole("dialog", { name: "テストレビュー" });
+    expect(within(guide).getByRole("heading", { name: "今回確認してほしいこと" })).toBeTruthy();
+    expect(within(guide).getByText("使いやすさ")).toBeTruthy();
+    expect(within(guide).getByText("orders.detail")).toBeTruthy();
+    fireEvent.click(within(guide).getByRole("button", { name: "確認してレビューを始める" }));
+    expect(screen.queryByRole("dialog", { name: "テストレビュー" })).toBeNull();
+    expect(screen.getByRole("button", { name: /レビュー通知：テストレビュー/ })).toBeTruthy();
   });
 
   it("locale差し替えとShadowRoot portalをhost CSSから分離して利用できる", async () => {
@@ -209,7 +428,7 @@ describe("FeedbackOverlay", () => {
         <FeedbackOverlay />
       </FeedbackProvider>
     );
-    await waitFor(() => expect(shadow.querySelector("button")?.textContent).toBe("Send feedback"));
+    await waitFor(() => expect(shadow.querySelector(".feedback-launcher")?.textContent).toContain("Send feedback"));
     host.remove();
   });
 });

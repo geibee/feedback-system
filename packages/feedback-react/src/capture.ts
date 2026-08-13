@@ -10,20 +10,35 @@ export type DomEvidenceProviderOptions = {
 };
 
 export type DomCaptureRenderOptions = {
+  width: number;
+  height: number;
   pixelRatio: number;
+  style: Record<string, string>;
   filter(node: Node): boolean;
 };
 
-/** exclude/mask を尊重する既定 DOM capture。mask は外部CSSの一時classで画素へ焼き込む。 */
+/** exclude/mask を尊重し、現在のviewportだけを取得する既定 DOM capture。 */
 export function createDomEvidenceProvider(options: DomEvidenceProviderOptions = {}): FeedbackEvidenceProvider {
   return async (request) => {
     if (typeof document === "undefined") return null;
     const root = options.root?.() ?? document.body;
+    const ownerDocument = root.ownerDocument;
+    const view = ownerDocument.defaultView ?? window;
+    const viewportWidth = ownerDocument.documentElement.clientWidth || view.innerWidth;
+    const viewportHeight = ownerDocument.documentElement.clientHeight || view.innerHeight;
+    const scrollX = Math.round(view.scrollX);
+    const scrollY = Math.round(view.scrollY);
     const maskedElements = installMasks(root, request.maskSelector);
     try {
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, options.maxPixelRatio ?? 2);
+      const pixelRatio = Math.min(view.devicePixelRatio || 1, options.maxPixelRatio ?? 2);
       const blob = await (options.render ?? toBlob)(root, {
+        width: viewportWidth,
+        height: viewportHeight,
         pixelRatio,
+        style: {
+          transform: `translate(${-scrollX}px, ${-scrollY}px)`,
+          transformOrigin: "top left"
+        },
         filter: (node) => !(node instanceof Element) || !node.matches(request.excludeSelector)
       });
       if (!blob) return null;
@@ -33,8 +48,8 @@ export function createDomEvidenceProvider(options: DomEvidenceProviderOptions = 
       return {
         bytes: new Uint8Array(await blob.arrayBuffer()),
         contentType: "image/png",
-        viewportWidth: document.documentElement.clientWidth || window.innerWidth,
-        viewportHeight: document.documentElement.clientHeight || window.innerHeight,
+        viewportWidth,
+        viewportHeight,
         pixelRatio,
         capturedAt: new Date().toISOString()
       };

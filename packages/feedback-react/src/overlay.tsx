@@ -96,6 +96,17 @@ export function FeedbackOverlay({
   const canRead = permissions.includes("feedback.read");
   const canComment = permissions.includes("feedback.comment");
   const posting = feedback.reviewContext?.posting ?? "deny";
+  const runtimeContextKey = feedback.hostContext && feedback.location
+    ? JSON.stringify([
+      feedback.hostContext.applicationKey,
+      feedback.hostContext.environmentKey,
+      feedback.hostContext.externalWorkspaceKey,
+      feedback.location.pageKey,
+      feedback.location.routeTemplate,
+      feedback.location.pathParameters,
+      feedback.location.queryParameters ?? {}
+    ])
+    : null;
 
   const refreshThreads = useCallback(async () => {
     const generation = ++threadRequestGeneration.current;
@@ -136,7 +147,7 @@ export function FeedbackOverlay({
     setContextMenu(null);
     setThreadListOpen(false);
     setActivePanelSide("right");
-  }, [session?.id]);
+  }, [runtimeContextKey, session?.id]);
   useEffect(() => { void refreshThreads(); }, [refreshThreads]);
 
   const reset = useCallback(() => {

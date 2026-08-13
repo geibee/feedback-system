@@ -25,6 +25,28 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "feedback-manifest-sync",
+      "name": "Feedback manifest sync local",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "feedback-local-manifest-client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "feedback-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "feedback-service",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -38,6 +60,12 @@
       "credentials": [
         { "type": "password", "value": "feedback-local-only", "temporary": false }
       ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "username": "service-account-feedback-manifest-sync",
+      "enabled": true,
+      "serviceAccountClientId": "feedback-manifest-sync"
     }
   ]
 }

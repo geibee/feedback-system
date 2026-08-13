@@ -58,6 +58,9 @@ paths:
       responses:
         "200":
           description: 登録済み application manifest
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:

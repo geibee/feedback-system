@@ -54,11 +54,14 @@ func (provider NotificationHealthProviderFunc) NotificationHealth(ctx context.Co
 
 // ReadinessDependencies は必須3依存と任意notification依存を区別する。
 type ReadinessDependencies struct {
-	Database          DatabaseReadinessProbe
-	EvidenceStorage   ReadinessProbe
-	ExportStorage     ReadinessProbe
-	Notification      NotificationHealthProvider
-	DependencyTimeout time.Duration
+	Database             DatabaseReadinessProbe
+	EvidenceStorage      ReadinessProbe
+	ExportStorage        ReadinessProbe
+	Notification         NotificationHealthProvider
+	EvidenceDisabled     bool
+	ExportDisabled       bool
+	NotificationDisabled bool
+	DependencyTimeout    time.Duration
 }
 
 type readinessResponse struct {
@@ -100,30 +103,45 @@ func ReadinessHandler(dependencies ReadinessDependencies) http.Handler {
 		}
 		results := make(chan result, 3)
 		var waitGroup sync.WaitGroup
-		for name, probe := range map[string]ReadinessProbe{
-			"evidence": dependencies.EvidenceStorage,
-			"export":   dependencies.ExportStorage,
-		} {
+		probes := map[string]ReadinessProbe{}
+		if !dependencies.EvidenceDisabled {
+			probes["evidence"] = dependencies.EvidenceStorage
+		}
+		if !dependencies.ExportDisabled {
+			probes["export"] = dependencies.ExportStorage
+		}
+		for name, probe := range probes {
+			waitGroup.Add(1)
+			go func(name string, probe ReadinessProbe) {
+				defer waitGroup.Done()
+				results <- result{name: name, err: checkProbe(request.Context(), timeout, probe)}
+			}(name, probe)
+		}
+		if !dependencies.NotificationDisabled {
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				results <- result{name: name, err: checkProbe(request.Context(), timeout, probe)}
+				health, err := checkNotification(request.Context(), timeout, dependencies.Notification)
+				results <- result{name: "notification", err: err, notification: health}
 			}()
 		}
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			health, err := checkNotification(request.Context(), timeout, dependencies.Notification)
-			results <- result{name: "notification", err: err, notification: health}
-		}()
 		go func() {
 			waitGroup.Wait()
 			close(results)
 		}()
 
-		response := readinessResponse{
-			Status: "ready", Database: "available", EvidenceStorage: "unknown",
-			ExportStorage: "unknown", Notification: "unknown",
+		response := readinessResponse{Status: "ready", Database: "available"}
+		response.EvidenceStorage = "unknown"
+		if dependencies.EvidenceDisabled {
+			response.EvidenceStorage = "disabled"
+		}
+		response.ExportStorage = "unknown"
+		if dependencies.ExportDisabled {
+			response.ExportStorage = "disabled"
+		}
+		response.Notification = "unknown"
+		if dependencies.NotificationDisabled {
+			response.Notification = "disabled"
 		}
 		for dependencyResult := range results {
 			switch dependencyResult.name {
@@ -142,7 +160,8 @@ func ReadinessHandler(dependencies ReadinessDependencies) http.Handler {
 			}
 		}
 		status := http.StatusOK
-		if response.EvidenceStorage != "available" || response.ExportStorage != "available" {
+		if (!dependencies.EvidenceDisabled && response.EvidenceStorage != "available") ||
+			(!dependencies.ExportDisabled && response.ExportStorage != "available") {
 			response.Status = "unavailable"
 			status = http.StatusServiceUnavailable
 		}

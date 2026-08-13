@@ -13,6 +13,10 @@ import "@feedback/react/styles.css";
 </FeedbackProvider>;
 ```
 
+routeまたはworkspaceが変わるSPAでは`adapter.subscribe`を実装します。Providerは変更通知を受けると進行中の
+context HTTP requestを`AbortSignal`で中断してstaleな結果を破棄し、最新の`getContext`／`getLocation`で再取得します。
+Providerへroute由来の`key`を付けて全面remountする必要はありません。`subscribe`がない既存adapterも利用できます。
+
 `FeedbackOverlay`は次のUIを`document.body`または指定した`portalTarget`へ描画します。
 
 - 画面上の対象を選択して投稿するFeedback Button

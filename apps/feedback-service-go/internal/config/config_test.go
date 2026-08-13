@@ -23,8 +23,11 @@ func TestParseDefaults(t *testing.T) {
 	if settings.Database.PoolSize != 10 || settings.Database.ConnectionTimeout != 10*time.Second || settings.Database.StatementTimeout != 30*time.Second {
 		t.Fatalf("database ranges: %+v", settings.Database)
 	}
-	if settings.OIDC.JWKSURL != "https://issuer.example/.well-known/jwks.json" {
-		t.Fatalf("jwks URL: %q", settings.OIDC.JWKSURL)
+	if settings.Profile != DeploymentProfileFull {
+		t.Fatalf("deployment profile: %q", settings.Profile)
+	}
+	if settings.OIDC == nil || settings.OIDC.JWKSURL != "https://issuer.example/.well-known/jwks.json" {
+		t.Fatalf("OIDC設定: %+v", settings.OIDC)
 	}
 	if settings.OIDC.SubjectClaim != "sub" || settings.OIDC.DisplayNameClaim != "name" || settings.OIDC.EmailClaim != "email" {
 		t.Fatalf("OIDC claim defaults: %+v", settings.OIDC)
@@ -188,6 +191,61 @@ func TestParseTokenExchange(t *testing.T) {
 	}
 }
 
+func TestParseAllowsExchangeOnlyAuthentication(t *testing.T) {
+	t.Parallel()
+
+	environment := baseEnvironment()
+	delete(environment, "FEEDBACK_OIDC_ISSUER")
+	delete(environment, "FEEDBACK_OIDC_AUDIENCE")
+	environment["FEEDBACK_TOKEN_EXCHANGE_ISSUER"] = "https://broker.example"
+	environment["FEEDBACK_TOKEN_EXCHANGE_AUDIENCE"] = "feedback-service-exchange"
+	environment["FEEDBACK_TOKEN_EXCHANGE_ACTOR_ISSUERS"] = "https://issuer.example"
+
+	settings, err := Parse(mapLookup(environment))
+	if err != nil {
+		t.Fatalf("exchange単独設定を読み込めませんでした: %v", err)
+	}
+	if settings.OIDC != nil || settings.TokenExchange == nil {
+		t.Fatalf("認証境界が不一致です: oidc=%+v exchange=%+v", settings.OIDC, settings.TokenExchange)
+	}
+}
+
+func TestParseCoreProfileDoesNotRequireOptionalFeatureSecrets(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"FEEDBACK_DEPLOYMENT_PROFILE": "core",
+		"FEEDBACK_DATABASE_PASSWORD":  "database-secret",
+		"FEEDBACK_OIDC_ISSUER":        "https://issuer.example",
+		"FEEDBACK_OIDC_AUDIENCE":      "feedback-service",
+		// 無効な拡張機能設定はcore runtimeの起動条件にしない。
+		"FEEDBACK_EVIDENCE_STORAGE": "s3",
+		"FEEDBACK_EXPORT_STORAGE":   "s3",
+	}
+	settings, err := Parse(mapLookup(environment))
+	if err != nil {
+		t.Fatalf("core profileを読み込めませんでした: %v", err)
+	}
+	if settings.Profile != DeploymentProfileCore {
+		t.Fatalf("profile=%q", settings.Profile)
+	}
+	if len(settings.Notification.EncryptionKey) != 0 || settings.Evidence.Storage.Mode != "" || settings.Export.Storage.Mode != "" {
+		t.Fatalf("無効な拡張機能設定が構築されました: %+v", settings)
+	}
+}
+
+func TestParseRejectsMissingAuthenticationBoundary(t *testing.T) {
+	t.Parallel()
+
+	environment := baseEnvironment()
+	delete(environment, "FEEDBACK_OIDC_ISSUER")
+	delete(environment, "FEEDBACK_OIDC_AUDIENCE")
+	_, err := Parse(mapLookup(environment))
+	if err == nil || !strings.Contains(err.Error(), "少なくとも一方") {
+		t.Fatalf("error=%v", err)
+	}
+}
+
 func TestParseS3Storage(t *testing.T) {
 	t.Parallel()
 
@@ -216,6 +274,13 @@ func TestParseRejectsInvalidConfiguration(t *testing.T) {
 		mutate   func(map[string]string)
 		contains string
 	}{
+		{
+			name: "deployment profileが不正",
+			mutate: func(values map[string]string) {
+				values["FEEDBACK_DEPLOYMENT_PROFILE"] = "minimal"
+			},
+			contains: "FEEDBACK_DEPLOYMENT_PROFILE",
+		},
 		{
 			name: "DB password未設定",
 			mutate: func(values map[string]string) {
@@ -403,7 +468,7 @@ func TestParseAllowsLocalAndExplicitDevelopmentHTTP(t *testing.T) {
 			if err != nil {
 				t.Fatalf("開発HTTPを読み込めませんでした: %v", err)
 			}
-			if settings.OIDC.Issuer != test.issuer {
+			if settings.OIDC == nil || settings.OIDC.Issuer != test.issuer {
 				t.Fatalf("issuer=%q", settings.OIDC.Issuer)
 			}
 		})

@@ -549,9 +549,9 @@ function ManifestAdministration({ transport, applicationKey, onError }: {
     }
   }, [applicationKey, onError, transport]);
   useEffect(() => { void load(); }, [load]);
-  return <div className="feedback-admin-card feedback-admin-card-wide"><div className="feedback-admin-card-heading"><div><h2>アプリ・画面設定</h2><p className="feedback-admin-help">メインアプリが持つ画面定義を自動で取り込みます。この画面でJSONを編集する必要はありません。</p></div><button type="button" onClick={() => void load()}>再読み込み</button></div>
+  return <div className="feedback-admin-card feedback-admin-card-wide"><div className="feedback-admin-card-heading"><div><h2>アプリ・画面設定</h2><p className="feedback-admin-help">CI/CDで同期した画面定義を表示します。この画面でJSONを編集する必要はありません。</p></div><button type="button" onClick={() => void load()}>再読み込み</button></div>
     {state === "loading" ? <p role="status">画面設定を確認しています…</p> : null}
-    {state === "missing" ? <div className="feedback-admin-empty" role="status"><strong>画面設定がまだ同期されていません</strong><p>先にメインアプリ（localhost:5173）へ管理者でログインしてください。起動時に画面一覧が自動登録されます。</p></div> : null}
+    {state === "missing" ? <div className="feedback-admin-empty" role="status"><strong>画面設定がまだ同期されていません</strong><p>CI/CDまたはbootstrap jobで<code>feedback manifest apply</code>を実行してください。</p></div> : null}
     {state === "ready" && manifest ? <><dl className="feedback-admin-summary feedback-admin-manifest-summary"><div><dt>アプリ名</dt><dd>{manifest.displayName}</dd></div><div><dt>アプリキー</dt><dd><code>{manifest.applicationKey}</code></dd></div><div><dt>設定バージョン</dt><dd>{manifest.manifestVersion}</dd></div><div><dt>登録画面</dt><dd>{manifest.routes.length}画面</dd></div></dl><ManifestRouteInventory routes={manifest.routes} /></> : null}
   </div>;
 }

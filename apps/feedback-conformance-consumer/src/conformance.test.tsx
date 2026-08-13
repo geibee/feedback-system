@@ -22,8 +22,8 @@ describe("consumer 2 conformance", () => {
   it("native routerをmanifest locationへ変換し機微queryを破棄する", () => {
     const adapter = adapterForCurrentUrl();
     expect(adapter.getContext()).toMatchObject({
-      applicationKey: "inventory-approval-fixture",
-      environmentKey: "fixture",
+      applicationKey: "inventory",
+      environmentKey: "local",
       externalWorkspaceKey: "east"
     });
     expect(adapter.getLocation()).toEqual({
@@ -44,7 +44,7 @@ describe("consumer 2 conformance", () => {
       participant: { principalId: `participant:${scope.externalWorkspaceKey}`, displayName: "Fixture reviewer" }
     }));
     const exchange = new FeedbackTokenExchangeAdapter(broker, () => now);
-    const east = { applicationKey: "inventory-approval-fixture", environmentKey: "fixture", externalWorkspaceKey: "east" };
+    const east = { applicationKey: "inventory", environmentKey: "local", externalWorkspaceKey: "east" };
     const west = { ...east, externalWorkspaceKey: "west" };
 
     expect(await exchange.getAccessToken(east)).toBe("feedback-token:east:1000");
@@ -86,10 +86,11 @@ function adapterForCurrentUrl(): FeedbackHostAdapter {
   const router: FixtureRouter = {
     pathname: () => window.location.pathname,
     search: () => window.location.search,
-    navigate: (path) => window.history.pushState({}, "", path)
+    navigate: (path) => window.history.pushState({}, "", path),
+    subscribe: () => () => undefined
   };
   return createInventoryHostAdapter({
-    environmentKey: "fixture",
+    environmentKey: "local",
     release: "test",
     router,
     tokenExchange: exchangeFixture()
@@ -150,8 +151,8 @@ function createTransport(state: {
 function sessionFixture(workspace: string) {
   return {
     id: workspace === "east" ? sessionId : "94000000-0000-4000-8000-000000000001",
-    applicationKey: "inventory-approval-fixture",
-    environmentKey: "fixture",
+    applicationKey: "inventory",
+    environmentKey: "local",
     externalWorkspaceKey: workspace,
     manifestVersion: "2026.08.1",
     title: "Inventory review",

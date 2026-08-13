@@ -152,7 +152,7 @@ type Store interface {
 	ResolveWorkspaceScope(context.Context, string, string, string, string) (auth.ResourceScope, error)
 	GetManifest(context.Context, string) (ManifestRecord, error)
 	PutManifest(context.Context, ManifestPut) (ManifestRecord, error)
-	ReviewContext(context.Context, auth.ResourceScope, string, string, []auth.Permission, int64) (ReviewContext, error)
+	ReviewContext(context.Context, auth.ResourceScope, string, string, []auth.Permission, bool, int64) (ReviewContext, error)
 	RecordAudit(context.Context, AuditEvent) error
 }
 
@@ -161,6 +161,8 @@ type Service struct {
 	authorizer                *auth.Authorizer
 	evidenceMaxBytes          int64
 	evidenceMaxCountWorkspace int
+	evidenceEnabled           bool
+	features                  []string
 	observeScope              func(context.Context, auth.ResourceScope)
 }
 
@@ -168,6 +170,16 @@ type Option func(*Service)
 
 func WithScopeObserver(observer func(context.Context, auth.ResourceScope)) Option {
 	return func(service *Service) { service.observeScope = observer }
+}
+
+// WithCoreProfile はobject storageとnotificationを使わないcore機能集合へ制限する。
+func WithCoreProfile() Option {
+	return func(service *Service) {
+		service.evidenceEnabled = false
+		service.features = []string{
+			"application-manifest", "idempotency", "etag", "message-history", "rate-limit",
+		}
+	}
 }
 
 func NewService(
@@ -186,6 +198,11 @@ func NewService(
 	service := &Service{
 		store: store, authorizer: authorizer,
 		evidenceMaxBytes: evidenceMaxBytes, evidenceMaxCountWorkspace: evidenceMaxCountWorkspace,
+		evidenceEnabled: true,
+		features: []string{
+			"application-manifest", "idempotency", "etag", "message-history", "private-evidence",
+			"rate-limit", "notification-outbox", "automatic-backup", "notification-connectors",
+		},
 	}
 	for _, option := range options {
 		if option != nil {
@@ -206,10 +223,7 @@ func (service *Service) Capabilities(ctx context.Context) (Capabilities, error) 
 			MaxBytes: service.evidenceMaxBytes, MaxCountPerWorkspace: service.evidenceMaxCountWorkspace,
 			AcceptedContentTypes: []string{"image/png", "image/webp"},
 		},
-		Features: []string{
-			"application-manifest", "idempotency", "etag", "message-history", "private-evidence",
-			"rate-limit", "notification-outbox", "automatic-backup", "notification-connectors",
-		},
+		Features: slices.Clone(service.features),
 	}, nil
 }
 
@@ -321,7 +335,7 @@ func (service *Service) ReviewContext(
 	permissions := slices.Clone(authorized.Permissions)
 	slices.Sort(permissions)
 	return service.store.ReviewContext(
-		ctx, scope, input.PageKey, input.RouteTemplate, permissions, service.evidenceMaxBytes,
+		ctx, scope, input.PageKey, input.RouteTemplate, permissions, service.evidenceEnabled, service.evidenceMaxBytes,
 	)
 }
 

@@ -161,7 +161,7 @@ func TestRuntimeHTTPFoundationAgainstPostgreSQL(t *testing.T) {
 		t.Fatalf("manifest PUT: etag=%q body=%s", putHeader.Get("ETag"), putBody)
 	}
 	getBody, getHeader := assertHTTPResponse(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/applications/"+applicationKey+"/manifest", validToken, nil, http.StatusOK, "http-"+runID+"-get", nil)
-	if getHeader.Get("ETag") != "" || !equalHTTPJSON(getBody, manifest) {
+	if getHeader.Get("ETag") != `"v1"` || !equalHTTPJSON(getBody, manifest) {
 		t.Fatalf("manifest GET: etag=%q body=%s", getHeader.Get("ETag"), getBody)
 	}
 

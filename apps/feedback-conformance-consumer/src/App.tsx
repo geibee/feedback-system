@@ -26,14 +26,18 @@ export function InventoryConsumer({ transport: injectedTransport, tokenExchange:
     navigate: (path) => {
       window.history.pushState({}, "", path);
       window.dispatchEvent(new PopStateEvent("popstate"));
+    },
+    subscribe: (listener) => {
+      window.addEventListener("popstate", listener);
+      return () => window.removeEventListener("popstate", listener);
     }
   }), []);
   const adapter = useMemo(() => createInventoryHostAdapter({
-    environmentKey: "fixture",
+    environmentKey: "local",
     release: "consumer-2",
     router,
     tokenExchange
-  }), [route, router, tokenExchange]);
+  }), [router, tokenExchange]);
   const transport = useMemo(() => injectedTransport ?? createFeedbackTransport({
     baseUrl: "/feedback/v1",
     getAccessToken: adapter.getAccessToken,
@@ -44,7 +48,6 @@ export function InventoryConsumer({ transport: injectedTransport, tokenExchange:
 
   return <FeedbackErrorBoundary fallback={<p>Feedback UI failed safely.</p>}>
     <FeedbackProvider
-      key={`${currentSite}:${route}`}
       adapter={adapter}
       transport={transport}
       features={{ contextMenu: true, evidenceCapture: false }}

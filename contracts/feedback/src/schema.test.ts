@@ -12,6 +12,38 @@ function validator(name: string) {
 }
 
 describe("Feedback JSON Schema", () => {
+  it("installation manifestは複数workspaceと初回access前のmembershipを検証する", () => {
+    const validate = validator("installation-manifest");
+    const entry = {
+      tenantKey: "company",
+      tenantDisplayName: "Company",
+      applicationKey: "portal",
+      applicationDisplayName: "Portal",
+      environmentKey: "production",
+      environmentBaseUrl: "https://portal.example.test",
+      allowedOrigins: ["https://portal.example.test"],
+      externalWorkspaceKey: "default",
+      workspaceDisplayName: "Default",
+      issuer: "https://id.example.test",
+      subject: "owner",
+      permissions: ["feedback.read", "feedback.admin"]
+    };
+    expect(validate({ schemaVersion: "1", entries: [entry] }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({
+      schemaVersion: "1",
+      entries: [{ ...entry, applicationKey: "Invalid Key" }]
+    })).toBe(false);
+    expect(validate({
+      schemaVersion: "1",
+      entries: [{ ...entry, issuer: "https://user@id.example.test" }]
+    })).toBe(false);
+    expect(validate({
+      schemaVersion: "1",
+      entries: [{ ...entry, allowedOrigins: ["http://portal.example.test"] }]
+    })).toBe(false);
+    expect(validate({ schemaVersion: "1", entries: [{ ...entry, secret: "value" }] })).toBe(false);
+  });
+
   it("application manifestのrouteとparameter policyを検証する", () => {
     const validate = validator("application-manifest");
     expect(validate({

@@ -223,27 +223,40 @@ func NewAPIHandler(service *usecase.Service, options ...APIHandlerOption) (*APIH
 // ValidateComplete はproduction routeがUnimplementedへ落ちる依存欠落を起動前に拒否する。
 // 部分構築は機能別integration testだけで使用し、実serverは必ずこの検査を通す。
 func (handler *APIHandler) ValidateComplete() error {
+	return handler.validateProduction(false)
+}
+
+// ValidateCore はcore profileで有効なoperationだけが配線済みであることを検査する。
+// 無効な拡張operationは登録済みのUnimplementedへ落ち、暗黙に有効化されない。
+func (handler *APIHandler) ValidateCore() error {
+	return handler.validateProduction(true)
+}
+
+func (handler *APIHandler) validateProduction(coreOnly bool) error {
 	if handler == nil {
 		return errors.New("production API handlerが未設定です")
 	}
 	missing := make([]string, 0, 15)
-	for name, absent := range map[string]bool{
-		"core":                 handler.service == nil,
-		"sessions":             handler.sessions == nil,
-		"discussions":          handler.discussions == nil,
-		"evidence":             handler.evidence == nil,
-		"exports":              handler.exports == nil,
-		"administration":       handler.administration == nil,
-		"backups":              handler.backups == nil,
-		"connectors":           handler.connectors == nil,
-		"notifications":        handler.notifications == nil,
-		"retention":            handler.retention == nil,
-		"admin-scope-resolver": handler.adminScopeResolver == nil,
-		"resource-resolver":    handler.scopeResolver == nil,
-		"authorizer":           handler.authorizer == nil,
-		"rate-limiter":         handler.rateLimiter == nil,
-		"auditor":              handler.auditor == nil,
-	} {
+	required := map[string]bool{
+		"core":              handler.service == nil,
+		"sessions":          handler.sessions == nil,
+		"discussions":       handler.discussions == nil,
+		"administration":    handler.administration == nil,
+		"retention":         handler.retention == nil,
+		"resource-resolver": handler.scopeResolver == nil,
+		"authorizer":        handler.authorizer == nil,
+		"rate-limiter":      handler.rateLimiter == nil,
+		"auditor":           handler.auditor == nil,
+	}
+	if !coreOnly {
+		required["evidence"] = handler.evidence == nil
+		required["exports"] = handler.exports == nil
+		required["backups"] = handler.backups == nil
+		required["connectors"] = handler.connectors == nil
+		required["notifications"] = handler.notifications == nil
+		required["admin-scope-resolver"] = handler.adminScopeResolver == nil
+	}
+	for name, absent := range required {
 		if absent {
 			missing = append(missing, name)
 		}
@@ -298,6 +311,7 @@ func (handler *APIHandler) GetFeedbackApplicationManifest(
 		WriteError(writer, request, mapServiceError(err))
 		return
 	}
+	writer.Header().Set("ETag", formatETag(record.Version))
 	writeRawJSON(writer, http.StatusOK, record.Manifest)
 }
 

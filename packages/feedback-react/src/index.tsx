@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ErrorInfo,
   type ReactNode
@@ -131,19 +132,30 @@ export function FeedbackProvider({
   const [location, setLocation] = useState<FeedbackLocationV1 | null>(null);
   const [reviewContext, setReviewContext] = useState<FeedbackReviewContextV1 | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const refreshController = useRef<AbortController | null>(null);
   const messages = useMemo(() => ({ ...defaultFeedbackMessages, ...messageOverrides }), [messageOverrides]);
 
   const refresh = useCallback(async () => {
+    refreshController.current?.abort();
+    const controller = new AbortController();
+    refreshController.current = controller;
     setState("loading");
     setError(null);
     try {
       const load = async () => {
-        await withTimeout(transport.getCapabilities(), requestTimeoutMs);
+        throwIfAborted(controller.signal);
+        await withTimeout(transport.getCapabilities({ signal: controller.signal }), requestTimeoutMs, controller.signal);
+        throwIfAborted(controller.signal);
         const nextHostContext = adapter.getContext();
         const nextLocation = adapter.getLocation();
         const nextReviewContext = nextLocation
-          ? await withTimeout(transport.getReviewContext(nextHostContext, nextLocation), requestTimeoutMs)
+          ? await withTimeout(
+            transport.getReviewContext(nextHostContext, nextLocation, { signal: controller.signal }),
+            requestTimeoutMs,
+            controller.signal
+          )
           : null;
+        throwIfAborted(controller.signal);
         return { nextHostContext, nextLocation, nextReviewContext };
       };
       let loaded: Awaited<ReturnType<typeof load>> | null = null;
@@ -153,16 +165,19 @@ export function FeedbackProvider({
           loaded = await load();
           break;
         } catch (nextError) {
+          if (controller.signal.aborted) return;
           lastError = nextError;
         }
       }
       if (!loaded) throw lastError;
+      if (controller.signal.aborted) return;
       const { nextHostContext, nextLocation, nextReviewContext } = loaded;
       setHostContext(nextHostContext);
       setLocation(nextLocation);
       setReviewContext(nextReviewContext);
       setState("ready");
     } catch (nextError) {
+      if (controller.signal.aborted) return;
       setHostContext(null);
       setLocation(null);
       setReviewContext(null);
@@ -170,12 +185,21 @@ export function FeedbackProvider({
       setState("unavailable");
       telemetry?.increment("service_unavailable", hostContextDimensions(adapter));
       onUnavailable?.(nextError);
+    } finally {
+      if (refreshController.current === controller) refreshController.current = null;
     }
   }, [adapter, contextRetryCount, onUnavailable, requestTimeoutMs, telemetry, transport]);
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    const unsubscribe = adapter.subscribe?.(() => {
+      void refresh();
+    });
+    return () => {
+      unsubscribe?.();
+      refreshController.current?.abort();
+    };
+  }, [adapter, refresh]);
 
   const value = useMemo<FeedbackContextValue>(() => ({
     adapter,
@@ -208,17 +232,28 @@ function hostContextDimensions(adapter: FeedbackHostAdapter) {
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw new Error("Feedback context refresh cancelled");
+}
+
+async function withTimeout<T>(promise: Promise<T>, milliseconds: number, signal: AbortSignal): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let handleAbort: (() => void) | undefined;
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error("Feedback Service request timeout")), milliseconds);
+      }),
+      new Promise<never>((_, reject) => {
+        handleAbort = () => reject(new Error("Feedback context refresh cancelled"));
+        if (signal.aborted) handleAbort();
+        else signal.addEventListener("abort", handleAbort, { once: true });
       })
     ]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    if (handleAbort) signal.removeEventListener("abort", handleAbort);
   }
 }
 

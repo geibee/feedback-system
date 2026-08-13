@@ -21,6 +21,7 @@ const (
 	BackupPull         Name = "backup-pull"
 	LegacyMigration    Name = "legacy-migration"
 	Migrate            Name = "migrate"
+	Manifest           Name = "manifest"
 )
 
 var entrypoints = map[string]Name{
@@ -47,6 +48,7 @@ var subcommands = map[string]Name{
 	string(BackupPull):         BackupPull,
 	string(LegacyMigration):    LegacyMigration,
 	string(Migrate):            Migrate,
+	string(Manifest):           Manifest,
 }
 
 // Invocation is the normalized role and its role-specific arguments.

@@ -43,6 +43,15 @@ func TestReadinessDependencyMatrix(t *testing.T) {
 				"exportStorage": "available", "notification": "available", "notificationFailedDeliveries": "0", "outboxLagSeconds": "0.0"},
 		},
 		{
+			name: "core profileの拡張依存は無効",
+			dependencies: ReadinessDependencies{
+				Database: databaseAvailable, EvidenceDisabled: true, ExportDisabled: true, NotificationDisabled: true,
+			},
+			wantStatus: 200,
+			want: map[string]string{"status": "ready", "database": "available", "evidenceStorage": "disabled",
+				"exportStorage": "disabled", "notification": "disabled"},
+		},
+		{
 			name: "database required",
 			dependencies: ReadinessDependencies{Database: databaseUnavailable, EvidenceStorage: available, ExportStorage: available,
 				Notification: availableNotification},

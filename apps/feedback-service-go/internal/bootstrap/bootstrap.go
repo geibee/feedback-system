@@ -28,20 +28,20 @@ var ErrApplicationKeyConflict = errors.New("application keyは別tenantで使用
 
 // Input は冪等bootstrapの入力である。
 type Input struct {
-	TenantKey              string
-	TenantDisplayName      string
-	ApplicationKey         string
-	ApplicationDisplayName string
-	EnvironmentKey         string
-	EnvironmentBaseURL     string
-	AllowedOrigins         []string
-	ExternalWorkspaceKey   string
-	WorkspaceDisplayName   string
-	Issuer                 string
-	Subject                string
-	Email                  *string
-	DisplayName            *string
-	Permissions            []Permission
+	TenantKey              string       `json:"tenantKey"`
+	TenantDisplayName      string       `json:"tenantDisplayName"`
+	ApplicationKey         string       `json:"applicationKey"`
+	ApplicationDisplayName string       `json:"applicationDisplayName"`
+	EnvironmentKey         string       `json:"environmentKey"`
+	EnvironmentBaseURL     string       `json:"environmentBaseUrl"`
+	AllowedOrigins         []string     `json:"allowedOrigins"`
+	ExternalWorkspaceKey   string       `json:"externalWorkspaceKey"`
+	WorkspaceDisplayName   string       `json:"workspaceDisplayName"`
+	Issuer                 string       `json:"issuer"`
+	Subject                string       `json:"subject"`
+	Email                  *string      `json:"email,omitempty"`
+	DisplayName            *string      `json:"displayName,omitempty"`
+	Permissions            []Permission `json:"permissions"`
 }
 
 // Result は登録または再利用したresource IDを返す。
@@ -82,6 +82,30 @@ func (r *Runner) Run(ctx context.Context, input Input) (Result, error) {
 		return Result{}, err
 	}
 	return result, nil
+}
+
+// Apply は宣言文書の全entryを検証後、同じtransaction内で冪等に同期する。
+func (r *Runner) Apply(ctx context.Context, document Document) ([]Result, error) {
+	validated, err := validateDocument(document)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]Result, 0, len(validated))
+	err = r.database.InTransaction(ctx, func(txCtx context.Context, tx postgres.Tx) error {
+		for index, input := range validated {
+			result, provisionErr := provision(txCtx, tx, input)
+			if provisionErr != nil {
+				return fmt.Errorf("entries[%d]を登録できません: %w", index, provisionErr)
+			}
+			results = append(results, result)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 func provision(ctx context.Context, tx postgres.Tx, input validatedInput) (Result, error) {

@@ -20,7 +20,8 @@ type LookupFunc func(string) (string, bool)
 type Config struct {
 	Service       ServiceSettings
 	Database      DatabaseSettings
-	OIDC          OIDCSettings
+	Profile       DeploymentProfile
+	OIDC          *OIDCSettings
 	TokenExchange *TokenExchangeSettings
 	Evidence      EvidenceSettings
 	Export        ExportSettings
@@ -28,6 +29,14 @@ type Config struct {
 	Notification  NotificationSettings
 	Retention     RetentionSettings
 }
+
+// DeploymentProfile はAPI runtimeへ配線する機能集合を表す。
+type DeploymentProfile string
+
+const (
+	DeploymentProfileFull DeploymentProfile = "full"
+	DeploymentProfileCore DeploymentProfile = "core"
+)
 
 type ServiceSettings struct {
 	Port int
@@ -151,6 +160,10 @@ func Parse(lookup LookupFunc) (Config, error) {
 	}
 
 	allowInsecureHTTP := optional(lookup, "FEEDBACK_ALLOW_INSECURE_HTTP", "") == "1"
+	profile, err := parseDeploymentProfile(lookup)
+	if err != nil {
+		return Config{}, err
+	}
 	database, err := ParseDatabase(lookup)
 	if err != nil {
 		return Config{}, err
@@ -163,17 +176,26 @@ func Parse(lookup LookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	evidenceStorage, err := parseEvidenceStorage(lookup)
-	if err != nil {
-		return Config{}, err
+	if oidc == nil && tokenExchange == nil {
+		return Config{}, errors.New("FEEDBACK_OIDC_ISSUER または FEEDBACK_TOKEN_EXCHANGE_ISSUER の少なくとも一方が必要です")
 	}
-	exportStorage, err := parseExportStorage(lookup)
-	if err != nil {
-		return Config{}, err
-	}
-	notification, err := ParseNotification(lookup)
-	if err != nil {
-		return Config{}, err
+
+	var evidenceStorage StorageSettings
+	var exportStorage StorageSettings
+	var notification NotificationSettings
+	if profile == DeploymentProfileFull {
+		evidenceStorage, err = parseEvidenceStorage(lookup)
+		if err != nil {
+			return Config{}, err
+		}
+		exportStorage, err = parseExportStorage(lookup)
+		if err != nil {
+			return Config{}, err
+		}
+		notification, err = ParseNotification(lookup)
+		if err != nil {
+			return Config{}, err
+		}
 	}
 
 	port, err := integer(lookup, "FEEDBACK_PORT", 8090, 1, 65_535)
@@ -200,22 +222,28 @@ func Parse(lookup LookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	exportPollMillis, err := integer64(lookup, "FEEDBACK_EXPORT_POLL_MS", 2_000, 100, 3_600_000)
-	if err != nil {
-		return Config{}, err
-	}
-	backupMaxAttempts, err := integer(lookup, "FEEDBACK_BACKUP_MAX_ATTEMPTS", 5, 1, 100)
-	if err != nil {
-		return Config{}, err
-	}
-	backupKeyPrefix := optional(lookup, "FEEDBACK_BACKUP_KEY_PREFIX", "backups/")
-	if !strings.HasSuffix(backupKeyPrefix, "/") {
-		backupKeyPrefix += "/"
+	var exportPollMillis int64
+	var backupMaxAttempts int
+	var backupKeyPrefix string
+	if profile == DeploymentProfileFull {
+		exportPollMillis, err = integer64(lookup, "FEEDBACK_EXPORT_POLL_MS", 2_000, 100, 3_600_000)
+		if err != nil {
+			return Config{}, err
+		}
+		backupMaxAttempts, err = integer(lookup, "FEEDBACK_BACKUP_MAX_ATTEMPTS", 5, 1, 100)
+		if err != nil {
+			return Config{}, err
+		}
+		backupKeyPrefix = optional(lookup, "FEEDBACK_BACKUP_KEY_PREFIX", "backups/")
+		if !strings.HasSuffix(backupKeyPrefix, "/") {
+			backupKeyPrefix += "/"
+		}
 	}
 
 	return Config{
 		Service:       ServiceSettings{Port: port},
 		Database:      database,
+		Profile:       profile,
 		OIDC:          oidc,
 		TokenExchange: tokenExchange,
 		Evidence: EvidenceSettings{
@@ -238,6 +266,14 @@ func Parse(lookup LookupFunc) (Config, error) {
 			BackupPrefix: backupKeyPrefix,
 		},
 	}, nil
+}
+
+func parseDeploymentProfile(lookup LookupFunc) (DeploymentProfile, error) {
+	profile := DeploymentProfile(optional(lookup, "FEEDBACK_DEPLOYMENT_PROFILE", string(DeploymentProfileFull)))
+	if profile != DeploymentProfileFull && profile != DeploymentProfileCore {
+		return "", errors.New("FEEDBACK_DEPLOYMENT_PROFILE は full または core を指定してください")
+	}
+	return profile, nil
 }
 
 // ParseDatabase はbootstrap/workerがOIDC等を要求せずDB設定だけを読める入口である。
@@ -407,25 +443,31 @@ func ParseLegacyMigration(lookup LookupFunc) (LegacyMigrationConfig, error) {
 	return LegacyMigrationConfig{Database: database, Evidence: evidence}, nil
 }
 
-func parseOIDC(lookup LookupFunc, allowInsecureHTTP bool) (OIDCSettings, error) {
-	issuer, err := required(lookup, "FEEDBACK_OIDC_ISSUER")
-	if err != nil {
-		return OIDCSettings{}, err
+func parseOIDC(lookup LookupFunc, allowInsecureHTTP bool) (*OIDCSettings, error) {
+	issuer, enabled := nonBlank(lookup, "FEEDBACK_OIDC_ISSUER")
+	if !enabled {
+		if anyConfigured(lookup,
+			"FEEDBACK_OIDC_AUDIENCE", "FEEDBACK_OIDC_JWKS_URL", "FEEDBACK_OIDC_SUBJECT_CLAIM",
+			"FEEDBACK_OIDC_DISPLAY_NAME_CLAIM", "FEEDBACK_OIDC_EMAIL_CLAIM",
+		) {
+			return nil, errors.New("direct OIDC設定には FEEDBACK_OIDC_ISSUER が必要です")
+		}
+		return nil, nil
 	}
 	issuer = strings.TrimRight(issuer, "/")
 	if err := validateSecureEndpoint(issuer, "FEEDBACK_OIDC_ISSUER", allowInsecureHTTP); err != nil {
-		return OIDCSettings{}, err
+		return nil, err
 	}
 	audience, err := required(lookup, "FEEDBACK_OIDC_AUDIENCE")
 	if err != nil {
-		return OIDCSettings{}, err
+		return nil, err
 	}
 	jwksURL := optional(lookup, "FEEDBACK_OIDC_JWKS_URL", issuer+"/.well-known/jwks.json")
 	if err := validateSecureEndpoint(jwksURL, "FEEDBACK_OIDC_JWKS_URL", allowInsecureHTTP); err != nil {
-		return OIDCSettings{}, err
+		return nil, err
 	}
 
-	return OIDCSettings{
+	return &OIDCSettings{
 		Issuer:           issuer,
 		Audience:         audience,
 		JWKSURL:          jwksURL,
@@ -438,6 +480,12 @@ func parseOIDC(lookup LookupFunc, allowInsecureHTTP bool) (OIDCSettings, error) 
 func parseTokenExchange(lookup LookupFunc, allowInsecureHTTP bool) (*TokenExchangeSettings, error) {
 	issuer, enabled := nonBlank(lookup, "FEEDBACK_TOKEN_EXCHANGE_ISSUER")
 	if !enabled {
+		if anyConfigured(lookup,
+			"FEEDBACK_TOKEN_EXCHANGE_AUDIENCE", "FEEDBACK_TOKEN_EXCHANGE_JWKS_URL",
+			"FEEDBACK_TOKEN_EXCHANGE_ACTOR_ISSUERS", "FEEDBACK_TOKEN_EXCHANGE_MAX_LIFETIME_SECONDS",
+		) {
+			return nil, errors.New("token exchange設定には FEEDBACK_TOKEN_EXCHANGE_ISSUER が必要です")
+		}
 		return nil, nil
 	}
 	issuer = strings.TrimRight(issuer, "/")
@@ -660,6 +708,15 @@ func required(lookup LookupFunc, name string) (string, error) {
 func nonBlank(lookup LookupFunc, name string) (string, bool) {
 	value, ok := lookup(name)
 	return value, ok && strings.TrimSpace(value) != ""
+}
+
+func anyConfigured(lookup LookupFunc, names ...string) bool {
+	for _, name := range names {
+		if _, ok := lookup(name); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func optional(lookup LookupFunc, name, fallback string) string {

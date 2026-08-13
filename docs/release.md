@@ -1,4 +1,28 @@
-# Go release artifact
+# Release artifact
+
+## SDK packages
+
+Feedback SDKをregistryへ配布する前に、空directoryへpublish可能なtarball一式を生成する。repository内のworkspaceは
+誤publish防止のため`private: true`を維持し、release builderだけがstaging copyから`private`を除去して同一versionの
+内部依存へ固定する。
+
+```bash
+bash scripts/build-feedback-sdk-release.sh --output /tmp/feedback-sdk-release --version 1.0.0-rc.1
+```
+
+生成物は`@feedback/contracts`、`@feedback/core`、`@feedback/react`、`@feedback/maplibre`、
+`@feedback/admin-react`のtarball、公開順を持つ`release-manifest.json`、`SHA256SUMS`である。
+`bash scripts/verify-feedback.sh`成功後、checksumと署名を検証し、`release-manifest.json`の`publishOrder`順に
+承認済みnpm互換registryへ投入する。例:
+
+```bash
+npm publish /tmp/feedback-sdk-release/feedback-contracts-1.0.0-rc.1.tgz \
+  --registry https://registry.example.com --tag next
+```
+
+registry credentialは環境またはuser-level npm設定から注入し、repositoryへ保存しない。release script自体はpublishを行わない。
+
+## Go Service・CLI
 
 空directoryを指定してmulti-arch artifactを生成する。
 

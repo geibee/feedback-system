@@ -30,6 +30,8 @@ export type FeedbackEvidenceProvider = (
 export type FeedbackHostAdapter = {
   getContext(): FeedbackHostContextV1;
   getLocation(): FeedbackLocationV1 | null;
+  /** context/location の変更通知。購読解除関数を返し、未実装時は初回読込だけを行う。 */
+  subscribe?(listener: () => void): () => void;
   getAccessToken(): Promise<string | null>;
   refreshAccessToken?(): Promise<string | null>;
   getIdentity?(): Promise<FeedbackParticipant | null>;

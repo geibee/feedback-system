@@ -15,6 +15,8 @@ podman compose --env-file deploy/.env -f deploy/compose.yaml up --build
 ```
 
 ComposeはAPI/workerより先にone-shot migrationを依存関係として完了する。migrationだけを手動確認する場合は次を使う。
+bootstrap後にはone-shotの`feedback manifest apply` jobがapplication manifestを実際に同期し、consumerは登録済みmanifestを読む。
+ブラウザ起動時の副作用には依存しない。
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/compose.yaml \
@@ -26,3 +28,5 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml up --build
 `bash scripts/smoke-feedback-standalone.sh` で実行する。scriptが作ったcontainerとvolumeは終了時に削除する。
 稼働済み環境へ移行する前の24時間lease/cursor/idempotency fault検証は、Go-only形状で
 `scripts/soak-feedback-go.sh --output <new-summary.json>`を実行する。未投入環境の初回導入では短縮実行を選べる。
+
+本番CI/CDで複数workspaceを同期する方法は[`installation.md`](installation.md)を参照する。

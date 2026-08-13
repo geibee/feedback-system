@@ -1,7 +1,8 @@
 # 運用
 
 API、notification worker、export worker、retention worker、bootstrapは同じService imageの別commandで起動する。
-DB、Evidence storage、Export storageは必須依存で、`/health/ready` が個別状態を報告する。notification backlogは
+既定の`full` profileではDB、Evidence storage、Export storageが必須依存で、`/health/ready` が個別状態を報告する。
+コメント中心の`core` profileはPostgreSQLだけを必須とし、Evidence／Export／Notificationを`disabled`と報告する。notification backlogは
 API readinessを落とさないが、metricとalertで追跡する。
 
 export worker内ではExport生成loopと自動backup loopを独立して実行する。backupの失敗や長時間処理によって

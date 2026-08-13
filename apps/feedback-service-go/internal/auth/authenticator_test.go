@@ -69,6 +69,45 @@ func TestAuthenticateSelectsSingleTrustBoundary(t *testing.T) {
 	}
 }
 
+func TestAuthenticatorSupportsExchangeOnlyBoundary(t *testing.T) {
+	t.Parallel()
+
+	fixture := newJWTFixture(t, "exchange-key")
+	verifier, err := newExchangeVerifier(exchangeSettings(), fixture.source(), func() time.Time { return verifierTestNow })
+	if err != nil {
+		t.Fatalf("exchange verifierを作成できませんでした: %v", err)
+	}
+	auditor := &denialAuditorStub{}
+	authenticator, err := NewAuthenticator(
+		nil,
+		verifier,
+		&principalResolverStub{principal: Principal{UserID: "user-id"}},
+		auditor,
+	)
+	if err != nil {
+		t.Fatalf("exchange単独authenticatorを作成できませんでした: %v", err)
+	}
+	if _, err := authenticator.Authenticate(
+		context.Background(), fixture.sign(t, exchangeToken(t, nil)), "exchange-request",
+	); err != nil {
+		t.Fatalf("exchange tokenを認証できませんでした: %v", err)
+	}
+	if _, err := authenticator.AuthenticateDirect(context.Background(), "anything", "direct-request"); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("無効なdirect境界のerror=%v", err)
+	}
+	if len(auditor.events) != 1 || auditor.events[0].ReasonCode != "auth.direct_disabled" {
+		t.Fatalf("audit=%+v", auditor.events)
+	}
+}
+
+func TestAuthenticatorRequiresAtLeastOneBoundary(t *testing.T) {
+	t.Parallel()
+
+	if _, err := NewAuthenticator(nil, nil, &principalResolverStub{}, &denialAuditorStub{}); err == nil {
+		t.Fatal("認証境界なしのauthenticatorが作成されました")
+	}
+}
+
 func TestAuthenticateAuditsUnknownIssuerExactlyOnce(t *testing.T) {
 	t.Parallel()
 

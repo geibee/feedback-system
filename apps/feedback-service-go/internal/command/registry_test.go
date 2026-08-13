@@ -43,4 +43,11 @@ func TestSubcommandInvocation(t *testing.T) {
 	if invocation.Name != Migrate || !reflect.DeepEqual(invocation.Args, []string{"--dry-run"}) {
 		t.Fatalf("subcommand解決結果が不正です: %+v", invocation)
 	}
+	invocation, err = Resolve("feedback", []string{"manifest", "apply", "--input", "manifest.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invocation.Name != Manifest || !reflect.DeepEqual(invocation.Args, []string{"apply", "--input", "manifest.json"}) {
+		t.Fatalf("manifest subcommand解決結果が不正です: %+v", invocation)
+	}
 }

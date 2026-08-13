@@ -83,4 +83,76 @@ describe("FeedbackProvider", () => {
     await act(() => result.current.refresh());
     expect(result.current.state).toBe("ready");
   });
+
+  it("host context変更時に古い読込を破棄して最新contextを公開する", async () => {
+    let workspace = "workspace-east";
+    let notifyContextChanged: (() => void) | undefined;
+    let resolveEast: ((value: Awaited<ReturnType<FeedbackTransport["getReviewContext"]>>) => void) | undefined;
+    const eastReviewContext = new Promise<Awaited<ReturnType<FeedbackTransport["getReviewContext"]>>>((resolve) => {
+      resolveEast = resolve;
+    });
+    const unsubscribe = vi.fn();
+    const changingAdapter: FeedbackHostAdapter = {
+      ...adapter,
+      getContext: () => ({
+        ...adapter.getContext(),
+        externalWorkspaceKey: workspace
+      }),
+      subscribe: (listener) => {
+        notifyContextChanged = listener;
+        return unsubscribe;
+      }
+    };
+    const transport = {
+      getCapabilities: vi.fn(async () => ({
+        apiVersion: "1.0",
+        apiMajorVersion: 1,
+        manifestSchemaVersions: ["1"],
+        targetSchemaVersions: ["1"],
+        evidence: { maxBytes: 1024, maxCountPerWorkspace: 1000, acceptedContentTypes: ["image/png"] },
+        features: []
+      })),
+      getReviewContext: vi.fn(async (context) => {
+        if (context.externalWorkspaceKey === "workspace-east") return eastReviewContext;
+        return {
+          session: null,
+          scope: "reviewable" as const,
+          posting: "deny" as const,
+          permissions: [],
+          participantPolicy: { mode: "authenticated-identity" as const },
+          evidencePolicy: { enabled: false, maxBytes: 1024, acceptedContentTypes: ["image/png"] }
+        };
+      }),
+      request: vi.fn(),
+      requestBinary: vi.fn()
+    } as FeedbackTransport;
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(FeedbackProvider, { adapter: changingAdapter, transport, children });
+    const { result, unmount } = renderHook(() => useFeedback(), { wrapper });
+
+    await waitFor(() => expect(transport.getReviewContext).toHaveBeenCalledTimes(1));
+    act(() => {
+      workspace = "workspace-west";
+      notifyContextChanged?.();
+    });
+    await waitFor(() => expect(result.current.hostContext?.externalWorkspaceKey).toBe("workspace-west"));
+    expect(result.current.reviewContext?.posting).toBe("deny");
+
+    await act(async () => {
+      resolveEast?.({
+        session: null,
+        scope: "reviewable",
+        posting: "allow",
+        permissions: ["feedback.comment"],
+        participantPolicy: { mode: "authenticated-identity" },
+        evidencePolicy: { enabled: false, maxBytes: 1024, acceptedContentTypes: ["image/png"] }
+      });
+      await Promise.resolve();
+    });
+    expect(result.current.hostContext?.externalWorkspaceKey).toBe("workspace-west");
+    expect(result.current.reviewContext?.posting).toBe("deny");
+
+    unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
 });

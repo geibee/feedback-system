@@ -88,7 +88,7 @@ cleanup() {
   if [[ "$smoke_succeeded" != "1" ]]; then
     compose ps >&2 || true
     compose logs --no-color --tail=80 feedback-service feedback-bootstrap-east \
-      feedback-bootstrap-west feedback-notification-worker \
+      feedback-bootstrap-west feedback-bootstrap-manifest-sync feedback-manifest-apply feedback-notification-worker \
       feedback-export-worker feedback-retention-worker feedback-webhook-connector \
       feedback-connector-register feedback-conformance-consumer >&2 || true
   fi
@@ -193,8 +193,12 @@ write_object_manifest() {
   ) >"$output"
 }
 
-manifest='{"schemaVersion":"1","applicationKey":"inventory","displayName":"Inventory","manifestVersion":"smoke-v1","routes":[{"pageKey":"inventory.home","template":"/inventory","label":"在庫"}]}'
-api_request PUT /applications/inventory/manifest "$temporary_root/manifest.json" "$temporary_root/manifest.headers" "$manifest"
+api_request GET /applications/inventory/manifest "$temporary_root/manifest.json" "$temporary_root/manifest.headers" ""
+manifest_version=$(jq -er '.manifestVersion' "$temporary_root/manifest.json")
+manifest_etag=$(header_value ETag "$temporary_root/manifest.headers")
+[[ "$manifest_version" == "2026.08.1" && -n "$manifest_etag" ]]
+jq -e '.routes[] | select(.pageKey == "inventory.list" and .template == "/sites/{siteKey}/inventory")' \
+  "$temporary_root/manifest.json" >/dev/null
 
 scope_query='?applicationKey=inventory&externalWorkspaceKey=east'
 for _ in {1..60}; do
@@ -216,7 +220,7 @@ api_request PATCH "/retention-policy$scope_query" "$temporary_root/retention-pat
   "$temporary_root/retention-patched.headers" '{"evidenceRetentionDays":1,"exportRetentionDays":1}' \
   -H "If-Match: $retention_etag"
 
-session='{"applicationKey":"inventory","environmentKey":"local","externalWorkspaceKey":"east","manifestVersion":"smoke-v1","title":"standalone smoke","outOfScopePosting":"warn","scopes":[{"pageKey":"inventory.home","routeTemplate":"/inventory","reviewable":true}],"perspectives":[{"code":"usability","label":"使いやすさ","status":"active"}]}'
+session=$(jq -cn --arg manifest "$manifest_version" '{applicationKey:"inventory",environmentKey:"local",externalWorkspaceKey:"east",manifestVersion:$manifest,title:"standalone smoke",outOfScopePosting:"warn",scopes:[{pageKey:"inventory.list",routeTemplate:"/sites/{siteKey}/inventory",reviewable:true}],perspectives:[{code:"usability",label:"使いやすさ",status:"active"}]}')
 api_request POST /sessions "$temporary_root/session.json" "$temporary_root/session.headers" "$session" \
   -H 'Idempotency-Key: standalone-smoke-session'
 session_id=$(jq -er '.id' "$temporary_root/session.json")
@@ -224,7 +228,7 @@ session_etag=$(header_value ETag "$temporary_root/session.headers")
 api_request PATCH "/sessions/$session_id" "$temporary_root/session-open.json" "$temporary_root/session-open.headers" \
   '{"status":"open"}' -H "If-Match: $session_etag" -H 'Content-Type: application/merge-patch+json'
 
-thread='{"location":{"schemaVersion":"1","pageKey":"inventory.home","routeTemplate":"/inventory","pathParameters":{},"queryParameters":{}},"target":{"schemaVersion":"1","kind":"screen-position","relativeX":0.25,"relativeY":0.75},"perspectiveCode":"usability","body":"standalone投稿","evidence":{"contentType":"image/png","dataBase64":"iVBORw0KGgoA","viewportWidth":100,"viewportHeight":100,"pixelRatio":1.0,"capturedAt":"2026-08-09T00:00:00Z"}}'
+thread='{"location":{"schemaVersion":"1","pageKey":"inventory.list","routeTemplate":"/sites/{siteKey}/inventory","pathParameters":{"siteKey":"east"},"queryParameters":{}},"target":{"schemaVersion":"1","kind":"screen-position","relativeX":0.25,"relativeY":0.75},"perspectiveCode":"usability","body":"standalone投稿","evidence":{"contentType":"image/png","dataBase64":"iVBORw0KGgoA","viewportWidth":100,"viewportHeight":100,"pixelRatio":1.0,"capturedAt":"2026-08-09T00:00:00Z"}}'
 api_request POST "/sessions/$session_id/threads" "$temporary_root/thread.json" "$temporary_root/thread.headers" "$thread" \
   -H 'Idempotency-Key: standalone-smoke-thread'
 thread_id=$(jq -er '.id' "$temporary_root/thread.json")

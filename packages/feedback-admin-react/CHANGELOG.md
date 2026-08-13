@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- application manifestをブラウザ起動時ではなくCI/CDの`feedback manifest apply`で同期する案内へ修正。
 - 証跡モーダルをbackdrop clickとEscapeで閉じられるようにし、モーダル内部の操作では閉じないようにしました。
 - Exportの状態取得に一時的に失敗しても、1秒から最大10秒のbackoffで自動追跡を継続し、復旧後に通常間隔へ戻すようにしました。
 - 選択したthreadの証跡をthread番号・観点・読込状態とともに専用モーダルへ表示し、thread切替時の古いpreview破棄と遅延responseの競合排除に対応しました。

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-13
+
+- tenant/application/environment/workspace/membershipをCI/CDから同期するinstallation manifest v1 schemaを追加。
+- application manifestのGET応答へETagを追加し、CI/CDの宣言的同期が更新前の版を`If-Match`で固定できるようにした。
+
 ## 2026-08-10
 
 - 管理画面からレビュー状態を一度で作成し、対象画面と観点を編集できるよう、セッション作成へ任意の `status`、PATCHへ任意の `scopes` / `perspectives` を後方互換で追加。

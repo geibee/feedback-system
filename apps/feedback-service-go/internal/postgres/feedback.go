@@ -172,6 +172,7 @@ func (d *Database) ReviewContext(
 	pageKey string,
 	routeTemplate string,
 	permissions []auth.Permission,
+	evidenceEnabled bool,
 	evidenceMaxBytes int64,
 ) (usecase.ReviewContext, error) {
 	session, err := d.activeSession(ctx, scope)
@@ -228,7 +229,7 @@ SELECT EXISTS (
 		Permissions:       append([]auth.Permission(nil), permissions...),
 		ParticipantPolicy: usecase.ParticipantPolicy{Mode: "authenticated-identity"},
 		EvidencePolicy: usecase.EvidencePolicy{
-			Enabled: true, MaxBytes: evidenceMaxBytes, AcceptedContentTypes: []string{"image/png", "image/webp"},
+			Enabled: evidenceEnabled, MaxBytes: evidenceMaxBytes, AcceptedContentTypes: []string{"image/png", "image/webp"},
 		},
 	}, nil
 }

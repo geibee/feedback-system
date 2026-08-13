@@ -1353,6 +1353,7 @@ export interface operations {
             /** @description 登録済み application manifest */
             200: {
                 headers: {
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {

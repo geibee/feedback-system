@@ -33,6 +33,60 @@ func TestCapabilitiesMatchesFrozenValuesAndFailsClosed(t *testing.T) {
 	}
 }
 
+func TestCoreProfileCapabilitiesDoNotAdvertiseOptionalFeatures(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{}
+	authorizer, err := auth.NewAuthorizer(store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(store, authorizer, 1024, 20, WithCoreProfile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := service.Capabilities(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"application-manifest", "idempotency", "etag", "message-history", "rate-limit"}
+	if !reflect.DeepEqual(value.Features, want) {
+		t.Fatalf("features=%v", value.Features)
+	}
+}
+
+func TestCoreProfileDisablesEvidenceInReviewContext(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{
+		scope: auth.ResourceScope{
+			TenantID: "tenant-id", ApplicationID: "application-id", EnvironmentID: "environment-id", WorkspaceID: "workspace-id",
+		},
+		workspacePermissions: []auth.Permission{auth.PermissionRead},
+		issuerAllowed:        true,
+	}
+	authorizer, err := auth.NewAuthorizer(store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(store, authorizer, 1024, 20, WithCoreProfile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ReviewContext(
+		context.Background(),
+		auth.Principal{UserID: "user-id", Subject: "subject", Issuer: "https://issuer.example"},
+		ReviewContextInput{ApplicationKey: "app", EnvironmentKey: "test", ExternalWorkspaceKey: "workspace", PageKey: "home", RouteTemplate: "/"},
+		func(json.RawMessage) error { return nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.reviewEvidenceEnabled {
+		t.Fatal("core profileのreview contextでevidenceが有効になりました")
+	}
+}
+
 func TestMeRestrictsExchangeMemberships(t *testing.T) {
 	t.Parallel()
 	store := &fakeStore{memberships: []auth.Membership{
@@ -149,6 +203,7 @@ type fakeStore struct {
 	audits                 []AuditEvent
 	put                    ManifestPut
 	putRecord              ManifestRecord
+	reviewEvidenceEnabled  bool
 }
 
 func (store *fakeStore) Ping(context.Context) error { return store.pingErr }
@@ -175,13 +230,15 @@ func (store *fakeStore) PutManifest(_ context.Context, input ManifestPut) (Manif
 }
 
 func (store *fakeStore) ReviewContext(
-	context.Context,
-	auth.ResourceScope,
-	string,
-	string,
-	[]auth.Permission,
-	int64,
+	_ context.Context,
+	_ auth.ResourceScope,
+	_ string,
+	_ string,
+	_ []auth.Permission,
+	evidenceEnabled bool,
+	_ int64,
 ) (ReviewContext, error) {
+	store.reviewEvidenceEnabled = evidenceEnabled
 	return ReviewContext{}, nil
 }
 

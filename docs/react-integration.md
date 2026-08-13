@@ -4,6 +4,20 @@ React 18/19では `@feedback/core` のHostAdapterとtransportを作成し、`@fe
 `FeedbackProvider` / `FeedbackErrorBoundary` / `FeedbackOverlay` を業務画面の一部へ配置する。
 SDK全体でrouter、認証、workspace解決を所有せず、HostAdapterから受け取る。
 
+SPAのrouteまたはworkspace変更は、routerの変更通知を任意の`FeedbackHostAdapter.subscribe`へ接続する。
+listenerを呼ぶ時点で`getContext`と`getLocation`は変更後の値を返す必要がある。Providerは通知時に進行中の
+context HTTP requestを`AbortSignal`で中断して古い結果を破棄し、最新contextを再取得する。購読解除関数はrouter listenerを
+解放する。Providerの`key`をrouteごとに変えて全面remountする必要はない。
+
+```ts
+const adapter: FeedbackHostAdapter = {
+  getContext: () => resolveContext(router.location),
+  getLocation: () => resolveLocation(router.location),
+  subscribe: (listener) => router.subscribe(listener),
+  // getAccessToken、navigateなど
+};
+```
+
 Service障害時はErrorBoundaryと `FeedbackUnavailable` がFeedback subtreeだけを縮退させる。
 業務画面の描画やナビゲーションをtoken取得の完了へ依存させない。MapLibreを使う場合だけ
 `@feedback/maplibre` を追加する。他フレームワークは `@feedback/core` とHTTP契約を利用する。

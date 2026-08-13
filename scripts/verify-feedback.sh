@@ -20,6 +20,7 @@ if rg -n 'apps/feedback-service/Dockerfile|eclipse-temurin|openjdk|gradle:' depl
   fail "Feedback Serviceのbuild/runtime経路にJDKまたはKotlin image参照があります"
 fi
 log "Go-only Feedback ServiceをJDKなしで検証します"
+bash -n scripts/build-feedback-sdk-release.sh
 
 node_major=$(node -p 'Number(process.versions.node.split(".")[0])')
 (( node_major >= 22 )) || fail "Node.js 22以上が必要です"
@@ -60,6 +61,7 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
       const config = JSON.parse(fs.readFileSync(0, "utf8"));
       const names = [
         "feedback-migrate", "feedback-service", "feedback-bootstrap-east", "feedback-bootstrap-west",
+        "feedback-bootstrap-manifest-sync", "feedback-manifest-apply",
         "feedback-notification-worker", "feedback-webhook-connector", "feedback-connector-register",
         "feedback-export-worker", "feedback-retention-worker",
       ];

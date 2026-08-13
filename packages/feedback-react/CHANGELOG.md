@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `FeedbackHostAdapter.subscribe`を購読し、route／workspace変更時に進行中のcontext HTTP requestを`AbortSignal`で中断して再取得するようにしました。
+- context変更時にOverlayの選択、投稿、thread表示stateを閉じ、変更前画面の操作を持ち越さないようにしました。
 - `FeedbackOverlay.pinPositionProvider`を追加し、hostが解決した`map-position`／`map-feature`を通常の番号付きpinとして表示できるようにしました。
 - Thread Drawerを選択中pinの反対側へ配置し、狭い画面では地図を残すコンパクトな下部sheetへ切り替えるようにしました。
 - Thread Drawerのthread切替時に古い証跡previewを破棄し、切替前の遅延responseが現在のpreviewを上書きしないようにしました。

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "entries": [
+    {
+      "tenantKey": "company",
+      "tenantDisplayName": "Company",
+      "applicationKey": "portal",
+      "applicationDisplayName": "Portal",
+      "environmentKey": "production",
+      "environmentBaseUrl": "https://portal.example.com",
+      "allowedOrigins": ["https://portal.example.com"],
+      "externalWorkspaceKey": "default",
+      "workspaceDisplayName": "Default",
+      "issuer": "https://id.example.com",
+      "subject": "feedback-administrator",
+      "email": "feedback-administrator@example.com",
+      "displayName": "Feedback administrator",
+      "permissions": [
+        "feedback.read",
+        "feedback.comment",
+        "feedback.manage",
+        "feedback.admin"
+      ]
+    }
+  ]
+}

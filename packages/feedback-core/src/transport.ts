@@ -21,7 +21,7 @@ export type FeedbackFetchResponse = {
 
 export type FeedbackFetch = (
   url: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string }
+  init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal }
 ) => Promise<FeedbackFetchResponse>;
 
 export type FeedbackRequestOptions = {
@@ -29,6 +29,7 @@ export type FeedbackRequestOptions = {
   body?: unknown;
   idempotencyKey?: string;
   ifMatch?: string;
+  signal?: AbortSignal;
 };
 
 export type FeedbackResource<T> = { value: T; etag: string | null };
@@ -36,9 +37,15 @@ export type FeedbackResource<T> = { value: T; etag: string | null };
 export interface FeedbackTransport {
   request<T>(path: string, options?: FeedbackRequestOptions): Promise<FeedbackResource<T>>;
   requestBinary(path: string, options?: FeedbackBinaryRequestOptions): Promise<FeedbackBinaryResource>;
-  getCapabilities(): Promise<FeedbackCapabilities>;
-  getReviewContext(context: FeedbackHostContextV1, location: FeedbackLocationV1): Promise<FeedbackReviewContextV1>;
+  getCapabilities(options?: FeedbackCallOptions): Promise<FeedbackCapabilities>;
+  getReviewContext(
+    context: FeedbackHostContextV1,
+    location: FeedbackLocationV1,
+    options?: FeedbackCallOptions
+  ): Promise<FeedbackReviewContextV1>;
 }
+
+export type FeedbackCallOptions = { signal?: AbortSignal };
 
 export type FeedbackBinaryResource = {
   bytes: Uint8Array;
@@ -47,7 +54,7 @@ export type FeedbackBinaryResource = {
   contentRange: string | null;
 };
 
-export type FeedbackBinaryRequestOptions = { range?: string };
+export type FeedbackBinaryRequestOptions = { range?: string; signal?: AbortSignal };
 
 export type FeedbackTransportOptions = {
   baseUrl: string;
@@ -102,6 +109,7 @@ export function createFeedbackTransport(options: FeedbackTransportOptions): Feed
       return options.fetch(`${baseUrl}${normalizePath(path)}`, {
         method,
         headers,
+        ...(requestOptions.signal ? { signal: requestOptions.signal } : {}),
         ...(requestOptions.body !== undefined ? { body: JSON.stringify(requestOptions.body) } : {})
       });
     };
@@ -120,8 +128,8 @@ export function createFeedbackTransport(options: FeedbackTransportOptions): Feed
     };
   };
 
-  const getCapabilities = async () => {
-    const { value } = await request<FeedbackCapabilities>("/capabilities");
+  const getCapabilities = async (callOptions: FeedbackCallOptions = {}) => {
+    const { value } = await request<FeedbackCapabilities>("/capabilities", callOptions);
     assertCompatibleCapabilities(value);
     return value;
   };
@@ -134,7 +142,11 @@ export function createFeedbackTransport(options: FeedbackTransportOptions): Feed
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
       if (requestOptions.range) headers.Range = requestOptions.range;
-      return options.fetch(`${baseUrl}${normalizePath(path)}`, { method: "GET", headers });
+      return options.fetch(`${baseUrl}${normalizePath(path)}`, {
+        method: "GET",
+        headers,
+        ...(requestOptions.signal ? { signal: requestOptions.signal } : {})
+      });
     };
     let response = await perform(await options.getAccessToken());
     if (response.status === 401 && options.refreshAccessToken) {
@@ -153,7 +165,11 @@ export function createFeedbackTransport(options: FeedbackTransportOptions): Feed
     };
   };
 
-  const getReviewContext = async (context: FeedbackHostContextV1, location: FeedbackLocationV1) => {
+  const getReviewContext = async (
+    context: FeedbackHostContextV1,
+    location: FeedbackLocationV1,
+    callOptions: FeedbackCallOptions = {}
+  ) => {
     const query = encodeQuery({
       applicationKey: context.applicationKey,
       environmentKey: context.environmentKey,
@@ -165,7 +181,7 @@ export function createFeedbackTransport(options: FeedbackTransportOptions): Feed
       pathParameters: JSON.stringify(location.pathParameters),
       queryParameters: location.queryParameters ? JSON.stringify(location.queryParameters) : undefined
     });
-    return (await request<FeedbackReviewContextV1>(`/review-context?${query}`)).value;
+    return (await request<FeedbackReviewContextV1>(`/review-context?${query}`, callOptions)).value;
   };
 
   return { request, requestBinary, getCapabilities, getReviewContext };

@@ -8,6 +8,7 @@ import type { FeedbackLocationV1, FeedbackTargetV1 } from "@feedback/contracts";
 ```
 
 OpenAPI と各 schema は `@feedback/contracts/openapi.yaml`、`@feedback/contracts/schemas/*` から参照できます。
+CI/CDでresourceを同期するinstallation manifestのschemaも`schemas/installation-manifest.schema.json`に含みます。
 `npm run generate` は `src/generated.ts` と `kotlin/FeedbackContractTypes.kt` を同じ専用OpenAPIから生成します。
 両方がdrift検査対象で、Kotlin型は `feedback.contract.generated` packageとして利用できます。
 registry が決まるまでは `private: true` のため、配布検証には repository 内の `npm pack` を使用します。

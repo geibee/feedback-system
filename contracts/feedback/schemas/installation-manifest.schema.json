@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/installation-manifest.v1.json",
+  "title": "Feedback installation manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenantKey",
+        "tenantDisplayName",
+        "applicationKey",
+        "applicationDisplayName",
+        "environmentKey",
+        "environmentBaseUrl",
+        "allowedOrigins",
+        "externalWorkspaceKey",
+        "workspaceDisplayName",
+        "issuer",
+        "subject",
+        "permissions"
+      ],
+      "properties": {
+        "tenantKey": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "tenantDisplayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "applicationKey": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "applicationDisplayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "environmentKey": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "environmentBaseUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2000,
+          "pattern": "^https://[^/@?#]+(?:[/?][^#]*)?$|^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?(?:[/?][^#]*)?$"
+        },
+        "allowedOrigins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://[^/@?#]+$|^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?$"
+          }
+        },
+        "externalWorkspaceKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "workspaceDisplayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "issuer": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 1000,
+          "pattern": "^https://[^/@?#]+(?:[/?][^#]*)?$|^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?(?:[/?][^#]*)?$"
+        },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "email": { "type": "string", "maxLength": 320 },
+        "displayName": { "type": "string", "maxLength": 200 },
+        "permissions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["feedback.read", "feedback.comment", "feedback.manage", "feedback.admin"]
+          }
+        }
+      }
+    }
+  }
+}

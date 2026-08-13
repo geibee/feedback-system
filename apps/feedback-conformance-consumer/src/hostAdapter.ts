@@ -10,6 +10,7 @@ export type FixtureRouter = {
   pathname(): string;
   search(): string;
   navigate(path: string): void | Promise<void>;
+  subscribe(listener: () => void): () => void;
 };
 
 export type InventoryHostAdapterOptions = {
@@ -38,6 +39,7 @@ export function createInventoryHostAdapter(options: InventoryHostAdapterOptions)
       options.router.pathname(),
       options.router.search()
     ),
+    subscribe: (listener) => options.router.subscribe(listener),
     getAccessToken: () => options.tokenExchange.getAccessToken(scope()),
     refreshAccessToken: () => options.tokenExchange.getAccessToken(scope(), true),
     getIdentity: async () => options.tokenExchange.getIdentity(scope()),

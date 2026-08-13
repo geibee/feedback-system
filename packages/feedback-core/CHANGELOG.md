@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `FeedbackHostAdapter.subscribe`を任意契約として追加し、route／workspace変更をSDKへ通知できるようにしました。context再取得では`AbortSignal`を渡し、旧HTTP requestも中断します。
+
 ## 1.0.0-alpha.1
 
 - framework 非依存の host adapter、transport、manifest/location/target API を追加。

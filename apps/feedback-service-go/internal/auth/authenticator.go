@@ -21,8 +21,8 @@ func NewAuthenticator(
 	resolver PrincipalResolver,
 	auditor DenialAuditor,
 ) (*Authenticator, error) {
-	if direct == nil {
-		return nil, fmt.Errorf("direct verifierが未設定です")
+	if direct == nil && exchange == nil {
+		return nil, fmt.Errorf("direct verifierまたはexchange verifierの少なくとも一方が必要です")
 	}
 	if resolver == nil {
 		return nil, fmt.Errorf("principal resolverが未設定です")
@@ -30,7 +30,7 @@ func NewAuthenticator(
 	if auditor == nil {
 		return nil, fmt.Errorf("denial auditorが未設定です")
 	}
-	if exchange != nil && exchange.settings.Issuer == direct.settings.Issuer {
+	if direct != nil && exchange != nil && exchange.settings.Issuer == direct.settings.Issuer {
 		return nil, fmt.Errorf("direct OIDCとtoken exchangeのissuerは分離してください")
 	}
 	return &Authenticator{direct: direct, exchange: exchange, resolver: resolver, auditor: auditor}, nil
@@ -49,7 +49,7 @@ func (authenticator *Authenticator) Authenticate(
 	}
 	var identity Identity
 	switch {
-	case issuer == authenticator.direct.settings.Issuer:
+	case authenticator.direct != nil && issuer == authenticator.direct.settings.Issuer:
 		identity, err = authenticator.direct.Verify(ctx, rawToken)
 	case authenticator.exchange != nil && issuer == authenticator.exchange.settings.Issuer:
 		identity, err = authenticator.exchange.Verify(ctx, rawToken)
@@ -67,6 +67,13 @@ func (authenticator *Authenticator) AuthenticateDirect(
 	rawToken string,
 	requestID string,
 ) (Principal, error) {
+	if authenticator.direct == nil {
+		err := invalidToken("direct OIDCは無効です", nil)
+		if auditErr := RecordAuthenticationDenial(ctx, authenticator.auditor, requestID, "auth.direct_disabled"); auditErr != nil {
+			return Principal{}, auditErr
+		}
+		return Principal{}, err
+	}
 	identity, err := authenticator.direct.Verify(ctx, rawToken)
 	if err != nil {
 		return authenticator.denyAuthentication(ctx, requestID, err)

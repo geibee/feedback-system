@@ -9,7 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/admin"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/contract"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/discussion"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/retention"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/session"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
@@ -102,6 +107,44 @@ func TestProductionAPIRejectsPartialWiring(t *testing.T) {
 		t.Fatalf("partial wiring error = %v", err)
 	}
 }
+
+func TestCoreProfileKeepsDisabledExportEndpointFailClosed(t *testing.T) {
+	t.Parallel()
+
+	dependency := &coreDependencyStub{}
+	handler := &APIHandler{
+		service: &usecase.Service{}, sessions: &session.Service{}, discussions: &discussion.Service{},
+		administration: &admin.Service{}, retention: &retention.Service{}, scopeResolver: dependency,
+		authorizer: &auth.Authorizer{}, rateLimiter: dependency, auditor: dependency,
+		discussionSettings: DiscussionAPISettings{
+			EvidenceMaximumBytes: 1024, PrincipalLimitPerMinute: 1, TenantLimitPerMinute: 1, IPLimitPerMinute: 1,
+		},
+	}
+	if err := handler.ValidateCore(); err != nil {
+		t.Fatalf("core API配線が拒否されました: %v", err)
+	}
+	recorder := httptest.NewRecorder()
+	handler.CreateFeedbackExport(
+		recorder,
+		httptest.NewRequest(http.MethodPost, "/feedback/v1/exports", strings.NewReader(`{}`)),
+		contract.CreateFeedbackExportParams{},
+	)
+	if recorder.Code != http.StatusNotImplemented {
+		t.Fatalf("無効なexport endpointのstatus=%d", recorder.Code)
+	}
+}
+
+type coreDependencyStub struct{}
+
+func (*coreDependencyStub) ResolveResourceScope(context.Context, string, string, string) (auth.ResourceScope, error) {
+	return auth.ResourceScope{}, nil
+}
+
+func (*coreDependencyStub) EnforceWriteRateLimit(context.Context, discussion.RateLimitInput) error {
+	return nil
+}
+
+func (*coreDependencyStub) RecordAudit(context.Context, usecase.AuditEvent) error { return nil }
 
 type fakeBearerAuthenticator struct {
 	principal auth.Principal

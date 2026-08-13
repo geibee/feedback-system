@@ -10,6 +10,27 @@ const jsonResponse = (value: unknown, status = 200, etag: string | null = null) 
 });
 
 describe("FeedbackTransport", () => {
+  it("AbortSignalをfetch adapterへ渡して進行中requestを中断する", async () => {
+    const controller = new AbortController();
+    let observedSignal: AbortSignal | undefined;
+    const fetch = vi.fn((_url: string, init?: { signal?: AbortSignal }) => {
+      observedSignal = init?.signal;
+      return new Promise<never>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    });
+    const transport = createFeedbackTransport({
+      baseUrl: "https://feedback.example/feedback/v1",
+      getAccessToken: async () => null,
+      fetch
+    });
+
+    const pending = transport.request("/resource", { signal: controller.signal });
+    await vi.waitFor(() => expect(observedSignal).toBe(controller.signal));
+    controller.abort();
+    await expect(pending).rejects.toThrow("aborted");
+  });
+
   it("401更新をsingle-flightにし、ETagをresourceと分けて返す", async () => {
     let requests = 0;
     const refresh = vi.fn(async () => "renewed");

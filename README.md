@@ -101,12 +101,12 @@ docker compose \
 
 導入は次の単位に分かれます。
 
-1. Feedback Service用のPostgreSQLとobject storageを用意する
+1. Feedback Service用のPostgreSQLを用意する（`full` profileではprivate object storageも用意する）
 2. OIDCまたはtoken exchangeを設定する
-3. tenant、application、environment、workspace、membershipを登録する
+3. installation manifestでtenant、application、environment、workspace、membershipを同期する
 4. ホストアプリへFeedback SDKを追加する
 5. `FeedbackHostAdapter`でrouter、token、workspace、画面遷移を接続する
-6. application manifestをホストアプリから同期する
+6. `feedback manifest apply`でapplication manifestをCI/CDから同期する
 7. `FeedbackProvider`と`FeedbackOverlay`を配置する
 
 Reactの最小構成:
@@ -132,10 +132,12 @@ SDKは次の情報をホストアプリから受け取ります。
 - `environmentKey`
 - `externalWorkspaceKey`
 - 現在のrouteと画面parameters
+- route／workspace変更通知（SPAでは任意の`HostAdapter.subscribe`で接続）
 - Feedback audienceを持つaccess token
 - deep linkの画面遷移処理
 
 詳しい実装は[`docs/react-integration.md`](docs/react-integration.md)を参照してください。
+resourceとmanifestの導入手順、v1のtenant境界は[`docs/installation.md`](docs/installation.md)を参照してください。
 
 ### ブラウザ設定
 

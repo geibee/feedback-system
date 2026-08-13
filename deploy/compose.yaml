@@ -102,6 +102,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: feedback-local-only
+      KC_HOSTNAME: http://localhost:8180
     ports:
       - "127.0.0.1:8180:8080"
     volumes:
@@ -220,6 +221,58 @@ services:
     depends_on:
       feedback-bootstrap-east:
         condition: service_completed_successfully
+
+  feedback-bootstrap-manifest-sync:
+    <<: *feedback-runtime-security
+    image: localhost/feedback-system-service:local
+    command: ["/app/bin/feedback-bootstrap"]
+    restart: "no"
+    environment:
+      <<: *database-environment
+      FEEDBACK_BOOTSTRAP_TENANT_KEY: local
+      FEEDBACK_BOOTSTRAP_TENANT_DISPLAY_NAME: Local
+      FEEDBACK_BOOTSTRAP_APPLICATION_KEY: inventory
+      FEEDBACK_BOOTSTRAP_APPLICATION_DISPLAY_NAME: Inventory Approval
+      FEEDBACK_BOOTSTRAP_ENVIRONMENT_KEY: local
+      FEEDBACK_BOOTSTRAP_ENVIRONMENT_BASE_URL: http://localhost:5175
+      FEEDBACK_BOOTSTRAP_ALLOWED_ORIGINS: http://localhost:5174,http://localhost:5175
+      FEEDBACK_BOOTSTRAP_EXTERNAL_WORKSPACE_KEY: east
+      FEEDBACK_BOOTSTRAP_WORKSPACE_DISPLAY_NAME: East
+      FEEDBACK_BOOTSTRAP_ISSUER: http://localhost:8180/realms/feedback
+      FEEDBACK_BOOTSTRAP_SUBJECT: 10000000-0000-4000-8000-000000000002
+      FEEDBACK_BOOTSTRAP_DISPLAY_NAME: Feedback Manifest Sync
+      FEEDBACK_BOOTSTRAP_PERMISSIONS: feedback.admin
+    depends_on:
+      feedback-bootstrap-west:
+        condition: service_completed_successfully
+
+  feedback-manifest-apply:
+    <<: *feedback-runtime-security
+    image: localhost/feedback-system-service:local
+    command:
+      - /app/feedback
+      - manifest
+      - apply
+      - --input
+      - /config/application-manifest.json
+      - --api-base-url
+      - http://feedback-service:8090/feedback/v1
+    restart: on-failure
+    environment:
+      FEEDBACK_ALLOW_INSECURE_HTTP: "1"
+      FEEDBACK_MANIFEST_TOKEN_URL: http://oidc:8080/realms/feedback/protocol/openid-connect/token
+      FEEDBACK_MANIFEST_CLIENT_ID: feedback-manifest-sync
+      FEEDBACK_MANIFEST_CLIENT_SECRET: ${FEEDBACK_MANIFEST_CLIENT_SECRET:?deploy/.envを作成してください}
+      FEEDBACK_MANIFEST_SCOPE: openid
+    volumes:
+      - ../apps/feedback-conformance-consumer/feedback-manifest.json:/config/application-manifest.json:ro,z
+    depends_on:
+      feedback-bootstrap-manifest-sync:
+        condition: service_completed_successfully
+      feedback-service:
+        condition: service_started
+      oidc:
+        condition: service_started
 
   feedback-notification-worker:
     <<: *feedback-runtime-security
@@ -345,8 +398,8 @@ services:
     volumes:
       - feedback-dev-certificates:/certs:ro
     depends_on:
-      feedback-service:
-        condition: service_started
+      feedback-manifest-apply:
+        condition: service_completed_successfully
       feedback-token-broker-reference:
         condition: service_started
 

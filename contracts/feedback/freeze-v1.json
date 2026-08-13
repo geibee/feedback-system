@@ -3,10 +3,11 @@
   "baselineCommit": "1f30e9a",
   "openapiOperationCount": 42,
   "contracts": {
-    "openapi.yaml": "sha256:350fbc853644f45eb490d1d6393051920246138db8bd6c03de43d5de167c84bd",
+    "openapi.yaml": "sha256:536a0d669c3571f4bb798236cf12c7e24c2663c716bec95bd756ffb812a76b7a",
     "schemas/connector-protocol.schema.json": "sha256:4467a857dc49d6a8282ac75aa8c40ec391b7793cab805ec9a8bc922243b4ed24",
     "token-exchange.openapi.yaml": "sha256:2504d874a5049e94bc9e2fa8998c3e6e0bc73e9e6c1e958622d20dac4a39d4e5",
     "schemas/application-manifest.schema.json": "sha256:a7e92ba7616b7629889db9b10f735dee26befa0d68a5ef3b4bfc2d3ad1121c43",
+    "schemas/installation-manifest.schema.json": "sha256:c70d5bbbc036635ac6e1461b5bc2c7afc614cecf320514132c03fea974abce59",
     "schemas/location.schema.json": "sha256:9249d46c075186f9a98b1493b3c2a4dd85ac1fb794da8b1589209439fec5dd0a",
     "schemas/target.schema.json": "sha256:1dd2163101ce56a4a01fc9dd5a5828394e0554681a08750674faa9130d830153",
     "schemas/token-exchange-jwt.schema.json": "sha256:22033707d1553c8440245e83766c648b783c12f9b81a025e55e47e49f642af9c",

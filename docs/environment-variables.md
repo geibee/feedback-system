@@ -7,6 +7,7 @@
 
 ```text
 FEEDBACK_PORT
+FEEDBACK_DEPLOYMENT_PROFILE
 FEEDBACK_DATABASE_URL
 FEEDBACK_DATABASE_USER
 FEEDBACK_DATABASE_PASSWORD
@@ -32,7 +33,19 @@ FEEDBACK_WRITE_RATE_LIMIT_PER_TENANT_PER_MINUTE
 FEEDBACK_WRITE_RATE_LIMIT_PER_IP_PER_MINUTE
 ```
 
-`FEEDBACK_DATABASE_PASSWORD`、OIDC issuer/audienceはAPIで必須であり、secretに既定値を置かない。
+`FEEDBACK_DEPLOYMENT_PROFILE`は `full`（既定）または `core` を指定する。`full`は従来どおりEvidence、Export/Backup、
+Notification/Connectorをすべて有効にする。`core`はコメント・session・manifest・membership・retention APIだけを配線し、
+拡張機能のAPIパスは互換性のため残したまま501で拒否する。`/capabilities`からも無効なfeatureを除外し、
+`/health/ready`では該当依存を`disabled`と報告する。
+
+`FEEDBACK_DATABASE_PASSWORD`はAPIで必須であり、secretに既定値を置かない。認証は次のいずれか一方以上を必須とする。
+
+- direct OIDC: `FEEDBACK_OIDC_ISSUER` と `FEEDBACK_OIDC_AUDIENCE`
+- token exchange: `FEEDBACK_TOKEN_EXCHANGE_ISSUER`、`FEEDBACK_TOKEN_EXCHANGE_AUDIENCE`、
+  `FEEDBACK_TOKEN_EXCHANGE_ACTOR_ISSUERS`
+
+direct OIDCは任意であり、token exchangeだけの配備では `FEEDBACK_OIDC_*` を設定しない。どちらかのissuerを設定した場合は、
+同じ境界の必須変数をすべて設定する。両方のissuerは同一にしない。
 `FEEDBACK_ALLOW_INSECURE_HTTP=1`はローカルfixture専用で、本番へ設定しない。
 
 ## Storage・worker
@@ -75,6 +88,27 @@ FEEDBACK_PULL_EXTERNAL_WORKSPACE_KEY
 FEEDBACK_PULL_DESTINATION_DIR
 ```
 
+## Application manifest apply
+
+`feedback manifest apply`はAPI runtimeと分離したCI/CD one-shotとして実行する。manifestとAPI URLはflagまたは環境変数で指定する。
+認証は短時間のBearer token、そのtokenを格納したsecret file、OAuth client credentialsのいずれか1つに限定する。
+
+```text
+FEEDBACK_MANIFEST_INPUT
+FEEDBACK_MANIFEST_API_BASE_URL
+FEEDBACK_MANIFEST_ACCESS_TOKEN
+FEEDBACK_MANIFEST_ACCESS_TOKEN_FILE
+FEEDBACK_MANIFEST_TOKEN_URL
+FEEDBACK_MANIFEST_CLIENT_ID
+FEEDBACK_MANIFEST_CLIENT_SECRET
+FEEDBACK_MANIFEST_SCOPE
+```
+
+`FEEDBACK_MANIFEST_ACCESS_TOKEN`と`FEEDBACK_MANIFEST_CLIENT_SECRET`に既定値はなく、CI/CDのsecret注入を使用する。
+本番ではtokenをprocess引数へ渡さない。通常はOAuth client credentialsを使い、対象applicationの
+`feedback.admin` membershipをservice accountへ事前に付与する。CLIはGET応答のETagを更新PUTの`If-Match`へ指定し、
+競合時は再取得や上書きを行わず失敗する。
+
 ## Connector runtime・register
 
 ```text
@@ -103,6 +137,7 @@ FEEDBACK_SMTP_PASSWORD
 ## Bootstrap one-shot
 
 `FEEDBACK_BOOTSTRAP_*`はbootstrap one-shotだけへ渡し、常駐API/workerへ設定しない。
+複数workspace・複数主体は環境変数を反復せず、`feedback-bootstrap --input <installation-manifest.json>`を使用する。
 
 ```text
 FEEDBACK_BOOTSTRAP_TENANT_KEY
@@ -181,6 +216,10 @@ FEEDBACK_EXTRACTION_SKIP_STANDALONE_SMOKE
 使用しない。
 
 ## Service storage
+
+次のstorageとnotification secretは `FEEDBACK_DEPLOYMENT_PROFILE=full` のAPI runtimeだけで必須となる。
+`core`ではobject storageを初期化せず、`FEEDBACK_NOTIFICATION_ENCRYPTION_KEY`も要求しない。workerを個別起動する場合は
+API profileにかかわらず、そのworker固有のstorageまたはsecretを従来どおり設定する。
 
 - `FEEDBACK_EVIDENCE_STORAGE=local|s3`。S3時は `FEEDBACK_S3_BUCKET` 必須、任意で
   `FEEDBACK_S3_REGION`、`FEEDBACK_S3_ENDPOINT_URL`、`FEEDBACK_S3_KEY_PREFIX`。

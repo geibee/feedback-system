@@ -201,6 +201,70 @@ export function resolveMapLibreFeedbackTargetAtClientPoint(
 
 export type FeedbackMapLibreMarker = { remove(): void };
 
+export type FeedbackMapLibrePinPositionMap = {
+  getCanvas(): HTMLCanvasElement;
+  project(lngLat: [number, number]): { x: number; y: number };
+  on(event: "move" | "resize" | "styledata" | "remove", listener: () => void): unknown;
+  off(event: "move" | "resize" | "styledata" | "remove", listener: () => void): unknown;
+};
+
+export type FeedbackMapLibrePinPositionProvider = {
+  getPosition(target: FeedbackTargetV1): { x: number; y: number } | null;
+  subscribe(listener: () => void): () => void;
+};
+
+/** 保存済み経緯度をviewport座標へ投影し、地図の表示変更をOverlay pinへ通知する。 */
+export function createMapLibreFeedbackPinPositionProvider(
+  map: FeedbackMapLibrePinPositionMap
+): FeedbackMapLibrePinPositionProvider {
+  const listeners = new Set<() => void>();
+  let listening = false;
+  let removed = false;
+  const positionEvents = ["move", "resize", "styledata"] as const;
+  const notify = () => listeners.forEach((listener) => listener());
+  const detach = () => {
+    if (!listening) return;
+    positionEvents.forEach((event) => map.off(event, notify));
+    map.off("remove", handleRemove);
+    listening = false;
+  };
+  const handleRemove = () => {
+    removed = true;
+    detach();
+    notify();
+  };
+  const attach = () => {
+    if (listening || removed) return;
+    positionEvents.forEach((event) => map.on(event, notify));
+    map.on("remove", handleRemove);
+    listening = true;
+  };
+  return {
+    getPosition(target) {
+      if (removed || (target.kind !== "map-feature" && target.kind !== "map-position")) return null;
+      const canvas = map.getCanvas();
+      if (!canvas.isConnected) return null;
+      const bounds = canvas.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return null;
+      const point = map.project([target.longitude, target.latitude]);
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y) ||
+          point.x < 0 || point.x > bounds.width || point.y < 0 || point.y > bounds.height) {
+        return null;
+      }
+      return { x: bounds.left + point.x, y: bounds.top + point.y };
+    },
+    subscribe(listener) {
+      if (removed) return () => undefined;
+      listeners.add(listener);
+      attach();
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) detach();
+      };
+    }
+  };
+}
+
 export type FeedbackMapLibrePinMap = {
   on(event: "styledata" | "remove", listener: () => void): void;
   off(event: "styledata" | "remove", listener: () => void): void;

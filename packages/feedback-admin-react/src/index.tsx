@@ -40,6 +40,7 @@ type ActiveExport = {
   job: ExportJob;
   format: "csv" | "xlsx";
   pollingError: string | null;
+  pollingFailureCount: number;
   downloadError: string | null;
   downloadState: "idle" | "downloading" | "succeeded" | "failed";
 };
@@ -231,6 +232,14 @@ function SessionAdministration({
     return () => { active = false; };
   }, [onError, selectedId, transport]);
   useEffect(() => { closeEvidence(); }, [closeEvidence, selectedId]);
+  useEffect(() => {
+    if (!evidence) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeEvidence();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [closeEvidence, evidence]);
   useEffect(() => () => {
     evidenceGeneration.current += 1;
     releaseEvidenceUrl();
@@ -445,7 +454,9 @@ function SessionAdministration({
         {visibleThreads.length === 0 ? <p className="feedback-admin-help">条件に一致するフィードバックはありません。</p> : null}
       </div>
       </div>
-      {evidence ? <div className="feedback-admin-dialog-backdrop"><section className="feedback-admin-dialog feedback-admin-evidence-dialog" role="dialog" aria-modal="true" aria-label={`証跡 #${evidence.displayNumber}`}><header><div><p className="eyebrow">スレッド #{evidence.displayNumber}</p><h2>証跡</h2><p>観点: {evidence.perspectiveLabel}</p></div><button type="button" aria-label="証跡を閉じる" onClick={closeEvidence}>×</button></header><div className="feedback-admin-evidence-body">
+      {evidence ? <div className="feedback-admin-dialog-backdrop" onClick={(event) => {
+        if (event.target === event.currentTarget) closeEvidence();
+      }}><section className="feedback-admin-dialog feedback-admin-evidence-dialog" role="dialog" aria-modal="true" aria-label={`証跡 #${evidence.displayNumber}`}><header><div><p className="eyebrow">スレッド #{evidence.displayNumber}</p><h2>証跡</h2><p>観点: {evidence.perspectiveLabel}</p></div><button type="button" aria-label="証跡を閉じる" onClick={closeEvidence}>×</button></header><div className="feedback-admin-evidence-body">
         {evidence.status === "loading" ? <p className="feedback-admin-help" role="status">証跡を読み込んでいます...</p> : null}
         {evidence.status === "error" ? <div><p className="feedback-admin-error" role="alert">証跡を読み込めませんでした: {evidence.error}</p><button type="button" onClick={() => {
           const thread = threads.find((item) => item.id === evidence.threadId);
@@ -617,6 +628,7 @@ function RetentionAndExport({
         job: resource.value,
         format: requestedFormat,
         pollingError: null,
+        pollingFailureCount: 0,
         downloadError: null,
         downloadState: resource.value.status === "completed" ? "downloading" : "idle"
       });
@@ -685,7 +697,7 @@ function RetentionAndExport({
   }, [transport]);
   useEffect(() => {
     const current = activeExport;
-    if (!current || current.pollingError || (current.job.status !== "queued" && current.job.status !== "running")) return;
+    if (!current || (current.job.status !== "queued" && current.job.status !== "running")) return;
     const generation = exportGeneration.current;
     const timer = setTimeout(() => {
       if (generation !== exportGeneration.current) return;
@@ -701,13 +713,13 @@ function RetentionAndExport({
         (caught) => {
           if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
           setActiveExport((latest) => latest?.job.id === current.job.id
-            ? { ...latest, pollingError: messageOf(caught) }
+            ? { ...latest, pollingError: messageOf(caught), pollingFailureCount: latest.pollingFailureCount + 1 }
             : latest);
         }
       );
-    }, 1000);
+    }, exportPollingDelay(current.pollingFailureCount));
     return () => clearTimeout(timer);
-  }, [activeExport?.job, activeExport?.pollingError, transport]);
+  }, [activeExport?.job, activeExport?.pollingFailureCount, transport]);
   useEffect(() => {
     if (!activeExport || activeExport.job.status !== "completed" || activeExport.downloadState !== "downloading" || automaticallyDownloaded.current.has(activeExport.job.id)) return;
     automaticallyDownloaded.current.add(activeExport.job.id);
@@ -728,7 +740,7 @@ function RetentionAndExport({
     } catch (caught) {
       if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
       setActiveExport((current) => current?.job.id === target.id
-        ? { ...current, pollingError: messageOf(caught) }
+        ? { ...current, pollingError: messageOf(caught), pollingFailureCount: current.pollingFailureCount + 1 }
         : current);
     }
   };
@@ -1011,11 +1023,15 @@ function withUpdatedExportJob(current: ActiveExport, job: ExportJob): ActiveExpo
     ...current,
     job,
     pollingError: null,
+    pollingFailureCount: 0,
     downloadError: job.status === "completed" && !enteredCompleted ? current.downloadError : null,
     downloadState: job.status === "completed"
       ? enteredCompleted ? "downloading" : current.downloadState
       : "idle"
   };
+}
+function exportPollingDelay(failureCount: number): number {
+  return Math.min(1000 * (2 ** Math.min(failureCount, 4)), 10_000);
 }
 function dateTimeLocal(value?: string | null): string {
   if (!value) return "";

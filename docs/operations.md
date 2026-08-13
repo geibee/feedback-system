@@ -4,6 +4,9 @@ API、notification worker、export worker、retention worker、bootstrapは同�
 DB、Evidence storage、Export storageは必須依存で、`/health/ready` が個別状態を報告する。notification backlogは
 API readinessを落とさないが、metricとalertで追跡する。
 
+export worker内ではExport生成loopと自動backup loopを独立して実行する。backupの失敗や長時間処理によって
+`queued`のExportがclaimされなくなる構成に戻さず、両loopの失敗とbacklogを個別に監視する。
+
 EvidenceとExportはlocal/S3共通interfaceを使い、分散配備ではS3を選ぶ。downloadは認可付きAPIだけを経由し、
 bucketを公開しない。workerのclaim/retryを維持し、複数instanceの同時処理は小さく始める。
 

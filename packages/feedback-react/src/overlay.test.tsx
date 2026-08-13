@@ -1,7 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryFeedbackTelemetry, type FeedbackHostAdapter, type FeedbackTransport } from "@feedback/core";
-import { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay";
+import type { FeedbackTargetV1 } from "@feedback/contracts";
+import {
+  FeedbackOverlay,
+  createLocalStorageParticipantAdapter,
+  feedbackThreadMatchesLocation,
+  type FeedbackPinPositionProvider
+} from "./overlay";
 import { FeedbackProvider } from "./index";
 
 const session = {
@@ -174,6 +180,65 @@ describe("FeedbackOverlay", () => {
     expect(screen.queryByRole("button", { name: "フィードバック" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /#1/ }));
     expect(await screen.findByRole("heading", { name: /#1/ })).toBeTruthy();
+  });
+
+  it("地図targetのpinをProviderで表示し、選択pinの反対側へDrawerを移す", async () => {
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1000);
+    const mapPositionThread = {
+      ...thread,
+      target: { schemaVersion: "1" as const, kind: "map-position" as const, longitude: 139.7, latitude: 35.6 }
+    };
+    const mapFeatureTarget = {
+      schemaVersion: "1",
+      kind: "map-feature",
+      provider: ["map", "libre"].join(""),
+      sourceKey: "lots",
+      featureKey: "42",
+      longitude: 139.71,
+      latitude: 35.61
+    } as unknown as FeedbackTargetV1;
+    const mapFeatureThread = {
+      ...thread,
+      id: "20000000-0000-4000-8000-000000000002",
+      displayNumber: 2,
+      target: mapFeatureTarget
+    };
+    const transport = createTransport(async (path) => {
+      if (path.endsWith("/threads")) return { value: { items: [mapPositionThread, mapFeatureThread] }, etag: null };
+      if (path === `/threads/${mapPositionThread.id}`) return { value: mapPositionThread, etag: '"1"' };
+      throw new Error(`unexpected: ${path}`);
+    });
+    let firstX = 100;
+    let notifyPositionChange: (() => void) | null = null;
+    const unsubscribe = vi.fn();
+    const positionProvider: FeedbackPinPositionProvider = {
+      getPosition: vi.fn((target) => ({
+        x: target.kind === "map-position" ? firstX : 700,
+        y: 200
+      })),
+      subscribe: vi.fn((listener: () => void) => {
+        notifyPositionChange = listener;
+        return unsubscribe;
+      })
+    };
+
+    const rendered = render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay pinPositionProvider={positionProvider} />
+      </FeedbackProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "#1" }));
+    expect(screen.getByRole("button", { name: "#2" })).toBeTruthy();
+    const drawer = await screen.findByRole("dialog", { name: "フィードバックスレッド" });
+    expect(drawer.classList.contains("is-right")).toBe(true);
+
+    firstX = 900;
+    act(() => { notifyPositionChange?.(); });
+    await waitFor(() => expect(drawer.classList.contains("is-left")).toBe(true));
+
+    rendered.unmount();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
   it.each([

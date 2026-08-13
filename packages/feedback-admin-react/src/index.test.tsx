@@ -218,6 +218,37 @@ describe("FeedbackAdminConsole", () => {
     expect(requestBinary).toHaveBeenCalledTimes(2);
   });
 
+  it("証跡モーダルは内部クリックでは維持し、背景クリックとEscapeで閉じてObject URLを解放する", async () => {
+    const requestBinary = vi.fn()
+      .mockResolvedValueOnce(binaryResource([1]))
+      .mockResolvedValueOnce(binaryResource([2]));
+    vi.spyOn(URL, "createObjectURL")
+      .mockReturnValueOnce("blob:backdrop")
+      .mockReturnValueOnce("blob:escape");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const baseRequest = createRequest();
+    const request = vi.fn(async (path: string, options?: unknown) => path.endsWith("/threads")
+      ? { value: { items: [evidenceThread] }, etag: null }
+      : baseRequest(path, options));
+
+    render(<FeedbackAdminConsole {...scope} transport={createTransport(request, requestBinary)} />);
+    await screen.findByText("#1 地図操作");
+    fireEvent.click(screen.getByRole("button", { name: "証跡" }));
+    await screen.findByRole("img", { name: "スレッド #1 の証跡" });
+    const dialog = screen.getByRole("dialog", { name: "証跡 #1" });
+    fireEvent.click(dialog);
+    expect(screen.getByRole("dialog", { name: "証跡 #1" })).toBeTruthy();
+    fireEvent.click(dialog.parentElement as HTMLElement);
+    expect(screen.queryByRole("dialog", { name: "証跡 #1" })).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:backdrop");
+
+    fireEvent.click(screen.getByRole("button", { name: "証跡" }));
+    await screen.findByRole("img", { name: "スレッド #1 の証跡" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "証跡 #1" })).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:escape");
+  });
+
   it.each(["csv", "xlsx"] as const)("Exportを1秒ごとに追跡し、完了時に作成時形式（%s）で一度だけ自動ダウンロードする", async (requestedFormat) => {
     const exportId = "30000000-0000-4000-8000-000000000001";
     let refreshCount = 0;
@@ -360,7 +391,7 @@ describe("FeedbackAdminConsole", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "エクスポートを作成" })); await Promise.resolve(); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
     expect(screen.getByText(/状態APIが停止中です/)).toBeTruthy();
-    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
     expect(refreshCount).toBe(1);
 
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "状態を再確認" })); await Promise.resolve(); });
@@ -374,6 +405,56 @@ describe("FeedbackAdminConsole", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "ファイルを再ダウンロード" })); await Promise.resolve(); });
     expect(requestBinary).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/download APIが停止中です/)).toBeNull();
+  });
+
+  it("Export状態取得の一時失敗を最大10秒のbackoffで再試行し、成功後は1秒間隔へ戻す", async () => {
+    const exportId = "30000000-0000-4000-8000-000000000004";
+    let refreshCount = 0;
+    const baseRequest = createRequest();
+    const request = vi.fn(async (path: string, options?: unknown) => {
+      if (path === "/exports") return { value: exportJob(exportId, "queued"), etag: null };
+      if (path === `/exports/${exportId}`) {
+        refreshCount += 1;
+        if (refreshCount <= 4) throw new Error("状態APIが一時的に利用できません");
+        return { value: exportJob(exportId, refreshCount === 5 ? "running" : "completed"), etag: null };
+      }
+      return baseRequest(path, options);
+    });
+    const requestBinary = vi.fn().mockResolvedValue(binaryResource([1]));
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:recovered-export");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    render(<FeedbackAdminConsole {...scope} transport={createTransport(request, requestBinary)} />);
+    await screen.findByText("#1 地図操作");
+    fireEvent.click(screen.getByRole("button", { name: "保存・エクスポート" }));
+    await screen.findByText("データをエクスポート");
+    vi.useFakeTimers();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "エクスポートを作成" })); await Promise.resolve(); });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(refreshCount).toBe(1);
+    expect(screen.getByText(/状態APIが一時的に利用できません/)).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(refreshCount).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(refreshCount).toBe(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    expect(refreshCount).toBe(3);
+    await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+    expect(refreshCount).toBe(4);
+    await act(async () => { await vi.advanceTimersByTimeAsync(9999); });
+    expect(refreshCount).toBe(4);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(refreshCount).toBe(5);
+    expect(screen.getByText("状態: 作成中")).toBeTruthy();
+    expect(screen.queryByText(/状態APIが一時的に利用できません/)).toBeNull();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(999); });
+    expect(refreshCount).toBe(5);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); await Promise.resolve(); });
+    expect(screen.getByText("状態: 完了")).toBeTruthy();
+    expect(requestBinary).toHaveBeenCalledTimes(1);
   });
 
   it("Export失敗時はサーバーエラーを日本語状態とともに表示してpollingを停止する", async () => {

@@ -283,6 +283,8 @@ export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "./capt
 export { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay.js";
 export type {
   FeedbackOverlayProps,
+  FeedbackPinPosition,
+  FeedbackPinPositionProvider,
   FeedbackTargetResolver,
   FeedbackTargetResolverInput,
   LocalStorageParticipantAdapter

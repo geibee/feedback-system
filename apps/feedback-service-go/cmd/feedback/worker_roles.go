@@ -56,19 +56,35 @@ func runExportWorker() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("Feedback export/backup workerを起動します")
-	return workerloop.Run(ctx, workerloop.Options{
-		PollInterval: settings.Export.PollInterval,
-		OnError: func(errorContext context.Context, cycleError error) {
-			logger.ErrorContext(errorContext, "export/backup worker cycleに失敗しました", slog.Any("error", cycleError))
+	logger.Info("Feedback export workerとbackup workerを起動します")
+	return workerloop.RunGroup(ctx,
+		func(workerContext context.Context) error {
+			runErr := workerloop.Run(workerContext, workerloop.Options{
+				PollInterval: settings.Export.PollInterval,
+				OnError: func(errorContext context.Context, cycleError error) {
+					logger.ErrorContext(errorContext, "backup worker cycleに失敗しました", slog.Any("error", cycleError))
+				},
+			}, func(cycleContext context.Context) (bool, error) {
+				return backupWorker.RunOnce(cycleContext, time.Now())
+			})
+			if runErr != nil {
+				return fmt.Errorf("backup workerを実行できません: %w", runErr)
+			}
+			return nil
 		},
-	}, func(cycleContext context.Context) (bool, error) {
-		worked, cycleErr := backupWorker.RunOnce(cycleContext, time.Now())
-		if cycleErr != nil || worked {
-			return worked, cycleErr
-		}
-		return exportWorker.RunOnce(cycleContext)
-	})
+		func(workerContext context.Context) error {
+			runErr := workerloop.Run(workerContext, workerloop.Options{
+				PollInterval: settings.Export.PollInterval,
+				OnError: func(errorContext context.Context, cycleError error) {
+					logger.ErrorContext(errorContext, "export worker cycleに失敗しました", slog.Any("error", cycleError))
+				},
+			}, exportWorker.RunOnce)
+			if runErr != nil {
+				return fmt.Errorf("export workerを実行できません: %w", runErr)
+			}
+			return nil
+		},
+	)
 }
 
 func runNotificationWorker() error {

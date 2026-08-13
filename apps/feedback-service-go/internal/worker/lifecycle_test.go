@@ -141,4 +141,119 @@ func TestRunRejectsIncompleteOptions(t *testing.T) {
 	}
 }
 
+func TestRunGroupExecutesWorkersIndependently(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	backupStarted := make(chan struct{})
+	var exportCalls atomic.Int32
+	done := make(chan error, 1)
+	go func() {
+		done <- RunGroup(ctx,
+			func(workerContext context.Context) error {
+				return Run(workerContext, Options{
+					PollInterval: time.Hour,
+					OnError:      func(context.Context, error) { t.Error("unexpected backup error") },
+				}, func(cycleContext context.Context) (bool, error) {
+					close(backupStarted)
+					<-cycleContext.Done()
+					return false, cycleContext.Err()
+				})
+			},
+			func(workerContext context.Context) error {
+				return Run(workerContext, Options{
+					PollInterval: time.Hour,
+					OnError:      func(context.Context, error) { t.Error("unexpected export error") },
+				}, func(context.Context) (bool, error) {
+					<-backupStarted
+					current := exportCalls.Add(1)
+					if current == 3 {
+						cancel()
+					}
+					return current < 3, nil
+				})
+			},
+		)
+	}()
+	<-backupStarted
+	select {
+	case err := <-done:
+		if err != nil || exportCalls.Load() != 3 {
+			t.Fatalf("RunGroup() error=%v export calls=%d", err, exportCalls.Load())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("backup処理中にexport workerが進行しません")
+	}
+}
+
+func TestRunGroupTransientFailureDoesNotBlockOtherWorker(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	backupAttempted := make(chan struct{})
+	var exportCalls atomic.Int32
+	err := RunGroup(ctx,
+		func(workerContext context.Context) error {
+			return Run(workerContext, Options{
+				PollInterval: time.Hour,
+				OnError:      func(context.Context, error) {},
+			}, func(context.Context) (bool, error) {
+				close(backupAttempted)
+				return false, errTransient
+			})
+		},
+		func(workerContext context.Context) error {
+			return Run(workerContext, Options{
+				PollInterval: time.Hour,
+				OnError:      func(context.Context, error) { t.Error("unexpected export error") },
+			}, func(context.Context) (bool, error) {
+				<-backupAttempted
+				exportCalls.Add(1)
+				cancel()
+				return false, nil
+			})
+		},
+	)
+	if err != nil || exportCalls.Load() != 1 {
+		t.Fatalf("RunGroup() error=%v export calls=%d", err, exportCalls.Load())
+	}
+}
+
+func TestRunGroupPropagatesFailureAndStopsOtherWorkers(t *testing.T) {
+	t.Parallel()
+	otherStopped := make(chan struct{})
+	err := RunGroup(context.Background(),
+		func(context.Context) error { return errTransient },
+		func(workerContext context.Context) error {
+			<-workerContext.Done()
+			close(otherStopped)
+			return nil
+		},
+	)
+	if !errors.Is(err, errTransient) {
+		t.Fatalf("RunGroup() error=%v", err)
+	}
+	select {
+	case <-otherStopped:
+	default:
+		t.Fatal("失敗時に他workerが停止していません")
+	}
+}
+
+func TestRunGroupRejectsIncompleteRunners(t *testing.T) {
+	t.Parallel()
+	if err := RunGroup(nil, func(context.Context) error { return nil }); err == nil {
+		t.Fatal("nil contextを受理しました")
+	}
+	if err := RunGroup(context.Background()); err == nil {
+		t.Fatal("空のrunnerを受理しました")
+	}
+	if err := RunGroup(context.Background(), nil); err == nil {
+		t.Fatal("nil runnerを受理しました")
+	}
+	if err := RunGroup(context.Background(), func(context.Context) error { return nil }); !errors.Is(err, ErrUnexpectedExit) {
+		t.Fatalf("予期しない正常終了error=%v", err)
+	}
+}
+
 var errTransient = errors.New("transient")

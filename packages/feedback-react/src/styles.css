@@ -470,6 +470,14 @@
   background: #fff;
 }
 
+.feedback-thread-drawer.is-left {
+  right: auto;
+  left: 0;
+  border-right: 1px solid var(--feedback-border);
+  border-left: 0;
+  box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
+}
+
 .feedback-panel-header {
   display: flex;
   flex: 0 0 auto;
@@ -809,6 +817,22 @@
   .feedback-review-guide-button { min-width: min(250px, calc(100vw - 40px)); }
   .feedback-picking-bar { width: calc(100vw - 24px); justify-content: space-between; border-radius: 12px; }
   .feedback-panel { width: 100vw; border-left: 0; }
+}
+
+@media (max-width: 920px) {
+  .feedback-thread-drawer,
+  .feedback-thread-drawer.is-left {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    max-height: min(40vh, 28rem);
+    border-top: 1px solid var(--feedback-border);
+    border-right: 0;
+    border-left: 0;
+    box-shadow: 0 -8px 24px rgb(15 23 42 / 14%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

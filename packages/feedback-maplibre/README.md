@@ -1,6 +1,6 @@
 # @feedback/maplibre
 
-MapLibre featureを製品横断の安定した `sourceKey` / `featureKey` へ変換し、地図pinの lifecycleと
+MapLibre featureを製品横断の安定した `sourceKey` / `featureKey` へ変換し、Overlay pinの位置解決、地図markerの lifecycleと
 WebGL証跡取得を管理する任意 package です。`maplibre-gl` はこの package だけの peer dependencyで、
 `@feedback/react` の導入には不要です。
 
@@ -29,6 +29,36 @@ import { resolveMapLibreFeedbackTargetAtClientPoint } from "@feedback/maplibre";
 ```
 
 `null`を返した領域はSDKの通常のDOM／画面座標targetへ戻ります。
+
+## 保存済みの地図targetをOverlay pinとして表示する
+
+`FeedbackOverlay`の番号付きpinへ`map-position`／`map-feature`を投影するには、同じMapLibre mapから
+位置Providerを作成します。
+
+```tsx
+import {
+  createMapLibreFeedbackPinPositionProvider,
+  resolveMapLibreFeedbackTargetAtClientPoint
+} from "@feedback/maplibre";
+
+const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
+
+<FeedbackOverlay
+  pinPositionProvider={pinPositionProvider}
+  targetResolver={(input) => {
+    if (!input.element?.closest("[data-feedback-map]")) return null;
+    return resolveMapLibreFeedbackTargetAtClientPoint(map, input, targetOptions);
+  }}
+/>;
+```
+
+位置Providerはtargetに保存されているlongitude／latitudeを`map.project`でcanvas座標へ変換し、canvasの
+viewport位置を加えてOverlay pinの座標を返します。`map-feature`も現在のstyleやsourceから地物を再検索せず、
+保存済み経緯度を使います。`move`、`resize`、`styledata`の後は位置変更を通知し、canvas外、DOMから切り離された
+canvas、または削除済みmapのpinは非表示にします。Providerは`move`、`resize`、`styledata`、`remove`を内部購読し、
+Overlayが`subscribe`の戻り値を呼び出すと地図eventの購読も解除されます。map削除後の`getPosition`は`null`を返します。
+
+既存の`bindMapLibreFeedbackPins`はMapLibre Markerを直接管理したいconsumer向けに引き続き利用できます。
 
 ## 証跡へ地図とcontrolを含める
 

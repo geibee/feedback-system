@@ -22,6 +22,8 @@ const MaximumShutdownTimeout = 30 * time.Second
 
 var ErrShutdownTimeout = errors.New("worker graceful shutdownがtimeoutしました")
 
+var ErrUnexpectedExit = errors.New("worker loopが予期せず終了しました")
+
 type cycleResult struct {
 	worked bool
 	err    error
@@ -90,6 +92,46 @@ func Run(ctx context.Context, options Options, cycle Cycle) error {
 			return nil
 		}
 	}
+}
+
+// RunGroup は複数のworker loopを並行実行し、いずれかの終了時に残りを安全停止する。
+// 親contextの取消前にloopが正常終了した場合は、予期しない終了としてprocessへ伝播する。
+func RunGroup(ctx context.Context, runners ...func(context.Context) error) error {
+	if ctx == nil {
+		return errors.New("worker group contextが未設定です")
+	}
+	if len(runners) == 0 {
+		return errors.New("worker group runnerが未設定です")
+	}
+	for _, runner := range runners {
+		if runner == nil {
+			return errors.New("worker group runnerが未設定です")
+		}
+	}
+
+	groupContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	results := make(chan error, len(runners))
+	for _, runner := range runners {
+		go func() {
+			results <- runner(groupContext)
+		}()
+	}
+
+	var failures []error
+	for index := 0; index < len(runners); index++ {
+		err := <-results
+		if index == 0 {
+			if err == nil && ctx.Err() == nil {
+				err = ErrUnexpectedExit
+			}
+			cancel()
+		}
+		if err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
 }
 
 func wait(ctx context.Context, duration time.Duration) error {

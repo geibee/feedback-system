@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `createMapLibreFeedbackPinPositionProvider(map)`を追加し、`map-position`／`map-feature`をOverlay pinへ投影できるようにしました。
+- Overlay pinを`move`、`resize`、`styledata`へ追従させ、canvas外・切断済み・map削除後は非表示にするようにしました。
+- 既存の`bindMapLibreFeedbackPins`は互換性を維持します。
+
 ## 1.0.0-alpha.1
 
 - MapLibre featureからv1 targetへの変換adapterを追加。

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   bindMapLibreFeedbackPins,
   captureReadyCanvasContextAttributes,
+  createMapLibreFeedbackPinPositionProvider,
   createMapLibreEvidenceProvider,
   findUnreadableMapCanvases,
   resolveMapLibreFeedbackTarget,
@@ -105,6 +106,56 @@ describe("MapLibre target adapter", () => {
     expect(removed).toHaveLength(2);
     listeners.get("remove")?.();
     expect(listeners.size).toBe(0);
+  });
+
+  it("地図targetをviewportへ投影し、移動通知とmap破棄をOverlayへ伝える", () => {
+    const canvas = document.createElement("canvas");
+    document.body.append(canvas);
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      x: 100, y: 50, left: 100, top: 50, right: 900, bottom: 650, width: 800, height: 600,
+      toJSON: () => ({})
+    });
+    const listeners = new Map<string, () => void>();
+    const map = {
+      getCanvas: () => canvas,
+      project: vi.fn(() => ({ x: 160, y: 120 })),
+      on: (name: string, listener: () => void) => listeners.set(name, listener),
+      off: (name: string) => listeners.delete(name)
+    };
+    const provider = createMapLibreFeedbackPinPositionProvider(map);
+    const changed = vi.fn();
+    const unsubscribe = provider.subscribe(changed);
+    const target = { schemaVersion: "1", kind: "map-position", longitude: 139.7, latitude: 35.6 } as const;
+
+    expect(provider.getPosition(target)).toEqual({ x: 260, y: 170 });
+    expect(map.project).toHaveBeenCalledWith([139.7, 35.6]);
+    listeners.get("move")?.();
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    listeners.get("remove")?.();
+    expect(changed).toHaveBeenCalledTimes(2);
+    expect(provider.getPosition(target)).toBeNull();
+    expect(listeners.size).toBe(0);
+    unsubscribe();
+  });
+
+  it("canvas外へ投影された地図pinを表示しない", () => {
+    const canvas = document.createElement("canvas");
+    document.body.append(canvas);
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 300, width: 400, height: 300,
+      toJSON: () => ({})
+    });
+    const provider = createMapLibreFeedbackPinPositionProvider({
+      getCanvas: () => canvas,
+      project: () => ({ x: 401, y: 120 }),
+      on: () => undefined,
+      off: () => undefined
+    });
+    expect(provider.getPosition({
+      schemaVersion: "1", kind: "map-feature", provider: "maplibre", sourceKey: "lots",
+      featureKey: "42", longitude: 139.7, latitude: 35.6
+    })).toBeNull();
   });
 
   it("render event内でWebGL描画を固定し、MapLibre controlsと共にDOM証跡へ渡す", async () => {

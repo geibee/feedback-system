@@ -1,6 +1,6 @@
 # @feedback/react
 
-React 18/19 用の `FeedbackProvider`、`FeedbackOverlay`、DOM/screen pin、Thread Drawer、DOM capture provider
+React 18/19 用の `FeedbackProvider`、`FeedbackOverlay`、DOM/screen／host解決pin、Thread Drawer、DOM capture provider
 を提供します。利用側は `@feedback/react/styles.css` を読み込み、`@feedback/core` の host adapter と transport
 を渡します。MapLibre は依存に含まれません。
 
@@ -38,11 +38,44 @@ Feedback Service、証跡previewを使う場合だけ `img-src blob:` を許可�
 MapLibreの地理座標／地物targetへ変換する場合は`@feedback/maplibre`の
 `resolveMapLibreFeedbackTargetAtClientPoint`を`targetResolver`から呼び出します。
 
+保存済みの`map-position`／`map-feature`をOverlayの番号付きpinとして表示する場合は、host固有の
+`pinPositionProvider`を渡します。MapLibreでは`createMapLibreFeedbackPinPositionProvider(map)`を使用します。
+
+```tsx
+import {
+  createMapLibreFeedbackPinPositionProvider,
+  resolveMapLibreFeedbackTargetAtClientPoint
+} from "@feedback/maplibre";
+
+const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
+
+<FeedbackOverlay
+  pinPositionProvider={pinPositionProvider}
+  targetResolver={(input) => {
+    if (!input.element?.closest("[data-feedback-map]")) return null;
+    return resolveMapLibreFeedbackTargetAtClientPoint(map, input, targetOptions);
+  }}
+/>;
+```
+
+Providerが位置を解決できないtargetは表示しません。位置変更通知を購読するため、地図の移動やresize後も同じ
+Overlay pinが再配置されます。独自Providerは次の契約を実装します。`subscribe`が返す関数でhost eventの購読を
+解除してください。
+
+```ts
+type FeedbackPinPositionProvider = {
+  getPosition(target: FeedbackTargetV1): { x: number; y: number } | null;
+  subscribe(listener: () => void): () => void;
+};
+```
+
 既定DOM captureは `data-feedback-exclude` を除外し、`data-feedback-mask` を同梱CSSでマスクします。
 cross-origin画像/fontはCORS対応または除外が必要です。captureを不要にする場合は
 `features.evidenceCapture: false`、独自方式は `adapter.captureEvidence` を使用します。
 DOM/screen pin は現在のmanifest locationと page/route/path/queryが一致するthreadだけを表示します。
 Thread Drawerや投稿一覧を開いている間もpinを維持し、開いているthreadのpinを選択中として表示します。
+Thread Drawerは選択中pinの反対側へ配置し、pinと地図上の対象を見ながら詳細を確認できるようにします。狭い画面では
+地図を完全に覆わないコンパクトな下部sheetへ切り替えます。
 Thread Drawerで別のthreadへ切り替えると以前の証跡previewを破棄します。切替前に開始した証跡取得が遅れて完了しても、
 現在開いているthreadのpreviewは上書きされません。Drawerを閉じた時とOverlayを破棄した時は証跡のBlob URLを解放します。
 

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { components } from "@feedback/contracts";
+import type { FeedbackTargetV1 } from "@feedback/contracts";
 import type { FeedbackEvidencePayload } from "@feedback/core";
 import { createDomEvidenceProvider } from "./capture.js";
 import { useFeedback } from "./index.js";
@@ -46,6 +47,8 @@ export type FeedbackOverlayProps = {
   className?: string;
   /** MapLibreなどhost固有領域のpointer座標を専用targetへ変換する。null時はDOM/screen targetへ戻す。 */
   targetResolver?: FeedbackTargetResolver;
+  /** 地図targetなどをviewport上のpin座標へ投影し、表示位置の変更を通知する。 */
+  pinPositionProvider?: FeedbackPinPositionProvider;
   /** レビュー案内の既読状態を保存するlocalStorage key。 */
   reviewIntroductionStorageKey?: string;
   /** 受付中レビューがない場合に表示する管理画面URL。 */
@@ -61,11 +64,19 @@ export type FeedbackTargetResolverInput = {
 
 export type FeedbackTargetResolver = (input: FeedbackTargetResolverInput) => Target | null;
 
+export type FeedbackPinPosition = { x: number; y: number };
+
+export type FeedbackPinPositionProvider = {
+  getPosition(target: FeedbackTargetV1): FeedbackPinPosition | null;
+  subscribe(listener: () => void): () => void;
+};
+
 /** v1 transport だけを使う汎用 Overlay。ホストの router/API/TanStack Query へ依存しない。 */
 export function FeedbackOverlay({
   deepLinkThreadId,
   className,
   targetResolver,
+  pinPositionProvider,
   reviewIntroductionStorageKey,
   reviewManagementUrl
 }: FeedbackOverlayProps) {
@@ -77,6 +88,7 @@ export function FeedbackOverlay({
   const [picked, setPicked] = useState<PickedTarget | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [threadListOpen, setThreadListOpen] = useState(false);
+  const [activePanelSide, setActivePanelSide] = useState<"left" | "right">("right");
   const [error, setError] = useState<string | null>(null);
   const captureGeneration = useRef(0);
   const threadRequestGeneration = useRef(0);
@@ -123,6 +135,7 @@ export function FeedbackOverlay({
     setPicked(null);
     setContextMenu(null);
     setThreadListOpen(false);
+    setActivePanelSide("right");
   }, [session?.id]);
   useEffect(() => { void refreshThreads(); }, [refreshThreads]);
 
@@ -282,7 +295,12 @@ export function FeedbackOverlay({
               threads={visibleThreads}
               session={session}
               activeThreadId={active?.thread.id ?? null}
-              onOpen={(id) => void openThread(id, false)}
+              positionProvider={pinPositionProvider}
+              onActiveSideChange={setActivePanelSide}
+              onOpen={(id, position) => {
+                setActivePanelSide(panelSideOpposite(position));
+                void openThread(id, false);
+              }}
             />
           ) : null}
           {mode === "idle" && !active && !threadListOpen && !contextMenu ? (
@@ -337,6 +355,7 @@ export function FeedbackOverlay({
             <ThreadDrawer
               resource={active}
               session={session}
+              side={activePanelSide}
               onChange={(next) => {
                 setActive(next);
                 setThreads((current) => current.map((item) => item.id === next.thread.id ? next.thread : item));
@@ -598,11 +617,13 @@ function groupThreadsByScreen(threads: Thread[]): Array<{ key: string; label: st
 function ThreadDrawer({
   resource,
   session,
+  side,
   onChange,
   onClose
 }: {
   resource: { thread: Thread; etag: string | null };
   session: Session;
+  side: "left" | "right";
   onChange(value: { thread: Thread; etag: string | null }): void;
   onClose(): void;
 }) {
@@ -702,7 +723,7 @@ function ThreadDrawer({
     }
   };
   return (
-    <aside ref={panelRef} className="feedback-panel feedback-thread-drawer" role="dialog" aria-label="フィードバックスレッド">
+    <aside ref={panelRef} className={`feedback-panel feedback-thread-drawer is-${side}`} role="dialog" aria-label="フィードバックスレッド">
       <PanelHeader title={`#${thread.displayNumber} ${perspectiveLabel(session, thread.perspectiveCode)}`} closeLabel="スレッドを閉じる" onClose={onClose} />
       <div className="feedback-thread-meta">
         <span className={`feedback-thread-status${thread.status === "resolved" ? " is-resolved" : ""}`}>
@@ -889,32 +910,42 @@ function PinLayer({
   threads,
   session,
   activeThreadId,
+  positionProvider,
+  onActiveSideChange,
   onOpen
 }: {
   threads: Thread[];
   session: Session;
   activeThreadId: string | null;
-  onOpen(id: string): void;
+  positionProvider?: FeedbackPinPositionProvider;
+  onActiveSideChange(side: "left" | "right"): void;
+  onOpen(id: string, position: FeedbackPinPosition): void;
 }) {
   const [layoutVersion, setLayoutVersion] = useState(0);
   useEffect(() => {
     const refresh = () => setLayoutVersion((current) => current + 1);
     window.addEventListener("resize", refresh);
     window.addEventListener("scroll", refresh, true);
+    const unsubscribePosition = positionProvider?.subscribe(refresh);
     const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(refresh);
     if (document.body) observer?.observe(document.body, { childList: true, subtree: true });
     return () => {
       window.removeEventListener("resize", refresh);
       window.removeEventListener("scroll", refresh, true);
+      unsubscribePosition?.();
       observer?.disconnect();
     };
-  }, []);
+  }, [positionProvider]);
   const pins = useMemo(() => threads.flatMap((thread) => {
-    const position = pinPosition(thread.target);
+    const position = pinPosition(thread.target, positionProvider);
     return position ? [{ thread, ...position }] : [];
     // layoutVersion triggers DOM geometry reads after host layout changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [layoutVersion, threads]);
+  }), [layoutVersion, positionProvider, threads]);
+  useEffect(() => {
+    const activePin = pins.find(({ thread }) => thread.id === activeThreadId);
+    if (activePin) onActiveSideChange(panelSideOpposite(activePin));
+  }, [activeThreadId, onActiveSideChange, pins]);
   if (pins.length === 0) return null;
   return (
     <svg className="feedback-screen-pins" aria-label="フィードバックのピン">
@@ -933,7 +964,7 @@ function PinLayer({
             aria-label={`#${thread.displayNumber}`}
             aria-pressed={thread.id === activeThreadId}
             title={threadLabel(thread, session)}
-            onClick={() => onOpen(thread.id)}
+            onClick={() => onOpen(thread.id, { x, y })}
           >
             <span>{thread.displayNumber}</span>
           </button>
@@ -943,12 +974,18 @@ function PinLayer({
   );
 }
 
-function pinPosition(target: Target): { x: number; y: number } | null {
+function pinPosition(
+  target: Target,
+  provider?: FeedbackPinPositionProvider
+): FeedbackPinPosition | null {
   if (target.kind === "screen-position") {
     return {
       x: target.relativeX * document.documentElement.clientWidth,
       y: target.relativeY * document.documentElement.clientHeight
     };
+  }
+  if (target.kind === "map-feature" || target.kind === "map-position") {
+    return provider?.getPosition(target) ?? null;
   }
   if (target.kind !== "ui-element") return null;
   const element = findFeedbackElement(target.elementKey);
@@ -958,6 +995,10 @@ function pinPosition(target: Target): { x: number; y: number } | null {
     x: rect.left + target.relativeX * Math.max(rect.width, 1),
     y: rect.top + target.relativeY * Math.max(rect.height, 1)
   };
+}
+
+function panelSideOpposite(position: FeedbackPinPosition): "left" | "right" {
+  return position.x > document.documentElement.clientWidth / 2 ? "left" : "right";
 }
 
 function FeedbackContextMenu({

@@ -14,23 +14,33 @@ viewport相対のscreen-positionとして保存する。右クリック投稿を
 `FeedbackProvider`へ`features={{ contextMenu: true }}`を渡す。
 
 `data-feedback-map`を付けた領域も右クリックを無視せず、resolver未指定時はscreen-positionとして扱う。
-MapLibreの地理座標／地物をtargetへ保存する場合は`FeedbackOverlay.targetResolver`を設定する。
+MapLibreの地理座標／地物をtargetへ保存する場合は`FeedbackOverlay.targetResolver`を設定し、保存済みの
+`map-position`／`map-feature`を番号付きpinとして表示する場合は`pinPositionProvider`も設定する。
 
 ```tsx
-import { resolveMapLibreFeedbackTargetAtClientPoint } from "@feedback/maplibre";
+import {
+  createMapLibreFeedbackPinPositionProvider,
+  resolveMapLibreFeedbackTargetAtClientPoint
+} from "@feedback/maplibre";
 
-<FeedbackOverlay targetResolver={(input) => {
-  const map = mapRef.current;
-  if (!map || !input.element?.closest("[data-feedback-map]")) return null;
-  return resolveMapLibreFeedbackTargetAtClientPoint(map, input, {
-    layers: feedbackLayerIds,
-    toSourceKey,
-    toFeatureKey
-  });
-}} />;
+const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
+
+<FeedbackOverlay
+  pinPositionProvider={pinPositionProvider}
+  targetResolver={(input) => {
+    if (!input.element?.closest("[data-feedback-map]")) return null;
+    return resolveMapLibreFeedbackTargetAtClientPoint(map, input, {
+      layers: feedbackLayerIds,
+      toSourceKey,
+      toFeatureKey
+    });
+  }}
+/>;
 ```
 
-resolverが`null`を返す領域は通常のDOM／screen targetへfallbackする。
+resolverが`null`を返す領域は通常のDOM／screen targetへfallbackする。位置Providerは保存済み経緯度を
+MapLibreのcanvasへ投影し、`move`、`resize`、`styledata`へ追従する。canvas外または破棄済みの地図にあるpinは
+表示しない。`map-feature`も保存時のlongitude／latitudeを使うため、現在の地物を再検索する必要はない。
 
 投稿画面では、現在画面のreview scopeへ割り当てられたactiveなレビュー観点、participant policyに応じた
 投稿者名、コメントを入力する。投稿者名を保持するhostは`getParticipantName`と`setParticipantName`を実装する。
@@ -59,5 +69,7 @@ adapter.captureEvidence = createMapLibreEvidenceProvider({
 使用する。詳細は`packages/feedback-maplibre/README.md`を参照する。
 
 「他の人の投稿を見る」はsession内のthreadを画面単位で表示する。選択時はHostAdapterの`navigate`完了後に
-Thread Drawerを開く。現在locationに一致するDOM／screen threadは番号付きpinとして表示し、hostのscroll、
-resize、DOM更新へ追従する。Thread Drawerや投稿一覧を開いている間もpinを維持し、開いているthreadを強調する。
+Thread Drawerを開く。現在locationに一致するDOM／screen threadと、位置Providerで解決できる地図threadは
+番号付きpinとして表示し、hostや地図の移動へ追従する。Thread Drawerや投稿一覧を開いている間もpinを維持し、
+開いているthreadを強調する。選択中pinが地図に隠れないよう、Drawerはpinの反対側へ配置する。狭い画面では
+地図の表示領域を残すコンパクトな下部sheetへ切り替える。

@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ErrorInfo,
   type FormEvent,
@@ -25,6 +26,23 @@ type NotificationConnector = Schemas["FeedbackNotificationConnector"];
 type ManifestRoute = Schemas["FeedbackApplicationManifestV1"]["routes"][number];
 type SessionScope = Session["scopes"][number];
 type SessionPerspective = Session["perspectives"][number];
+
+type EvidencePreview = {
+  threadId: string;
+  displayNumber: number;
+  perspectiveLabel: string;
+  status: "loading" | "ready" | "error";
+  url: string | null;
+  error: string | null;
+};
+
+type ActiveExport = {
+  job: ExportJob;
+  format: "csv" | "xlsx";
+  pollingError: string | null;
+  downloadError: string | null;
+  downloadState: "idle" | "downloading" | "succeeded" | "failed";
+};
 
 const perspectiveDefinitions = [
   ["BUSINESS_FLOW", "業務フロー", "一連の業務が想定どおり進められるか"],
@@ -166,7 +184,19 @@ function SessionAdministration({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [manifestRoutes, setManifestRoutes] = useState<ManifestRoute[]>([]);
-  const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<EvidencePreview | null>(null);
+  const evidenceGeneration = useRef(0);
+  const evidenceUrl = useRef<string | null>(null);
+  const releaseEvidenceUrl = useCallback(() => {
+    if (!evidenceUrl.current) return;
+    URL.revokeObjectURL(evidenceUrl.current);
+    evidenceUrl.current = null;
+  }, []);
+  const closeEvidence = useCallback(() => {
+    evidenceGeneration.current += 1;
+    releaseEvidenceUrl();
+    setEvidence(null);
+  }, [releaseEvidenceUrl]);
   const refresh = useCallback(async () => {
     try {
       const page = await transport.request<Schemas["FeedbackSessionPage"]>(`/sessions?${scopeQuery}`);
@@ -193,12 +223,18 @@ function SessionAdministration({
   }, [applicationKey, onError, transport]);
   useEffect(() => {
     if (!selectedId) { setThreads([]); return; }
+    let active = true;
     void transport.request<Schemas["FeedbackThreadPage"]>(`/sessions/${selectedId}/threads`).then(
-      (page) => setThreads(page.value.items),
-      (caught) => onError(messageOf(caught))
+      (page) => { if (active) setThreads(page.value.items); },
+      (caught) => { if (active) onError(messageOf(caught)); }
     );
+    return () => { active = false; };
   }, [onError, selectedId, transport]);
-  useEffect(() => () => { if (evidenceUrl) URL.revokeObjectURL(evidenceUrl); }, [evidenceUrl]);
+  useEffect(() => { closeEvidence(); }, [closeEvidence, selectedId]);
+  useEffect(() => () => {
+    evidenceGeneration.current += 1;
+    releaseEvidenceUrl();
+  }, [releaseEvidenceUrl]);
   const selected = sessions.find((session) => session.id === selectedId);
   const visibleSessions = sessions.filter((session) => session.title.toLowerCase().includes(sessionSearch.toLowerCase()));
   const visibleThreads = threads.filter((thread) => {
@@ -341,12 +377,26 @@ function SessionAdministration({
       setNotice(thread.status === "open" ? "フィードバックを対応済みにしました" : "フィードバックを再オープンしました");
     } catch (caught) { onError(messageOf(caught)); }
   };
-  const showEvidence = async (threadId: string) => {
+  const showEvidence = async (thread: Thread) => {
+    const generation = evidenceGeneration.current + 1;
+    evidenceGeneration.current = generation;
+    releaseEvidenceUrl();
+    const preview = {
+      threadId: thread.id,
+      displayNumber: thread.displayNumber,
+      perspectiveLabel: perspectiveDisplayLabel(thread.perspectiveCode, selected?.perspectives)
+    };
+    setEvidence({ ...preview, status: "loading", url: null, error: null });
     try {
-      const binary = await transport.requestBinary(`/threads/${threadId}/evidence`);
-      if (evidenceUrl) URL.revokeObjectURL(evidenceUrl);
-      setEvidenceUrl(URL.createObjectURL(new Blob([binary.bytes.slice().buffer as ArrayBuffer], { type: binary.contentType })));
-    } catch (caught) { onError(messageOf(caught)); }
+      const binary = await transport.requestBinary(`/threads/${thread.id}/evidence`);
+      if (generation !== evidenceGeneration.current) return;
+      const url = URL.createObjectURL(new Blob([binary.bytes.slice().buffer as ArrayBuffer], { type: binary.contentType }));
+      evidenceUrl.current = url;
+      setEvidence({ ...preview, status: "ready", url, error: null });
+    } catch (caught) {
+      if (generation !== evidenceGeneration.current) return;
+      setEvidence({ ...preview, status: "error", url: null, error: messageOf(caught) });
+    }
   };
   const openThread = async (threadId: string) => {
     const pendingWindow = openExternal ? null : openPendingWindow();
@@ -368,7 +418,7 @@ function SessionAdministration({
         <div className="feedback-admin-sidebar-heading"><h2>レビューセッション</h2><button type="button" onClick={() => setCreateOpen(true)}>新規作成</button></div>
         <label>セッションを検索<input type="search" placeholder="タイトルを検索" value={sessionSearch} onChange={(event) => setSessionSearch(event.target.value)} /></label>
         {loading ? <p className="feedback-admin-help">読み込んでいます...</p> : null}
-        <ul className="feedback-admin-session-list">{visibleSessions.map((session) => <li key={session.id} data-session-title={session.title.toLowerCase()}><button type="button" className={session.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(session.id)}><strong>{session.title}</strong><span>{sessionStatusLabel(session.status)}</span></button></li>)}</ul>
+        <ul className="feedback-admin-session-list">{visibleSessions.map((session) => <li key={session.id} data-session-title={session.title.toLowerCase()}><button type="button" className={session.id === selectedId ? "selected" : ""} onClick={() => { closeEvidence(); setSelectedId(session.id); }}><strong>{session.title}</strong><span>{sessionStatusLabel(session.status)}</span></button></li>)}</ul>
         {!loading && visibleSessions.length === 0 ? <p className="feedback-admin-help">{sessionSearch ? "条件に一致するセッションはありません。" : "レビューセッションはまだありません。"}</p> : null}
       </aside>
       <div className="feedback-admin-review-main">
@@ -389,12 +439,20 @@ function SessionAdministration({
           <div className="feedback-admin-actions">
             <button type="button" onClick={() => void openThread(thread.id)}>対象アプリでスレッドを開く</button>
             <button type="button" onClick={() => void toggleThread(thread)}>{thread.status === "open" ? "対応済みにする" : "再オープン"}</button>
-            {thread.evidenceAvailable ? <button type="button" onClick={() => void showEvidence(thread.id)}>証跡</button> : null}
+            {thread.evidenceAvailable ? <button type="button" onClick={() => void showEvidence(thread)}>証跡</button> : null}
           </div>
         </article>)}
-        {visibleThreads.length === 0 ? <p className="feedback-admin-help">条件に一致するフィードバックはありません。</p> : null}{evidenceUrl ? <img src={evidenceUrl} alt="証跡" /> : null}
+        {visibleThreads.length === 0 ? <p className="feedback-admin-help">条件に一致するフィードバックはありません。</p> : null}
       </div>
       </div>
+      {evidence ? <div className="feedback-admin-dialog-backdrop"><section className="feedback-admin-dialog feedback-admin-evidence-dialog" role="dialog" aria-modal="true" aria-label={`証跡 #${evidence.displayNumber}`}><header><div><p className="eyebrow">スレッド #{evidence.displayNumber}</p><h2>証跡</h2><p>観点: {evidence.perspectiveLabel}</p></div><button type="button" aria-label="証跡を閉じる" onClick={closeEvidence}>×</button></header><div className="feedback-admin-evidence-body">
+        {evidence.status === "loading" ? <p className="feedback-admin-help" role="status">証跡を読み込んでいます...</p> : null}
+        {evidence.status === "error" ? <div><p className="feedback-admin-error" role="alert">証跡を読み込めませんでした: {evidence.error}</p><button type="button" onClick={() => {
+          const thread = threads.find((item) => item.id === evidence.threadId);
+          if (thread) void showEvidence(thread);
+        }}>再試行</button></div> : null}
+        {evidence.status === "ready" && evidence.url ? <img src={evidence.url} alt={`スレッド #${evidence.displayNumber} の証跡`} /> : null}
+      </div></section></div> : null}
       {createOpen ? <div className="feedback-admin-dialog-backdrop"><section className="feedback-admin-dialog" role="dialog" aria-modal="true" aria-label="レビューセッションの作成"><header><div><p className="eyebrow">レビュー管理</p><h2>レビューセッションを作成</h2></div><button type="button" aria-label="閉じる" onClick={() => setCreateOpen(false)}>×</button></header><form className="feedback-admin-session-form" onSubmit={(event) => void create(event)}>
         <label className="wide">タイトル<input autoFocus required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="wide">説明<textarea rows={3} maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
         <label>状態<select value={createStatus} onChange={(event) => setCreateStatus(event.target.value as Session["status"])}><option value="draft">下書き</option><option value="open">受付中</option><option value="closed">終了</option></select></label><label>対象外画面からの投稿<select value={outOfScopePosting} onChange={(event) => setOutOfScopePosting(event.target.value as Session["outOfScopePosting"])}><option value="warn">警告して許可</option><option value="allow">許可</option><option value="deny">禁止</option></select></label><label>開始日時<input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></label><label>終了日時<input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label>
@@ -505,7 +563,13 @@ function RetentionAndExport({
   const [policy, setPolicy] = useState<Schemas["FeedbackRetentionPolicy"] | null>(null);
   const [etag, setEtag] = useState<string | null>(null);
   const [format, setFormat] = useState<"csv" | "xlsx">("csv");
-  const [job, setJob] = useState<ExportJob | null>(null);
+  const [activeExport, setActiveExport] = useState<ActiveExport | null>(null);
+  const [creatingExport, setCreatingExport] = useState(false);
+  const creatingExportRef = useRef(false);
+  const exportGeneration = useRef(0);
+  const statusRequestGeneration = useRef(0);
+  const automaticallyDownloaded = useRef(new Set<string>());
+  const downloadsInFlight = useRef(new Set<string>());
   const [backupPolicy, setBackupPolicy] = useState<BackupPolicy | null>(null);
   const [backupPolicyView, setBackupPolicyView] = useState<BackupPolicyView | null>(null);
   const [backupEtag, setBackupEtag] = useState<string | null>(null);
@@ -523,6 +587,10 @@ function RetentionAndExport({
     } catch (caught) { onError(messageOf(caught)); }
   }, [onError, scopeQuery, transport]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => () => {
+    exportGeneration.current += 1;
+    statusRequestGeneration.current += 1;
+  }, []);
   const save = async () => {
     if (!policy || !etag) return;
     try {
@@ -531,13 +599,34 @@ function RetentionAndExport({
     } catch (caught) { onError(messageOf(caught)); }
   };
   const createExport = async () => {
+    if (creatingExportRef.current || activeExport?.job.status === "queued" || activeExport?.job.status === "running") return;
+    const generation = exportGeneration.current + 1;
+    exportGeneration.current = generation;
+    statusRequestGeneration.current += 1;
+    const requestedFormat = format;
+    creatingExportRef.current = true;
+    setCreatingExport(true);
+    setActiveExport(null);
     try {
       const resource = await transport.request<ExportJob>("/exports", {
         method: "POST", idempotencyKey: idempotencyKey(),
-        body: { applicationKey, environmentKey, externalWorkspaceKey, format, locale, timezone }
+        body: { applicationKey, environmentKey, externalWorkspaceKey, format: requestedFormat, locale, timezone }
       });
-      setJob(resource.value);
-    } catch (caught) { onError(messageOf(caught)); }
+      if (generation !== exportGeneration.current) return;
+      setActiveExport({
+        job: resource.value,
+        format: requestedFormat,
+        pollingError: null,
+        downloadError: null,
+        downloadState: resource.value.status === "completed" ? "downloading" : "idle"
+      });
+      onError(null);
+    } catch (caught) {
+      if (generation === exportGeneration.current) onError(messageOf(caught));
+    } finally {
+      creatingExportRef.current = false;
+      if (generation === exportGeneration.current) setCreatingExport(false);
+    }
   };
   const saveBackupPolicy = async () => {
     if (!backupPolicy || !backupEtag) return;
@@ -563,19 +652,90 @@ function RetentionAndExport({
       await load();
     } catch (caught) { onError(messageOf(caught)); }
   };
-  const refreshJob = async () => {
-    if (!job) return;
-    try { setJob((await transport.request<ExportJob>(`/exports/${job.id}`)).value); }
-    catch (caught) { onError(messageOf(caught)); }
-  };
-  const download = async () => {
-    if (!job?.downloadUrl) return;
+  const downloadExport = useCallback(async (target: ExportJob, requestedFormat: "csv" | "xlsx", generation: number) => {
+    if (downloadsInFlight.current.has(target.id)) return;
+    downloadsInFlight.current.add(target.id);
+    let url: string | null = null;
     try {
-      const binary = await transport.requestBinary(`/exports/${job.id}/download`);
-      const url = URL.createObjectURL(new Blob([binary.bytes.slice().buffer as ArrayBuffer], { type: binary.contentType }));
-      const anchor = document.createElement("a"); anchor.href = url; anchor.download = `feedback-${job.id}.${format}`; anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (caught) { onError(messageOf(caught)); }
+      const binary = await transport.requestBinary(`/exports/${target.id}/download`);
+      if (generation !== exportGeneration.current) return;
+      url = URL.createObjectURL(new Blob([binary.bytes.slice().buffer as ArrayBuffer], { type: binary.contentType }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `feedback-${target.id}.${requestedFormat}`;
+      anchor.hidden = true;
+      document.body.append(anchor);
+      try { anchor.click(); }
+      finally { anchor.remove(); }
+      setActiveExport((current) => current?.job.id === target.id
+        ? { ...current, downloadError: null, downloadState: "succeeded" }
+        : current);
+    } catch (caught) {
+      if (generation !== exportGeneration.current) return;
+      setActiveExport((current) => current?.job.id === target.id
+        ? { ...current, downloadError: messageOf(caught), downloadState: "failed" }
+        : current);
+    } finally {
+      downloadsInFlight.current.delete(target.id);
+      if (url) {
+        const urlToRelease = url;
+        setTimeout(() => URL.revokeObjectURL(urlToRelease), 0);
+      }
+    }
+  }, [transport]);
+  useEffect(() => {
+    const current = activeExport;
+    if (!current || current.pollingError || (current.job.status !== "queued" && current.job.status !== "running")) return;
+    const generation = exportGeneration.current;
+    const timer = setTimeout(() => {
+      if (generation !== exportGeneration.current) return;
+      const requestGeneration = statusRequestGeneration.current + 1;
+      statusRequestGeneration.current = requestGeneration;
+      void transport.request<ExportJob>(`/exports/${current.job.id}`).then(
+        (resource) => {
+          if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
+          setActiveExport((latest) => latest?.job.id === current.job.id
+            ? withUpdatedExportJob(latest, resource.value)
+            : latest);
+        },
+        (caught) => {
+          if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
+          setActiveExport((latest) => latest?.job.id === current.job.id
+            ? { ...latest, pollingError: messageOf(caught) }
+            : latest);
+        }
+      );
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [activeExport?.job, activeExport?.pollingError, transport]);
+  useEffect(() => {
+    if (!activeExport || activeExport.job.status !== "completed" || activeExport.downloadState !== "downloading" || automaticallyDownloaded.current.has(activeExport.job.id)) return;
+    automaticallyDownloaded.current.add(activeExport.job.id);
+    void downloadExport(activeExport.job, activeExport.format, exportGeneration.current);
+  }, [activeExport, downloadExport]);
+  const refreshJob = async () => {
+    if (!activeExport) return;
+    const target = activeExport.job;
+    const generation = exportGeneration.current;
+    const requestGeneration = statusRequestGeneration.current + 1;
+    statusRequestGeneration.current = requestGeneration;
+    try {
+      const resource = await transport.request<ExportJob>(`/exports/${target.id}`);
+      if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
+      setActiveExport((current) => current?.job.id === target.id
+        ? withUpdatedExportJob(current, resource.value)
+        : current);
+    } catch (caught) {
+      if (generation !== exportGeneration.current || requestGeneration !== statusRequestGeneration.current) return;
+      setActiveExport((current) => current?.job.id === target.id
+        ? { ...current, pollingError: messageOf(caught) }
+        : current);
+    }
+  };
+  const download = () => {
+    if (!activeExport || activeExport.job.status !== "completed" || activeExport.downloadState === "downloading") return;
+    setActiveExport({ ...activeExport, downloadError: null, downloadState: "downloading" });
+    void downloadExport(activeExport.job, activeExport.format, exportGeneration.current);
   };
   return <div className="feedback-admin-grid">
     <div className="feedback-admin-card"><h2>保存期間</h2>{policy ? <>
@@ -584,11 +744,15 @@ function RetentionAndExport({
       <button type="button" onClick={() => void save()}>保存</button>
     </> : null}</div>
     <div className="feedback-admin-card"><h2>データをエクスポート</h2><p className="feedback-admin-help">レビュー記録をファイルとして出力します。</p>
-      <label>ファイル形式<select value={format} onChange={(event) => setFormat(event.target.value as "csv" | "xlsx")}><option value="csv">CSV（表計算ソフト向け）</option><option value="xlsx">Excel（XLSX）</option></select></label>
-      <div className="feedback-admin-actions"><button type="button" onClick={() => void createExport()}>エクスポートを作成</button>
-        {job ? <button type="button" onClick={() => void refreshJob()}>状態を更新</button> : null}
-        {job?.downloadUrl ? <button type="button" onClick={() => void download()}>ファイルをダウンロード</button> : null}</div>
-      {job ? <p>{job.status} {job.error}</p> : null}
+      <label>ファイル形式<select value={format} disabled={creatingExport || activeExport?.job.status === "queued" || activeExport?.job.status === "running"} onChange={(event) => setFormat(event.target.value as "csv" | "xlsx")}><option value="csv">CSV（表計算ソフト向け）</option><option value="xlsx">Excel（XLSX）</option></select></label>
+      <div className="feedback-admin-actions"><button type="button" disabled={creatingExport || activeExport?.job.status === "queued" || activeExport?.job.status === "running"} onClick={() => void createExport()}>{creatingExport ? "作成を依頼中..." : "エクスポートを作成"}</button>
+        {activeExport ? <button type="button" disabled={activeExport.downloadState === "downloading"} onClick={() => void refreshJob()}>状態を再確認</button> : null}
+        {activeExport?.job.status === "completed" ? <button type="button" disabled={activeExport.downloadState === "downloading"} onClick={download}>{activeExport.downloadState === "downloading" ? "ダウンロード中..." : "ファイルを再ダウンロード"}</button> : null}</div>
+      {activeExport ? <div className="feedback-admin-export-status"><p role="status">状態: {exportStatusLabel(activeExport.job.status)}</p>
+        {activeExport.job.status === "failed" ? <p className="feedback-admin-error" role="alert">エクスポートに失敗しました: {activeExport.job.error || "原因は通知されませんでした"}</p> : null}
+        {activeExport.pollingError ? <p className="feedback-admin-error" role="alert">状態を確認できませんでした: {activeExport.pollingError}</p> : null}
+        {activeExport.downloadError ? <p className="feedback-admin-error" role="alert">ファイルをダウンロードできませんでした: {activeExport.downloadError}</p> : null}
+      </div> : null}
     </div>
     <div className="feedback-admin-card"><h2>自動証跡バックアップ</h2>{backupPolicy ? <>
       <label><input type="checkbox" checked={backupPolicy.enabled} onChange={(event) => setBackupPolicy({ ...backupPolicy, enabled: event.target.checked })} />有効</label>
@@ -834,6 +998,24 @@ function perspectiveDisplayLabel(code: string, perspectives?: readonly SessionPe
 function permissionList(value: string): string[] { return value.split(",").map((item) => item.trim()).filter(Boolean); }
 function sessionStatusLabel(value: Session["status"]): string {
   return value === "open" ? "受付中" : value === "closed" ? "終了" : "下書き";
+}
+function exportStatusLabel(value: ExportJob["status"]): string {
+  return value === "queued" ? "待機中"
+    : value === "running" ? "作成中"
+      : value === "completed" ? "完了"
+        : "失敗";
+}
+function withUpdatedExportJob(current: ActiveExport, job: ExportJob): ActiveExport {
+  const enteredCompleted = job.status === "completed" && current.job.status !== "completed";
+  return {
+    ...current,
+    job,
+    pollingError: null,
+    downloadError: job.status === "completed" && !enteredCompleted ? current.downloadError : null,
+    downloadState: job.status === "completed"
+      ? enteredCompleted ? "downloading" : current.downloadState
+      : "idle"
+  };
 }
 function dateTimeLocal(value?: string | null): string {
   if (!value) return "";

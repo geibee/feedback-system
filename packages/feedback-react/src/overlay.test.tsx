@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryFeedbackTelemetry, type FeedbackHostAdapter, type FeedbackTransport } from "@feedback/core";
 import { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay";
@@ -50,7 +50,10 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("FeedbackOverlay", () => {
   it("別locationの同じDOM keyへpinを混在させない", () => {
@@ -448,6 +451,108 @@ describe("FeedbackOverlay", () => {
     const retainedPin = screen.getByRole("button", { name: "#1" });
     expect(retainedPin.getAttribute("aria-pressed")).toBe("true");
     expect(retainedPin.classList.contains("is-active")).toBe(true);
+  });
+
+  it("thread切替時に旧証跡requestを無視し、置換・切替・unmountでBlob URLを解放する", async () => {
+    const firstThread = { ...thread, evidenceAvailable: true };
+    const secondThread = {
+      ...firstThread,
+      id: "20000000-0000-4000-8000-000000000002",
+      displayNumber: 2
+    };
+    let resolveStaleEvidence: ((value: { bytes: Uint8Array; contentType: string; etag: null; contentRange: null }) => void) | undefined;
+    const staleEvidence = new Promise<{ bytes: Uint8Array; contentType: string; etag: null; contentRange: null }>((resolve) => {
+      resolveStaleEvidence = resolve;
+    });
+    const transport = createTransport(async (path) => {
+      if (path === `/threads/${firstThread.id}`) return { value: firstThread, etag: '"1"' };
+      if (path === `/threads/${secondThread.id}`) return { value: secondThread, etag: '"1"' };
+      if (path.endsWith("/threads")) return { value: { items: [firstThread, secondThread] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    const requestBinary = vi.fn()
+      .mockResolvedValueOnce({ bytes: new Uint8Array([1]), contentType: "image/png", etag: null, contentRange: null })
+      .mockReturnValueOnce(staleEvidence)
+      .mockResolvedValueOnce({ bytes: new Uint8Array([2]), contentType: "image/png", etag: null, contentRange: null })
+      .mockResolvedValueOnce({ bytes: new Uint8Array([3]), contentType: "image/png", etag: null, contentRange: null });
+    transport.requestBinary = requestBinary;
+    const createObjectURL = vi.fn()
+      .mockReturnValueOnce("blob:first-evidence")
+      .mockReturnValueOnce("blob:second-evidence")
+      .mockReturnValueOnce("blob:third-evidence");
+    const revokeObjectURL = vi.fn();
+    const NativeURL = URL;
+    vi.stubGlobal("URL", class extends NativeURL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    });
+
+    const view = render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "#1" }));
+    const evidenceButton = await screen.findByRole("button", { name: "証跡" });
+    fireEvent.click(evidenceButton);
+    expect(await screen.findByRole("img", { name: "証跡" })).toHaveProperty("src", "blob:first-evidence");
+
+    fireEvent.click(evidenceButton);
+    expect(screen.queryByRole("img", { name: "証跡" })).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:first-evidence");
+    fireEvent.click(screen.getByRole("button", { name: "#2" }));
+    expect(await screen.findByRole("heading", { name: /#2/ })).toBeTruthy();
+
+    await act(async () => {
+      resolveStaleEvidence?.({ bytes: new Uint8Array([9]), contentType: "image/png", etag: null, contentRange: null });
+      await staleEvidence;
+    });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("img", { name: "証跡" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "証跡" }));
+    expect(await screen.findByRole("img", { name: "証跡" })).toHaveProperty("src", "blob:second-evidence");
+    fireEvent.click(screen.getByRole("button", { name: "#1" }));
+    expect(await screen.findByRole("heading", { name: /#1/ })).toBeTruthy();
+    expect(screen.queryByRole("img", { name: "証跡" })).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:second-evidence");
+
+    fireEvent.click(screen.getByRole("button", { name: "証跡" }));
+    expect(await screen.findByRole("img", { name: "証跡" })).toHaveProperty("src", "blob:third-evidence");
+    view.unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:third-evidence");
+  });
+
+  it("thread切替時に旧threadの証跡取得errorを消去する", async () => {
+    const firstThread = { ...thread, evidenceAvailable: true };
+    const secondThread = {
+      ...firstThread,
+      id: "20000000-0000-4000-8000-000000000002",
+      displayNumber: 2
+    };
+    const transport = createTransport(async (path) => {
+      if (path === `/threads/${firstThread.id}`) return { value: firstThread, etag: '"1"' };
+      if (path === `/threads/${secondThread.id}`) return { value: secondThread, etag: '"1"' };
+      if (path.endsWith("/threads")) return { value: { items: [firstThread, secondThread] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    transport.requestBinary = vi.fn(async () => { throw new Error("旧threadの証跡取得に失敗しました"); });
+
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "#1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "証跡" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("旧threadの証跡取得に失敗しました");
+
+    fireEvent.click(screen.getByRole("button", { name: "#2" }));
+    expect(await screen.findByRole("heading", { name: /#2/ })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.queryByRole("img", { name: "証跡" })).toBeNull();
   });
 
   it("レビュー案内で対象画面と観点を確認できる", async () => {

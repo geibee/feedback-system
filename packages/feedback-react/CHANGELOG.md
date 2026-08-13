@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Thread Drawerのthread切替時に古い証跡previewを破棄し、切替前の遅延responseが現在のpreviewを上書きしないようにしました。
+- Drawerを閉じた時、threadを切り替えた時、Overlayを破棄した時に証跡のBlob URLを解放するようにしました。
+
 ## 1.0.0-alpha.1
 
 - Provider、Overlay、DOM/screen pin、Thread Drawer、locale/theme/portal拡張点を追加。

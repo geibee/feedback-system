@@ -43,6 +43,8 @@ cross-origin画像/fontはCORS対応または除外が必要です。captureを�
 `features.evidenceCapture: false`、独自方式は `adapter.captureEvidence` を使用します。
 DOM/screen pin は現在のmanifest locationと page/route/path/queryが一致するthreadだけを表示します。
 Thread Drawerや投稿一覧を開いている間もpinを維持し、開いているthreadのpinを選択中として表示します。
+Thread Drawerで別のthreadへ切り替えると以前の証跡previewを破棄します。切替前に開始した証跡取得が遅れて完了しても、
+現在開いているthreadのpreviewは上書きされません。Drawerを閉じた時とOverlayを破棄した時は証跡のBlob URLを解放します。
 
 MapLibreの地図を証跡へ含める場合は`@feedback/maplibre`の`createMapLibreEvidenceProvider`で既定DOM captureを
 包み、`adapter.captureEvidence`へ指定してください。MapLibreを使わないconsumerには追加依存は入りません。

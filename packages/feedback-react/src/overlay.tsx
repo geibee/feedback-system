@@ -613,7 +613,9 @@ function ThreadDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [evidencePreview, setEvidencePreview] = useState<{ threadId: string; url: string } | null>(null);
+  const evidenceUrlRef = useRef<string | null>(null);
+  const evidenceRequestGeneration = useRef(0);
   const thread = resource.thread;
   const permissions = feedback.reviewContext?.permissions ?? [];
   const canComment = permissions.includes("feedback.comment");
@@ -623,7 +625,20 @@ function ThreadDrawer({
   useEffect(() => {
     void Promise.resolve(feedback.adapter.getParticipantName?.() ?? null).then((value) => setParticipantName(value ?? ""));
   }, [feedback.adapter]);
-  useEffect(() => () => { if (evidenceUrl) URL.revokeObjectURL(evidenceUrl); }, [evidenceUrl]);
+  useEffect(() => {
+    evidenceRequestGeneration.current += 1;
+    const previousUrl = evidenceUrlRef.current;
+    evidenceUrlRef.current = null;
+    setEvidencePreview(null);
+    setError(null);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+    return () => {
+      evidenceRequestGeneration.current += 1;
+      const currentUrl = evidenceUrlRef.current;
+      evidenceUrlRef.current = null;
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+    };
+  }, [thread.id]);
 
   const refresh = async () => {
     const next = await feedback.transport.request<Thread>(`/threads/${encodeURIComponent(thread.id)}`);
@@ -666,12 +681,24 @@ function ThreadDrawer({
     }
   };
   const showEvidence = async () => {
+    const generation = ++evidenceRequestGeneration.current;
+    const previousUrl = evidenceUrlRef.current;
+    evidenceUrlRef.current = null;
+    setEvidencePreview(null);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+    setError(null);
     try {
       const evidence = await feedback.transport.requestBinary(`/threads/${encodeURIComponent(thread.id)}/evidence`);
-      if (evidenceUrl) URL.revokeObjectURL(evidenceUrl);
-      setEvidenceUrl(URL.createObjectURL(new Blob([evidence.bytes.slice().buffer as ArrayBuffer], { type: evidence.contentType })));
+      if (generation !== evidenceRequestGeneration.current) return;
+      const nextUrl = URL.createObjectURL(new Blob([evidence.bytes.slice().buffer as ArrayBuffer], { type: evidence.contentType }));
+      if (generation !== evidenceRequestGeneration.current) {
+        URL.revokeObjectURL(nextUrl);
+        return;
+      }
+      evidenceUrlRef.current = nextUrl;
+      setEvidencePreview({ threadId: thread.id, url: nextUrl });
     } catch (nextError) {
-      setError(messageOf(nextError));
+      if (generation === evidenceRequestGeneration.current) setError(messageOf(nextError));
     }
   };
   return (
@@ -744,7 +771,9 @@ function ThreadDrawer({
           </button>
         ) : null}
       </div>
-      {evidenceUrl ? <img className="feedback-evidence-preview" src={evidenceUrl} alt={feedback.messages.evidence} /> : null}
+      {evidencePreview?.threadId === thread.id
+        ? <img className="feedback-evidence-preview" src={evidencePreview.url} alt={feedback.messages.evidence} />
+        : null}
     </aside>
   );
 }

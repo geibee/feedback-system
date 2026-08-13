@@ -16,4 +16,13 @@ import "@feedback/admin-react/styles.css";
 />;
 ```
 
+threadの証跡は専用モーダルに表示され、選択したthread番号と観点を確認できます。別のthreadや証跡へ切り替えた
+場合は以前のpreviewを破棄し、先に開始した取得が遅れて完了しても現在の選択を上書きしません。モーダルには読込中／
+失敗状態と閉じる操作が表示され、閉じた証跡のBlob URLは解放されます。
+
+CSV／XLSX Exportを作成すると、jobが`queued`／`running`の間は完了まで自動追跡し、`completed`になった時点で
+作成時に選択した形式のファイルを自動ダウンロードします。`failed`ではserverから返されたエラーを表示します。
+状態取得またはダウンロードに失敗したjobは画面に保持されるため、手動で状態を再確認し、完了済みファイルを再度
+ダウンロードできます。処理中は同じ画面からExportを重複作成できません。
+
 正式配布先が承認されるまでは `private: true` を維持し、repository内のAdmin Consoleからworkspace参照します。

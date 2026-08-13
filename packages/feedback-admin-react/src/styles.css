@@ -44,6 +44,12 @@
 .feedback-admin-dialog > header h2, .feedback-admin-dialog > header p { margin-block: 0; }
 .feedback-admin-dialog > header h2 { font-size: 1.45rem; }
 .feedback-admin-dialog > header > button { min-width: 2.5rem; min-height: 2.5rem; border-radius: 999px; font-size: 1.35rem; }
+.feedback-admin-evidence-dialog { width: min(72rem, calc(100vw - 2rem)); }
+.feedback-admin-evidence-body { display: grid; min-height: 14rem; place-items: center; padding: 1.5rem 2rem 2rem; }
+.feedback-admin-evidence-body > div { width: 100%; text-align: center; }
+.feedback-admin-evidence-body img { max-height: calc(100vh - 12rem); object-fit: contain; }
+.feedback-admin-export-status { margin-top: .75rem; border-radius: .45rem; padding: .65rem .8rem; background: #f8fafc; }
+.feedback-admin-export-status p { margin-block: .25rem; }
 .feedback-admin-session-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem 1.25rem; padding: 1.5rem 2rem 2rem; }
 .feedback-admin-session-form .wide { grid-column: 1 / -1; }
 .feedback-admin-session-form fieldset { min-width: 0; border: 1px solid #cbd5e1; border-radius: .75rem; padding: 1.25rem; background: #fbfdff; }

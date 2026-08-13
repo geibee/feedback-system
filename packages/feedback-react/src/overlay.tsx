@@ -44,16 +44,28 @@ export const feedbackMapAttribute = "data-feedback-map";
 export type FeedbackOverlayProps = {
   deepLinkThreadId?: string | null;
   className?: string;
+  /** MapLibreなどhost固有領域のpointer座標を専用targetへ変換する。null時はDOM/screen targetへ戻す。 */
+  targetResolver?: FeedbackTargetResolver;
   /** レビュー案内の既読状態を保存するlocalStorage key。 */
   reviewIntroductionStorageKey?: string;
   /** 受付中レビューがない場合に表示する管理画面URL。 */
   reviewManagementUrl?: string;
 };
 
+export type FeedbackTargetResolverInput = {
+  action: "pick" | "context-menu";
+  element: Element | null;
+  clientX: number;
+  clientY: number;
+};
+
+export type FeedbackTargetResolver = (input: FeedbackTargetResolverInput) => Target | null;
+
 /** v1 transport だけを使う汎用 Overlay。ホストの router/API/TanStack Query へ依存しない。 */
 export function FeedbackOverlay({
   deepLinkThreadId,
   className,
+  targetResolver,
   reviewIntroductionStorageKey,
   reviewManagementUrl
 }: FeedbackOverlayProps) {
@@ -121,6 +133,26 @@ export function FeedbackOverlay({
     setContextMenu(null);
   }, []);
 
+  const resolvePointerTarget = useCallback((
+    element: Element | null,
+    event: MouseEvent,
+    action: FeedbackTargetResolverInput["action"]
+  ): Target => {
+    const fallback = targetAtEvent(element, event);
+    if (!targetResolver) return fallback;
+    try {
+      return targetResolver({
+        action,
+        element,
+        clientX: event.clientX,
+        clientY: event.clientY
+      }) ?? fallback;
+    } catch (nextError) {
+      setError(messageOf(nextError));
+      return fallback;
+    }
+  }, [targetResolver]);
+
   const startPicking = useCallback(() => {
     captureGeneration.current += 1;
     setActive(null);
@@ -187,10 +219,9 @@ export function FeedbackOverlay({
       const element = event.target instanceof Element ? event.target : null;
       if (element?.closest("[data-feedback-overlay]")) return;
       if (element?.closest(`[${feedbackExcludeAttribute}]`)) return;
-      if (element?.closest(`[${feedbackMapAttribute}]`)) return;
       event.preventDefault();
       event.stopPropagation();
-      void selectTarget(targetAtEvent(element, event));
+      void selectTarget(resolvePointerTarget(element, event, "pick"));
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") reset();
@@ -201,7 +232,7 @@ export function FeedbackOverlay({
       document.removeEventListener("click", handleClick, true);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [canComment, feedback.location, mode, posting, reset, selectTarget, session]);
+  }, [canComment, feedback.location, mode, posting, reset, resolvePointerTarget, selectTarget, session]);
 
   useEffect(() => {
     if (
@@ -216,19 +247,18 @@ export function FeedbackOverlay({
       const element = event.target instanceof Element ? event.target : null;
       if (element?.closest("[data-feedback-overlay]")) return;
       if (element?.closest(`[${feedbackExcludeAttribute}]`)) return;
-      if (element?.closest(`[${feedbackMapAttribute}]`)) return;
       event.preventDefault();
       setActive(null);
       setThreadListOpen(false);
       setContextMenu({
         clientX: event.clientX,
         clientY: event.clientY,
-        target: targetAtEvent(element, event)
+        target: resolvePointerTarget(element, event, "context-menu")
       });
     };
     document.addEventListener("contextmenu", handleContextMenu, true);
     return () => document.removeEventListener("contextmenu", handleContextMenu, true);
-  }, [canComment, feedback.features.contextMenu, feedback.location, mode, posting, session]);
+  }, [canComment, feedback.features.contextMenu, feedback.location, mode, posting, resolvePointerTarget, session]);
 
   if (feedback.state !== "ready" || !feedback.location) return null;
   const visibleThreads = threads.filter((thread) => feedbackThreadMatchesLocation(thread, feedback.location!));
@@ -247,9 +277,16 @@ export function FeedbackOverlay({
             autoOpen={feedback.features.autoIntroduction === true}
             storageKey={reviewIntroductionStorageKey}
           />
+          {canRead ? (
+            <PinLayer
+              threads={visibleThreads}
+              session={session}
+              activeThreadId={active?.thread.id ?? null}
+              onOpen={(id) => void openThread(id, false)}
+            />
+          ) : null}
           {mode === "idle" && !active && !threadListOpen && !contextMenu ? (
             <>
-              <PinLayer threads={visibleThreads} session={session} onOpen={(id) => void openThread(id, false)} />
               {canComment && posting !== "deny" ? (
                 <button type="button" className="feedback-launcher" onClick={startPicking}>
                   <span aria-hidden="true">＋</span>
@@ -819,7 +856,17 @@ function MessageItem({ message, onUpdated }: { message: Message; onUpdated(): vo
   );
 }
 
-function PinLayer({ threads, session, onOpen }: { threads: Thread[]; session: Session; onOpen(id: string): void }) {
+function PinLayer({
+  threads,
+  session,
+  activeThreadId,
+  onOpen
+}: {
+  threads: Thread[];
+  session: Session;
+  activeThreadId: string | null;
+  onOpen(id: string): void;
+}) {
   const [layoutVersion, setLayoutVersion] = useState(0);
   useEffect(() => {
     const refresh = () => setLayoutVersion((current) => current + 1);
@@ -853,8 +900,9 @@ function PinLayer({ threads, session, onOpen }: { threads: Thread[]; session: Se
         >
           <button
             type="button"
-            className={`feedback-pin${thread.status === "resolved" ? " is-resolved" : ""}`}
+            className={`feedback-pin${thread.status === "resolved" ? " is-resolved" : ""}${thread.id === activeThreadId ? " is-active" : ""}`}
             aria-label={`#${thread.displayNumber}`}
+            aria-pressed={thread.id === activeThreadId}
             title={threadLabel(thread, session)}
             onClick={() => onOpen(thread.id)}
           >

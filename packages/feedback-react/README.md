@@ -34,10 +34,18 @@ Feedback Buttonを押すと対象選択modeになり、次にクリックした�
 `ShadowRoot` を指定できます。strict CSP では同梱CSSを stylesheet として読み込み、`connect-src` に
 Feedback Service、証跡previewを使う場合だけ `img-src blob:` を許可してください。
 
+`data-feedback-map`配下の操作も除外せず、`targetResolver`未指定時は画面座標targetとして投稿できます。
+MapLibreの地理座標／地物targetへ変換する場合は`@feedback/maplibre`の
+`resolveMapLibreFeedbackTargetAtClientPoint`を`targetResolver`から呼び出します。
+
 既定DOM captureは `data-feedback-exclude` を除外し、`data-feedback-mask` を同梱CSSでマスクします。
 cross-origin画像/fontはCORS対応または除外が必要です。captureを不要にする場合は
 `features.evidenceCapture: false`、独自方式は `adapter.captureEvidence` を使用します。
 DOM/screen pin は現在のmanifest locationと page/route/path/queryが一致するthreadだけを表示します。
+Thread Drawerや投稿一覧を開いている間もpinを維持し、開いているthreadのpinを選択中として表示します。
+
+MapLibreの地図を証跡へ含める場合は`@feedback/maplibre`の`createMapLibreEvidenceProvider`で既定DOM captureを
+包み、`adapter.captureEvidence`へ指定してください。MapLibreを使わないconsumerには追加依存は入りません。
 
 自己申告名が必要なparticipant policyでは`adapter.getParticipantName`／`setParticipantName`を使います。
 `createLocalStorageParticipantAdapter`はlocalStorageへの保存を明示的に選択する場合だけ利用してください。

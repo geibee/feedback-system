@@ -1,5 +1,127 @@
-import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { MapGeoJSONFeature } from "maplibre-gl";
 import type { FeedbackTargetV1, FeedbackThreadV1 } from "@feedback/contracts";
+import type { FeedbackEvidenceProvider } from "@feedback/core";
+
+export const maplibreCanvasSelector = "canvas.maplibregl-canvas";
+export const captureReadyCanvasContextAttributes = { preserveDrawingBuffer: true } as const;
+
+export type FeedbackMapLibreEvidenceMap = {
+  getCanvas(): HTMLCanvasElement;
+  on(event: "render", listener: () => void): unknown;
+  off(event: "render", listener: () => void): unknown;
+  triggerRepaint(): void;
+};
+
+export type FeedbackMapLibreEvidenceProviderOptions = {
+  /** DOM全体をPNG化するprovider。通常は@feedback/reactのcreateDomEvidenceProviderを渡す。 */
+  capture: FeedbackEvidenceProvider;
+  /** React refの初期化順を吸収し、画面内に存在するMapLibre mapを撮影時点で返す。 */
+  maps(): readonly FeedbackMapLibreEvidenceMap[];
+  /** triggerRepaint後のrender待機上限。 */
+  renderTimeoutMs?: number;
+};
+
+type FrozenMapCanvas = {
+  canvas: HTMLCanvasElement;
+  snapshot: HTMLCanvasElement;
+  parent: Node;
+};
+
+/**
+ * MapLibreのrender event内でWebGL canvasを2D canvasへ固定してからDOM証跡を取得する。
+ * preserveDrawingBufferを常時有効にせず、MapLibre controlsを含むDOM全体を1枚に合成できる。
+ */
+export function createMapLibreEvidenceProvider(
+  options: FeedbackMapLibreEvidenceProviderOptions
+): FeedbackEvidenceProvider {
+  return async (request) => {
+    const maps = [...new Set(options.maps())];
+    const frozen = await Promise.all(maps.map((map) => freezeMapCanvas(
+      map,
+      options.renderTimeoutMs ?? 1_000
+    )));
+    const installed = frozen.flatMap((item) => item && installFrozenCanvas(item) ? [item] : []);
+    try {
+      return await options.capture(request);
+    } finally {
+      installed.reverse().forEach(restoreFrozenCanvas);
+    }
+  };
+}
+
+/** preserveDrawingBuffer無効のMapLibre canvasを検出し、旧来のDOM capture設定漏れを可視化する。 */
+export function findUnreadableMapCanvases(
+  root: ParentNode,
+  selector: string = maplibreCanvasSelector
+): HTMLCanvasElement[] {
+  return Array.from(root.querySelectorAll<HTMLCanvasElement>(selector)).filter(
+    (canvas) => preservesDrawingBuffer(canvas) === false
+  );
+}
+
+function preservesDrawingBuffer(canvas: HTMLCanvasElement): boolean | null {
+  const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+  if (!context) return null;
+  return context.getContextAttributes()?.preserveDrawingBuffer === true;
+}
+
+async function freezeMapCanvas(
+  map: FeedbackMapLibreEvidenceMap,
+  timeoutMs: number
+): Promise<FrozenMapCanvas | null> {
+  const canvas = map.getCanvas();
+  const parent = canvas.parentNode;
+  if (!parent || !canvas.isConnected || canvas.width === 0 || canvas.height === 0) return null;
+  const snapshot = await new Promise<HTMLCanvasElement>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      map.off("render", onRender);
+      if (timer !== undefined) clearTimeout(timer);
+    };
+    const onRender = () => {
+      cleanup();
+      try {
+        resolve(copyCanvasBitmap(canvas));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    map.on("render", onRender);
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("MapLibreの再描画が完了せず、地図を証跡へ取り込めませんでした"));
+    }, Math.max(1, timeoutMs));
+    try {
+      map.triggerRepaint();
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+  return { canvas, snapshot, parent };
+}
+
+function copyCanvasBitmap(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const snapshot = canvas.cloneNode(false) as HTMLCanvasElement;
+  snapshot.width = canvas.width;
+  snapshot.height = canvas.height;
+  const context = snapshot.getContext("2d");
+  if (!context) throw new Error("MapLibre証跡用の2D canvasを作成できませんでした");
+  context.drawImage(canvas, 0, 0);
+  return snapshot;
+}
+
+function installFrozenCanvas(value: FrozenMapCanvas): boolean {
+  if (value.canvas.parentNode !== value.parent) return false;
+  value.parent.replaceChild(value.snapshot, value.canvas);
+  return true;
+}
+
+function restoreFrozenCanvas(value: FrozenMapCanvas): void {
+  if (value.snapshot.parentNode === value.parent) {
+    value.parent.replaceChild(value.canvas, value.snapshot);
+  }
+}
 
 export type FeedbackMapLibreTargetOptions = {
   layers?: string[];
@@ -16,10 +138,20 @@ export type FeedbackMapLibreMap = {
   ): MapGeoJSONFeature[];
 };
 
+export type FeedbackMapLibrePointer = {
+  point: { x: number; y: number };
+  lngLat: { lng: number; lat: number };
+};
+
+export type FeedbackMapLibreClientPointMap = FeedbackMapLibreMap & {
+  getCanvas(): HTMLCanvasElement;
+  unproject(point: [number, number]): { lng: number; lat: number };
+};
+
 /** MapLibre 固有 ID を host adapter で安定 key に変換して FeedbackTargetV1 を作る。 */
 export function resolveMapLibreFeedbackTarget(
   map: FeedbackMapLibreMap,
-  event: Pick<MapMouseEvent, "point" | "lngLat">,
+  event: FeedbackMapLibrePointer,
   options: FeedbackMapLibreTargetOptions
 ): FeedbackTargetV1 {
   const position: FeedbackTargetV1 = {
@@ -48,6 +180,23 @@ export function resolveMapLibreFeedbackTarget(
     longitude: event.lngLat.lng,
     latitude: event.lngLat.lat
   };
+}
+
+/** browserのclient座標をcanvas内座標と経緯度へ変換し、OverlayのtargetResolverから利用できるtargetを作る。 */
+export function resolveMapLibreFeedbackTargetAtClientPoint(
+  map: FeedbackMapLibreClientPointMap,
+  input: { clientX: number; clientY: number },
+  options: FeedbackMapLibreTargetOptions
+): FeedbackTargetV1 {
+  const bounds = map.getCanvas().getBoundingClientRect();
+  const point = {
+    x: input.clientX - bounds.left,
+    y: input.clientY - bounds.top
+  };
+  return resolveMapLibreFeedbackTarget(map, {
+    point,
+    lngLat: map.unproject([point.x, point.y])
+  }, options);
 }
 
 export type FeedbackMapLibreMarker = { remove(): void };

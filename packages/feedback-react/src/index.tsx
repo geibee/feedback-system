@@ -281,4 +281,9 @@ export type {
 export { createDomEvidenceProvider } from "./capture.js";
 export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "./capture.js";
 export { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay.js";
-export type { FeedbackOverlayProps, LocalStorageParticipantAdapter } from "./overlay.js";
+export type {
+  FeedbackOverlayProps,
+  FeedbackTargetResolver,
+  FeedbackTargetResolverInput,
+  LocalStorageParticipantAdapter
+} from "./overlay.js";

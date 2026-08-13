@@ -290,6 +290,44 @@ describe("FeedbackOverlay", () => {
     expect(within(composer).getByText("orders.save")).toBeTruthy();
   });
 
+  it("data-feedback-map領域の右クリックを無視せずhost resolverまたは画面座標へ変換する", async () => {
+    const transport = createTransport(async (path) => {
+      if (path.endsWith("/threads")) return { value: { items: [] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    const targetResolver = vi.fn(() => ({
+      schemaVersion: "1" as const,
+      kind: "map-position" as const,
+      longitude: 139.7,
+      latitude: 35.6
+    }));
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport} features={{ contextMenu: true, evidenceCapture: false }}>
+        <div data-feedback-map=""><canvas aria-label="地図" /></div>
+        <FeedbackOverlay targetResolver={targetResolver} />
+      </FeedbackProvider>
+    );
+
+    const mapCanvas = await screen.findByLabelText("地図");
+    const contextMenuEvent = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 160,
+      clientY: 120
+    });
+    fireEvent(mapCanvas, contextMenuEvent);
+
+    expect(contextMenuEvent.defaultPrevented).toBe(true);
+    expect(targetResolver).toHaveBeenCalledWith(expect.objectContaining({
+      action: "context-menu",
+      element: mapCanvas,
+      clientX: 160,
+      clientY: 120
+    }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "フィードバックを残す" }));
+    expect(await screen.findByRole("dialog", { name: "フィードバックの投稿" })).toBeTruthy();
+  });
+
   it("他の人の投稿を画面ごとに一覧表示し、選択したスレッドへ遷移する", async () => {
     const navigate = vi.fn();
     const otherThread = {
@@ -388,6 +426,28 @@ describe("FeedbackOverlay", () => {
     expect(screenPin.parentElement?.getAttribute("y")).toBe("376");
     expect(domPin.parentElement?.getAttribute("x")).toBe("146");
     expect(domPin.parentElement?.getAttribute("y")).toBe("196");
+  });
+
+  it("thread drawerを開いてもpinを維持して選択中として表示する", async () => {
+    const transport = createTransport(async (path) => {
+      if (path === `/threads/${thread.id}`) return { value: thread, etag: '"1"' };
+      if (path.endsWith("/threads")) return { value: { items: [thread] }, etag: null };
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    const pin = await screen.findByRole("button", { name: "#1" });
+    expect(pin.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(pin);
+
+    expect(await screen.findByRole("dialog", { name: "フィードバックスレッド" })).toBeTruthy();
+    const retainedPin = screen.getByRole("button", { name: "#1" });
+    expect(retainedPin.getAttribute("aria-pressed")).toBe("true");
+    expect(retainedPin.classList.contains("is-active")).toBe(true);
   });
 
   it("レビュー案内で対象画面と観点を確認できる", async () => {

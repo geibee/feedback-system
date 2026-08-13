@@ -727,6 +727,10 @@
 
 .feedback-pin > span { transform: rotate(45deg); }
 .feedback-pin.is-resolved { background: var(--feedback-pin-resolved); }
+.feedback-pin.is-active {
+  outline: 3px solid color-mix(in srgb, var(--feedback-pin) 30%, transparent);
+  outline-offset: 2px;
+}
 
 .feedback-thread-meta,
 .feedback-message-heading {

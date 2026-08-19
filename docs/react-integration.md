@@ -1,5 +1,8 @@
 # React組み込み
 
+> **Legacy Feedback Service:** この文書は`@feedback/react`と`/feedback/v1`の従来組み込み向けです。
+> 新規SPAは`@feedback/redmine-plugin/loader`を使う[`quickstart.md`](quickstart.md)を参照してください。
+
 React 18/19では `@feedback/core` のHostAdapterとtransportを作成し、`@feedback/react` の
 `FeedbackProvider` / `FeedbackErrorBoundary` / `FeedbackOverlay` を業務画面の一部へ配置する。
 SDK全体でrouter、認証、workspace解決を所有せず、HostAdapterから受け取る。

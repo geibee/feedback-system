@@ -22,7 +22,7 @@ export function parseCurrentUserResult(value: unknown): RedmineCurrentPrincipalV
   text(principal.subjectId, "subjectId", 200);
   if (principal.displayName !== null) text(principal.displayName, "displayName", 200);
   if (principal.redmineUserId !== null) integer(principal.redmineUserId, "redmineUserId", 1);
-  if (principal.source !== "host-session" && principal.source !== "redmine-api-key") throw invalid("principal source");
+  if (principal.source !== "host-session") throw invalid("principal source");
   return principal as RedmineCurrentPrincipalV1;
 }
 

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import {
-  RedmineTrustedClient
-} from "@feedback/redmine-core/trusted";
-import { canonicalJson, sha256Hex } from "@feedback/redmine-core";
+  canonicalJson,
+  parseThreadListResult,
+  parseThreadResult,
+  sha256Hex
+} from "@feedback/redmine-core";
 import { createFeedbackRedmineGatewayHandler } from "@feedback/redmine-gateway";
 
 const [commandArg, endpointArg, seedPathArg, statePathArg] = process.argv.slice(2);
@@ -23,22 +25,13 @@ else throw new Error(`unknown command: ${command}`);
 
 async function createFixture() {
   let currentUserAttempts = 0;
-  const client = new RedmineTrustedClient({
-    profile,
-    apiKey: seed.apiKey,
-    fetch: async (url, init) => {
-      if (new URL(url).pathname.endsWith("/users/current.json") && currentUserAttempts++ < 2) {
-        return new Response(null, { status: 503 });
-      }
-      return globalThis.fetch(url, init);
-    },
-    allowHttpDevelopment: true
-  });
-  const validation = await client.validateConnection();
-  assert.equal(currentUserAttempts, 3);
-  assert.equal(validation.user.id, seed.userId);
-  assert.equal(validation.projectId, seed.projectId);
-  assert.equal(validation.customFields, "not-yet-proven");
+  /** @type {import("@feedback/redmine-core/trusted").RedmineFetch} */
+  const retryingFetch = async (url, init) => {
+    if (new URL(url).pathname.endsWith("/users/current.json") && currentUserAttempts++ < 2) {
+      return new Response(null, { status: 503 });
+    }
+    return globalThis.fetch(url, init);
+  };
   const threadId = crypto.randomUUID();
   const intentId = crypto.randomUUID();
   const screenshot = Uint8Array.from(Buffer.from(
@@ -46,6 +39,7 @@ async function createFixture() {
     "base64"
   ));
   const capturedAt = new Date().toISOString();
+  /** @type {import("@feedback/redmine-core").FeedbackHostResourceRefV1} */
   const resourceRef = { schemaVersion: "1", kind: "record", key: "conformance-resource" };
   const hostResourceKey = await sha256Hex(new TextEncoder().encode(canonicalJson(resourceRef)));
   /** @type {NonNullable<import("@feedback/redmine-core").RedmineThreadCreateInput["evidence"]>} */
@@ -59,9 +53,15 @@ async function createFixture() {
     pixelRatio: 1,
     capturedAt
   };
-  /** @type {import("@feedback/redmine-core/trusted").TrustedCreateInput} */
+  const gateway = gatewayHandler(hostResourceKey, retryingFetch);
+  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`));
+  assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
+  assert.equal(currentUserAttempts, 3);
+
+  /** @type {import("@feedback/redmine-core").RedmineThreadCreateInput} */
   const input = {
     profileId: profile.profileId,
+    resourceRef,
     threadId,
     intentId,
     comment: "最初のコメント\n再構築テスト",
@@ -77,17 +77,22 @@ async function createFixture() {
     release: "conformance",
     locale: "ja-JP",
     capturedAt,
-    evidence,
-    hostResourceKey,
-    author: {
-      source: "redmine-api-key",
-      subjectId: String(validation.user.id),
-      displayName: validation.user.name,
-      redmineUserId: validation.user.id
-    },
-    submissionChannel: "extension"
+    evidence
   };
-  const created = await client.createThread(input, screenshot);
+  const form = new FormData();
+  const { profileId: _profileId, ...createRequest } = input;
+  form.append("request", new Blob([JSON.stringify(createRequest)], { type: "application/json;charset=utf-8" }));
+  form.append("evidence", new Blob([screenshot], { type: evidence.contentType }), evidence.filename);
+  const createResponse = await gateway(gatewayRequest(`${profilePath()}/threads`, {
+    method: "POST",
+    headers: {
+      "X-Feedback-CSRF": "conformance-csrf",
+      "Idempotency-Key": intentId
+    },
+    body: form
+  }));
+  assert.equal(createResponse.status, 201, await createResponse.clone().text());
+  const created = parseThreadResult(await createResponse.json());
   assert.equal(created.threadId, threadId);
   assert.equal(created.initialComment, "最初のコメント\n再構築テスト");
   assert.equal(created.attachments.length, 2);
@@ -99,7 +104,7 @@ async function createFixture() {
   writeFileSync(statePath, JSON.stringify({
     threadId,
     issueId: created.issueId,
-    hostResourceKey: input.hostResourceKey,
+    hostResourceKey,
     resourceRef,
     pageKey: input.location.pageKey,
     evidenceSha256: evidence.sha256,
@@ -110,9 +115,14 @@ async function createFixture() {
 
 async function verifyFixture() {
   const state = JSON.parse(readFileSync(statePath, "utf8"));
-  const direct = new RedmineTrustedClient({ profile, apiKey: seed.apiKey, fetch: globalThis.fetch, allowHttpDevelopment: true });
-  assert.equal((await direct.validateConnection()).customFields, "verified");
-  const rebuilt = await direct.getThread({ hostResourceKey: state.hostResourceKey, threadId: state.threadId });
+  const gateway = gatewayHandler(state.hostResourceKey);
+  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`));
+  assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
+  const detailResponse = await gateway(gatewayRequest(
+    `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=untrusted-client-value`
+  ));
+  assert.equal(detailResponse.status, 200, await detailResponse.clone().text());
+  const rebuilt = parseThreadResult(await detailResponse.json());
   assert.equal(rebuilt.threadId, state.threadId);
   assert.equal(rebuilt.initialComment, "最初のコメント\n再構築テスト");
   assert(rebuilt.locator);
@@ -131,91 +141,82 @@ async function verifyFixture() {
   assert.equal(rebuilt.attachments.length, 2);
   const primary = rebuilt.attachments.find((attachment) => attachment.primaryEvidence);
   assert(primary);
-  const downloaded = await direct.getAttachment({
-    hostResourceKey: state.hostResourceKey,
-    threadId: state.threadId,
-    attachmentId: primary.id
-  });
-  assert.equal(downloaded.sha256, state.evidenceSha256);
-  assert.equal(downloaded.bytes.byteLength, state.screenshotByteSize);
+  const attachmentResponse = await gateway(gatewayRequest(
+    `${profilePath()}/threads/${state.threadId}/attachments/${primary.id}` +
+      "?resourceKind=record&resourceKey=untrusted-client-value"
+  ));
+  assert.equal(attachmentResponse.status, 200, await attachmentResponse.clone().text());
+  const downloaded = new Uint8Array(await attachmentResponse.arrayBuffer());
+  assert.equal(attachmentResponse.headers.get("x-feedback-content-sha256"), state.evidenceSha256);
+  assert.equal(await sha256Hex(downloaded), state.evidenceSha256);
+  assert.equal(downloaded.byteLength, state.screenshotByteSize);
 
   /** @type {import("@feedback/redmine-core").RedmineThreadSort[]} */
   const sorts = ["created_desc", "created_asc", "updated_desc"];
   for (const sort of sorts) {
-    const listed = await direct.listThreads({
-      hostResourceKey: state.hostResourceKey,
+    const query = new URLSearchParams({
+      resourceKind: state.resourceRef.kind,
+      resourceKey: state.resourceRef.key,
       pageKey: state.pageKey,
-      sort,
-      filter: {},
-      offset: 0
+      sort
     });
+    const listResponse = await gateway(gatewayRequest(`${profilePath()}/threads?${query}`));
+    assert.equal(listResponse.status, 200, await listResponse.clone().text());
+    const listed = parseThreadListResult(await listResponse.json());
     assert.equal(listed.threads[0]?.threadId, state.threadId);
   }
 
-  const gateway = createFeedbackRedmineGatewayHandler({
-    host: {
-      authenticate: async () => ({ subjectId: "host-user", displayName: "Host User", redmineUserId: null }),
-      authorizeProfile: async () => true,
-      authorizeResource: async () => ({ resourceKey: state.hostResourceKey }),
-      authorizeStoredResource: async ({ storedResourceKey }) => storedResourceKey === state.hostResourceKey,
-      verifyCsrf: async () => true
-    },
-    loadProfile: async () => ({ ...profile, authorizationMode: "resource-scoped", secretRef: "conformance-key" }),
-    loadSecret: async () => seed.apiKey,
-    fetch: globalThis.fetch,
-    allowHttpDevelopment: true
-  });
-  const gatewayResponse = await gateway(new Request(
-    `http://app.example/internal/feedback-redmine/v1/profiles/${profile.profileId}/threads/${state.threadId}` +
-      "?resourceKind=record&resourceKey=untrusted-client-value",
-    { headers: { Origin: "http://app.example", "Sec-Fetch-Site": "same-origin" } }
-  ));
-  assert.equal(gatewayResponse.status, 200);
-  const gatewayThread = (await gatewayResponse.json()).thread;
-  assert.deepEqual(gatewayThread, rebuilt);
-
-  const extensionConformanceModule = "../../../apps/feedback-redmine-extension/dist/conformance.js";
-  const { fetchThreadThroughExtension } = await import(extensionConformanceModule);
-  const { schemaVersion: _schemaVersion, ...clientProfile } = profile.clientProfile;
-  const extensionThread = await fetchThreadThroughExtension({
-    profile: {
-      ...clientProfile,
-      hostOrigins: ["https://inventory.example.invalid"],
-      redmineBaseUrl: endpoint,
-      projectId: profile.projectId,
-      trackerId: profile.trackerId,
-      isPrivate: profile.isPrivate,
-      defaultPriorityId: profile.defaultPriorityId,
-      customFieldIds: profile.customFieldIds,
-      showRedmineLink: profile.showRedmineLink
-    },
-    apiKey: seed.apiKey,
-    resourceRef: state.resourceRef,
-    threadId: state.threadId,
-    fetch: globalThis.fetch
-  });
-  assert.deepEqual(extensionThread, rebuilt);
-
-  const deniedGateway = createFeedbackRedmineGatewayHandler({
-    host: {
-      authenticate: async () => ({ subjectId: "host-user", displayName: "Host User", redmineUserId: null }),
-      authorizeProfile: async () => true,
-      authorizeResource: async () => ({ resourceKey: state.hostResourceKey }),
-      authorizeStoredResource: async () => false,
-      verifyCsrf: async () => true
-    },
-    loadProfile: async () => ({ ...profile, authorizationMode: "resource-scoped", secretRef: "conformance-key" }),
-    loadSecret: async () => seed.apiKey,
-    fetch: globalThis.fetch,
-    allowHttpDevelopment: true
-  });
-  const deniedResponse = await deniedGateway(new Request(
-    `http://app.example/internal/feedback-redmine/v1/profiles/${profile.profileId}/threads/${state.threadId}` +
-      "?resourceKind=record&resourceKey=known-thread-from-other-resource",
-    { headers: { Origin: "http://app.example", "Sec-Fetch-Site": "same-origin" } }
+  const deniedGateway = gatewayHandler(state.hostResourceKey, globalThis.fetch, false);
+  const deniedResponse = await deniedGateway(gatewayRequest(
+    `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=known-thread-from-other-resource`
   ));
   assert.equal(deniedResponse.status, 404);
   process.stdout.write(`verified Redmine ${seed.version} reconstruction issue ${state.issueId}\n`);
+}
+
+function profilePath() {
+  return `/internal/feedback-redmine/v1/profiles/${profile.profileId}`;
+}
+
+/**
+ * @param {string} hostResourceKey
+ * @param {import("@feedback/redmine-core/trusted").RedmineFetch} [redmineFetch]
+ * @param {boolean} [allowStoredResource]
+ */
+function gatewayHandler(hostResourceKey, redmineFetch = globalThis.fetch, allowStoredResource = true) {
+  return createFeedbackRedmineGatewayHandler({
+    host: {
+      authenticate: async () => ({
+        subjectId: "conformance-host-user",
+        displayName: "Conformance Host User",
+        redmineUserId: seed.userId
+      }),
+      authorizeProfile: async () => true,
+      authorizeResource: async () => ({ resourceKey: hostResourceKey }),
+      authorizeStoredResource: async ({ storedResourceKey }) =>
+        allowStoredResource && storedResourceKey === hostResourceKey,
+      verifyCsrf: async () => true
+    },
+    loadProfile: async () => ({ ...profile, authorizationMode: "resource-scoped", secretRef: "conformance-key" }),
+    loadSecret: async () => seed.apiKey,
+    fetch: redmineFetch,
+    allowHttpDevelopment: true
+  });
+}
+
+/**
+ * @param {string} path
+ * @param {RequestInit} [init]
+ */
+function gatewayRequest(path, init = {}) {
+  return new Request(`http://app.example${path}`, {
+    ...init,
+    headers: {
+      Origin: "http://app.example",
+      "Sec-Fetch-Site": "same-origin",
+      ...Object.fromEntries(new Headers(init.headers))
+    }
+  });
 }
 
 /**

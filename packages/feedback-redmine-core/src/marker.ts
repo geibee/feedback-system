@@ -8,7 +8,6 @@ export type FeedbackMetadataV1 = {
   pageKey: string;
   hostResourceKey: string;
   perspectiveCode: string;
-  submissionChannel: "embedded" | "extension";
   submittedById: string;
   capturedAt: string;
 };
@@ -27,7 +26,6 @@ export function buildRedmineDescription(comment: string, metadata: FeedbackMetad
     ["Page", metadata.pageKey],
     ["Host resource", metadata.hostResourceKey],
     ["Perspective", metadata.perspectiveCode],
-    ["Submission channel", metadata.submissionChannel],
     ["Submitted by ID", metadata.submittedById],
     ["Captured at", metadata.capturedAt],
     ["Context attachment", "feedback-context-v1.json"]
@@ -53,7 +51,6 @@ export function parseFeedbackMetadata(description: string): Partial<FeedbackMeta
         return separator < 0 ? [line, ""] : [line.slice(0, separator), line.slice(separator + 2)];
       })
   );
-  const channel = entries.get("Submission channel");
   return {
     threadId: entries.get("Thread ID"),
     intentId: entries.get("Intent ID"),
@@ -64,7 +61,6 @@ export function parseFeedbackMetadata(description: string): Partial<FeedbackMeta
     pageKey: entries.get("Page"),
     hostResourceKey: entries.get("Host resource"),
     perspectiveCode: entries.get("Perspective"),
-    submissionChannel: channel === "embedded" || channel === "extension" ? channel : undefined,
     submittedById: entries.get("Submitted by ID"),
     capturedAt: entries.get("Captured at")
   };

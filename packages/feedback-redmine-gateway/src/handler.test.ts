@@ -34,8 +34,7 @@ const profile: GatewayServerProfile = {
     perspectiveCode: 28,
     locator: 29,
     submittedById: 30,
-    submittedByName: 31,
-    submissionChannel: 32
+    submittedByName: 31
   },
   showRedmineLink: false,
   authorizationMode: "resource-scoped",
@@ -64,8 +63,7 @@ function issueFixture(id = 123) {
       { id: 28, value: "ux" },
       { id: 29, value: "" },
       { id: 30, value: "subject-1" },
-      { id: 31, value: "利用者" },
-      { id: 32, value: "embedded" }
+      { id: 31, value: "利用者" }
     ],
     attachments: [],
     journals: []

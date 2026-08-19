@@ -3,7 +3,7 @@ import type { RedmineEvidenceMetadata } from "./model.js";
 import { RedmineFeedbackError, contractError } from "./errors.js";
 
 export type TrustedFeedbackAuthor = {
-  source: "host-session" | "redmine-api-key";
+  source: "host-session";
   subjectId: string;
   displayName: string | null;
   redmineUserId: number | null;

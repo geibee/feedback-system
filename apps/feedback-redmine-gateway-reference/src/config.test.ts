@@ -83,8 +83,7 @@ function createProfileFiles(extra: Record<string, unknown> = {}): string {
       perspectiveCode: 28,
       locator: 29,
       submittedById: 30,
-      submittedByName: 31,
-      submissionChannel: 32
+      submittedByName: 31
     },
     authorizationMode: "resource-scoped",
     showRedmineLink: false,

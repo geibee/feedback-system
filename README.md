@@ -1,227 +1,142 @@
 # Feedback System
 
-React SPAへ画面内フィードバックを追加するためのSDKと、独立したFeedback Service、
-Admin Consoleを提供します。
+React SPAへ画面内フィードバックを追加し、Redmine issue・journal・attachment・custom fieldを唯一の業務データ正本として使う
+pluginとsame-origin gatewayです。Feedback専用DBやobject storageを新設せず、ホストアプリの既存sessionとresource認可を利用します。
 
-ホストアプリのrouter・認証・業務DBを所有せず、コメント、画面上のpin、証跡、
-返信、解決管理などのフィードバック機能だけを分離して導入できます。
+> 現在のバージョンは`1.0.0-alpha.1`です。npm packageはregistry公開前のため、repository workspaceまたは
+> release builderが生成するtarballから利用します。
 
-> 現在のバージョンは `1.0.0-alpha.1` です。
-> npm packageはregistry公開前のため、リポジトリ内のworkspaceまたは
-> `npm pack`で生成したtarballから利用します。
-
-## 主な機能
-
-- React 18 / 19向けのコメントOverlay、DOM／画面座標pin、Thread Drawer
-- レビューセッション、確認観点、返信、解決状態の管理
-- 画像などの証跡をprivate object storageへ保存
-- メンバー、通知、保存期間、CSV／XLSX／証跡パッケージexportを扱うAdmin Console
-- OIDC Bearer JWT、またはmTLS token exchangeによる認証
-- 任意のMapLibre連携
-
-Feedback Serviceに障害が発生した場合はFeedback UIだけを縮退させ、
-ホストアプリ全体の表示や操作は継続できます。
-
-## Redmineを正本にする構成
-
-Feedback専用DBやobject storageを新設せず、Redmine issue・journal・attachment・custom fieldを唯一の業務データ正本にする
-別構成も提供します。既存sessionを使う埋め込みJavaScriptプラグインと、個人Redmine API keyをbrowser sessionだけに保持する
-Manifest V3 Chrome / Edge拡張を同じUI・契約で利用できます。
-
-埋め込み版では業務アプリケーションと同一originのstateless gatewayが認証・resource authorization・CSRFを検証し、
-server-side integration keyでRedmineへ接続します。gatewayはDB、queue、cache、attachment storageを持ちません。
-拡張機能版は業務画面を変更できない場合向けで、許可済みHTTPS originだけにprogrammatic content scriptを登録します。
-
-導入は[`docs/redmine-integration.md`](docs/redmine-integration.md)、gatewayは
-[`docs/redmine-gateway.md`](docs/redmine-gateway.md)、拡張機能は
-[`docs/redmine-extension.md`](docs/redmine-extension.md)を参照してください。これは従来のFeedback Service runtimeを
-Redmineへ暗黙移行する機能ではありません。
-
-## 構成
+## 標準構成
 
 ```text
-React SPA ── Feedback SDK ─────────────┐
-                                       │
-Admin Console ─────────────────────────┼── Feedback Service
-                                       │      ├── PostgreSQL
-OIDC Provider ── Bearer JWT ───────────┤      └── private object storage
-                                       │
-Host backend ── mTLS token exchange ───┘
+React SPA
+  └─ @feedback/redmine-plugin/loader
+       │  feature flagでdynamic import / unmount
+       ▼
+same-origin /internal/feedback-redmine/v1
+  └─ @feedback/redmine-gateway
+       │  session認証・resource認可・CSRF
+       │  server-side integration API key
+       ▼
+Redmine
+  ├─ issue + 11 custom fields
+  ├─ journal
+  └─ context / evidence attachment
 ```
 
-Feedback Serviceはホストアプリの業務DBを参照しません。
-ホスト側のprojectやworkspaceは、Feedback側のexternalWorkspaceKeyとして対応付けます。
+Feedback UIは初回投稿、任意のスクリーンショット、スレッド参照を提供します。返信、編集、担当、優先度、状態変更は
+Redmine UIで行います。gatewayはstatelessで、DB、queue、cache、filesystem upload、object storageを持ちません。
 
-## ローカルで起動する
+ブラウザ拡張機能は配布しません。pluginをSPA buildへ同梱し、hostのfeature flagからいつでも有効化・無効化できる境界を
+標準にします。
+
+## SPAへ組み込む
+
+標準入口は`@feedback/redmine-plugin/loader`です。controllerを作成しただけではDOM、通信、timer、router購読を開始しません。
+
+```ts
+import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+
+const feedback = createRedmineFeedbackPluginController({
+  profileId: "inventory-production",
+  adapter,
+  getCsrfToken: () =>
+    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
+  onUnavailable: (error) => console.error("Feedbackを利用できません", error)
+});
+
+await feedback.setEnabled(featureFlags.feedback ?? true);
+const unsubscribe = featureFlags.subscribe("feedback", (enabled) => {
+  void feedback.setEnabled(enabled);
+});
+
+// SPA自体を破棄するとき
+unsubscribe();
+feedback.destroy();
+```
+
+`setEnabled(false)`は通信、polling、購読、React root、controller所有DOMを破棄します。draft、follow、pending intentは保持し、
+再有効化できます。完全撤去時だけ`await feedback.purgeLocalState()`を明示実行し、integration module、npm依存、gateway mountを
+削除します。Redmine上のデータは削除しません。
+
+React 18または19はSPAとpeer dependencyとして共有します。Redmine API key、Redmine URL、project/tracker/custom field IDを
+browserへ渡す公開optionはありません。
+
+## 導入
 
 必要なもの:
 
-- Docker Engine
-- Docker Compose v2
-- 初回build時のネットワーク接続
+- Node.js 22以上25未満とnpm
+- REST APIを有効化したRedmine 5.1.12以上
+- React 18または19のSPA
+- 既存session認証とresource認可を提供できるホストbackend
 
-```bash
-cp deploy/.env.example deploy/.env
+1. Redmineに専用project、tracker、integration user、11 custom fieldsを作る。
+2. `@feedback/redmine-gateway`を既存認証middleware後段へsame-originでmountする。
+3. integration userのAPI keyをserver-side secretだけから注入する。
+4. SPAに`@feedback/redmine-plugin`を同梱し、loader controllerをfeature flagへ接続する。
+5. 初回投稿、参照、無効化、再有効化をstagingで確認する。
 
-docker compose \
-  --env-file deploy/.env \
-  -f deploy/compose.yaml \
-  up -d --build
-```
+詳しい手順は[`docs/quickstart.md`](docs/quickstart.md)、Redmine準備は
+[`docs/redmine-integration.md`](docs/redmine-integration.md)、gateway SPIは
+[`docs/redmine-gateway.md`](docs/redmine-gateway.md)を参照してください。
 
-起動確認:
+`apps/feedback-redmine-gateway-reference`はローカル確認用です。demo session adapterは業務resourceを認可しないため、
+本番では必ずホスト固有の認証・認可・CSRF adapterへ置き換えます。
 
-```bash
-curl --fail http://localhost:8090/health/ready
-
-docker compose \
-  --env-file deploy/.env \
-  -f deploy/compose.yaml \
-  ps
-```
-
-主なURL:
-
-| URL | 用途 |
-| --- | --- |
-| <http://localhost:5174> | Admin Console |
-| <http://localhost:5175> | consumer適合性fixture |
-| <http://localhost:8090/feedback/v1> | Feedback API v1 |
-| <http://localhost:8090/health/ready> | API readiness |
-| <http://localhost:8180> | ローカルOIDC Provider |
-
-Admin Consoleのローカルユーザー:
-
-```text
-ユーザー名: feedback-admin
-パスワード: feedback-local-only
-```
-
-`deploy/.env.example`のcredentialはローカル専用です。本番環境には使用しないでください。
-
-停止:
-
-```bash
-docker compose \
-  --env-file deploy/.env \
-  -f deploy/compose.yaml \
-  down
-```
-
-`down --volumes`はPostgreSQL、証跡、exportを含むローカルデータを削除します。
-
-詳しい起動方法は[`docs/quickstart.md`](docs/quickstart.md)を参照してください。
-
-## ホストアプリへ組み込む
-
-導入は次の単位に分かれます。
-
-1. Feedback Service用のPostgreSQLを用意する（`full` profileではprivate object storageも用意する）
-2. OIDCまたはtoken exchangeを設定する
-3. installation manifestでtenant、application、environment、workspace、membershipを同期する
-4. ホストアプリへFeedback SDKを追加する
-5. `FeedbackHostAdapter`でrouter、token、workspace、画面遷移を接続する
-6. `feedback manifest apply`でapplication manifestをCI/CDから同期する
-7. `FeedbackProvider`と`FeedbackOverlay`を配置する
-
-Reactの最小構成:
-
-```tsx
-import {
-  FeedbackErrorBoundary,
-  FeedbackOverlay,
-  FeedbackProvider
-} from "@feedback/react";
-import "@feedback/react/styles.css";
-
-<FeedbackErrorBoundary>
-  <FeedbackProvider adapter={adapter} transport={transport}>
-    <FeedbackOverlay />
-  </FeedbackProvider>
-</FeedbackErrorBoundary>;
-```
-
-SDKは次の情報をホストアプリから受け取ります。
-
-- `applicationKey`
-- `environmentKey`
-- `externalWorkspaceKey`
-- 現在のrouteと画面parameters
-- route／workspace変更通知（SPAでは任意の`HostAdapter.subscribe`で接続）
-- Feedback audienceを持つaccess token
-- deep linkの画面遷移処理
-
-詳しい実装は[`docs/react-integration.md`](docs/react-integration.md)を参照してください。
-resourceとmanifestの導入手順、v1のtenant境界は[`docs/installation.md`](docs/installation.md)を参照してください。
-
-### ブラウザ設定
-
-別originのFeedback Serviceへ接続する場合は、次の設定も必要です。
-
-- Feedback Serviceのallowed originsへホストアプリのoriginを登録する
-- ホストアプリのCSP `connect-src`へFeedback APIのoriginを追加する
-- 証跡previewを使用する場合はCSP `img-src blob:`を許可する
-- Feedback APIのoriginを`frame-src`へ追加しない
-- cross-origin画像やfontを証跡へ含める場合は、対象リソースのCORSを設定する
-
-### 認証と認可
-
-直接OIDCを使う場合、JWTにはFeedback Serviceが検証するissuerとaudienceに加え、
-`feedback_permissions`文字列配列が必要です。IdPはOAuth scopeをこのclaimへmappingします。
-
-ホストアプリの権限とFeedbackのmembershipは別に管理されます。Feedback Serviceの実効権限は、
-tokenに含まれるpermissionとFeedback DBのmembershipの積集合です。
-
-詳細は[`docs/authentication.md`](docs/authentication.md)を参照してください。
-
-実際の組み込み例として
-[`geibee/gis-example`](https://github.com/geibee/gis-example)も参照できます。
-
-## 開発
-
-SDKやServiceを変更する場合は、Node.js 22以上25未満、npm、Go 1.26.5が必要です。
+## 開発と検証
 
 ```bash
 npm ci
+npm run build
+npm run smoke:redmine
 bash scripts/verify-feedback.sh
 ```
 
-標準品質ゲートは、Goとnpm workspaceのbuild／test、契約drift、
-package consumer適合性、Compose構成を検査します。
+`npm run build`は共有契約とRedmine SPA/gateway packageをbuildします。従来runtimeだけは`npm run build:legacy`、
+repository全体は`npm run build:all`です。標準品質ゲートはskip変数なしの`bash scripts/verify-feedback.sh`で、
+package、browser lifecycle/security、gateway container、digest固定Redmine 4-version matrix、legacy互換経路を検証します。
 
-standalone構成の全経路を確認する場合:
+## Release
 
 ```bash
-bash scripts/smoke-feedback-standalone.sh
+bash scripts/build-feedback-redmine-release.sh \
+  --output /tmp/feedback-redmine-release \
+  --version 1.0.0-rc.1
 ```
 
-このスクリプトは専用のcontainerとvolumeを作成し、終了時に削除します。
+Redmine releaseには`@feedback/contracts`、共有core/DOM capture、Redmine core/UI/plugin/gatewayのtarball、manifest、SHA-256を含みます。
+ブラウザ拡張ZIP、React runtime入りbundle、reference gateway imageは含みません。詳細は[`docs/release.md`](docs/release.md)を
+参照してください。
 
 ## 公開契約
 
-- REST API: [`contracts/feedback/openapi.yaml`](contracts/feedback/openapi.yaml)
+- Gateway OpenAPI: [`contracts/feedback/redmine-gateway.openapi.yaml`](contracts/feedback/redmine-gateway.openapi.yaml)
 - JSON Schema: [`contracts/feedback/schemas`](contracts/feedback/schemas)
-- npm packages: `@feedback/contracts`、`@feedback/core`、`@feedback/react`
-- 任意package: `@feedback/maplibre`、`@feedback/admin-react`
-- DB migration: [`apps/feedback-service-go/migrations`](apps/feedback-service-go/migrations)
+- npm packages: `@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、`@feedback/redmine-core`、
+  `@feedback/redmine-react`、`@feedback/redmine-plugin`、`@feedback/redmine-gateway`
+- Redmine保存契約: issue custom fields、description metadata、`feedback-context-v1.json`
 
-`/feedback/v1`と`@feedback/*` 1.xは後方互換を維持します。
-ServiceとSDKは対応するversionを揃えて更新してください。
+APIまたはDTOを変更するときはOpenAPI、生成型、[`docs/api-compatibility.md`](docs/api-compatibility.md)を同じ変更で更新します。
+
+## Legacy Feedback Service
+
+PostgreSQL、private object storage、OIDC、Admin Consoleを使う従来Feedback Serviceは互換経路として維持しますが、
+新規導入の既定ではありません。評価・保守時は[`docs/legacy-quickstart.md`](docs/legacy-quickstart.md)を参照してください。
+
+本番投入済み環境は存在しない前提のため、Redmineへのデータ移行、dual-write、read-only切替期間、rollback変換は提供しません。
 
 ## ドキュメント
 
 | 内容 | ドキュメント |
 | --- | --- |
-| 起動とmigration | [`docs/quickstart.md`](docs/quickstart.md) |
-| React SPAへの組み込み | [`docs/react-integration.md`](docs/react-integration.md) |
-| OIDCとtoken exchange | [`docs/authentication.md`](docs/authentication.md) |
-| 環境変数 | [`docs/environment-variables.md`](docs/environment-variables.md) |
-| 運用、health、storage、旧環境移行 | [`docs/operations.md`](docs/operations.md) |
-| backupと通知connector | [`docs/backup-and-connectors.md`](docs/backup-and-connectors.md) |
-| API／SDK互換性 | [`docs/api-compatibility.md`](docs/api-compatibility.md) |
-| upgradeとrollback | [`docs/upgrade.md`](docs/upgrade.md) |
+| Redmine SPA Quickstart | [`docs/quickstart.md`](docs/quickstart.md) |
+| Redmine projectと11 custom fields | [`docs/redmine-integration.md`](docs/redmine-integration.md) |
+| same-origin gateway | [`docs/redmine-gateway.md`](docs/redmine-gateway.md) |
+| 環境変数とsecret境界 | [`docs/environment-variables.md`](docs/environment-variables.md) |
+| API／package互換性 | [`docs/api-compatibility.md`](docs/api-compatibility.md) |
 | release artifact | [`docs/release.md`](docs/release.md) |
-| Azure Container Appsへの配備 | [`docs/azure-deployment.md`](docs/azure-deployment.md) |
+| Legacy runtime Quickstart | [`docs/legacy-quickstart.md`](docs/legacy-quickstart.md) |
 
 ## License
 

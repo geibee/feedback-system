@@ -12,8 +12,7 @@ export const redmineCustomFieldKeys = [
   "perspectiveCode",
   "locator",
   "submittedById",
-  "submittedByName",
-  "submissionChannel"
+  "submittedByName"
 ] as const;
 
 export type RedmineCustomFieldKey = (typeof redmineCustomFieldKeys)[number];

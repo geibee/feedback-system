@@ -23,8 +23,8 @@
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@feedback/redmine-core": "1.0.0-alpha.1",
-    "@feedback/react": "1.0.0-alpha.1"
+    "@feedback/dom-capture": "1.0.0-alpha.1",
+    "@feedback/redmine-core": "1.0.0-alpha.1"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

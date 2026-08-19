@@ -1,2 +1,2 @@
-export { createDomEvidenceProvider } from "@feedback/react";
-export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "@feedback/react";
+export { createDomEvidenceProvider } from "@feedback/dom-capture";
+export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "@feedback/dom-capture";

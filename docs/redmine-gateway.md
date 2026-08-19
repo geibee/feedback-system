@@ -27,7 +27,7 @@ membershipを確認してからmetadata/contentを取得する。
 
 ## server profile
 
-server profileはRedmine URL、project/tracker/default priority、private flag、12個のcustom field ID、公開client profile、
+server profileはRedmine URL、project/tracker/default priority、private flag、11個のcustom field ID、公開client profile、
 secret referenceを持つ。clientがこれらを上書きできるrequest fieldはない。Redmine base URLは本番でHTTPSだけを許可し、
 userinfo、query、fragment、dot segmentを拒否する。
 
@@ -54,8 +54,7 @@ reference appではprofileを2ファイルへ分ける。client profileにはUI�
     "perspectiveCode": 28,
     "locator": 29,
     "submittedById": 30,
-    "submittedByName": 31,
-    "submissionChannel": 32
+    "submittedByName": 31
   },
   "authorizationMode": "resource-scoped",
   "showRedmineLink": false,
@@ -63,8 +62,9 @@ reference appではprofileを2ファイルへ分ける。client profileにはUI�
 }
 ```
 
-設定する環境変数は[`environment-variables.md`](environment-variables.md)を参照する。3変数はいずれも未設定時に起動を失敗し、
-secretに既定値はない。
+設定する環境変数は[`environment-variables.md`](environment-variables.md)を参照する。reference appの3変数はいずれも
+未設定時に起動を失敗し、secretに既定値はない。libraryを本番hostへ組み込む場合は環境変数名を公開契約にせず、既存の
+設定・secret注入機構から`loadProfile`と`loadSecret`を実装する。
 
 ## HTTPと冪等性
 
@@ -82,7 +82,7 @@ attachment `content_url`はRedmine base URLと同じorigin/base pathだけを許
 
 `apps/feedback-redmine-gateway-reference`はWeb標準handlerをNode HTTP serverへ接続する最小例である。CLI起動時のdemo adapterは
 署名付きcookieを要求し、未署名cookieや固定principalを受理しない。ただし業務resourceを実認可するproduction adapterではないため、
-本番では必ず顧客実装へ差し替える。
+本番artifactや推奨配備には含めず、必ず顧客実装へ差し替える。
 
 Docker imageは`node` userで動作し、read-only root filesystem、`--cap-drop ALL`、
 `no-new-privileges`で起動できる。reverse proxyのaccess logからcookie、request body、query、

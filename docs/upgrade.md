@@ -1,5 +1,8 @@
 # Upgrade
 
+> **Legacy Feedback Service:** この文書は従来Feedback ServiceのDB/API upgrade向けです。本番投入済み環境はないため、
+> Redmine標準構成へのdata migrationは対象外です。
+
 Feedback API v1とSDK majorを揃え、SDK起動時のcapabilities negotiationを維持する。Flyway migrationは適用後に
 編集・削除せず、新しいversionでforward fixする。破壊的DDLはexpand、両対応/backfill、contractの複数releaseへ分ける。
 

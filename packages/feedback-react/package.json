@@ -25,7 +25,7 @@
   "dependencies": {
     "@feedback/contracts": "1.0.0-alpha.1",
     "@feedback/core": "1.0.0-alpha.1",
-    "html-to-image": "1.11.13"
+    "@feedback/dom-capture": "1.0.0-alpha.1"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

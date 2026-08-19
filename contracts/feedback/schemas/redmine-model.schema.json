@@ -55,7 +55,7 @@
         "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
         "displayName": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }] },
         "redmineUserId": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
-        "source": { "enum": ["host-session", "redmine-api-key"] }
+        "source": { "const": "host-session" }
       }
     },
     "currentUserResult": {

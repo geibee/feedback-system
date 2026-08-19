@@ -1,7 +1,41 @@
 # 環境変数
 
-この独立repositoryでは、Go runtimeが参照する環境変数を次の完全なkey一覧で管理する。`*_PASSWORD`、`*_SECRET`、
-暗号鍵、OIDC/connectorの接続情報はsecret managerまたはorchestratorのsecret注入を使い、repositoryやimageへ保存しない。
+新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。profile ID、host adapter、CSRF callback、feature flagは
+SPAの明示的なintegration moduleから渡し、Redmine接続情報やsecretをbrowserへ渡さない。
+
+## Redmine gateway（標準）
+
+`@feedback/redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
+`loadProfile`と`loadSecret`を実装する。secretに既定値を置かない。
+
+ローカル確認用reference appだけが次を使用する。
+
+```text
+FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
+FEEDBACK_REDMINE_GATEWAY_API_KEY
+FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET
+```
+
+profile fileはread-only server profile JSONへのabsolute pathである。API keyはFeedback専用integration user用、session secretは
+demo session署名用で、いずれも必須かつ既定値を持たない。API keyと署名鍵をprofile file、image、SPAへ記載しない。
+
+referenceのdemo session adapterは業務resourceを認可しないため本番利用禁止である。本番では既存session・resource authorization・
+CSRF実装を`FeedbackRedmineGatewayHost`へ注入する。
+
+Redmine Docker適合性試験だけが次を使用し、本番runtimeへ設定しない。
+
+```text
+FEEDBACK_REDMINE_IMAGE
+FEEDBACK_REDMINE_CONFORMANCE_SECRET
+FEEDBACK_REDMINE_CONFORMANCE_RUN_ID
+```
+
+通常はmatrix scriptが一時secretとrun IDを生成する。固定値をrepositoryやCI定義へ保存しない。
+
+## Legacy Feedback Service variables
+
+> **Legacy Feedback Service:** 以下はPostgreSQL、object storage、OIDC、workerを使う従来runtime向けで、新規導入の標準ではない。
+> `*_PASSWORD`、`*_SECRET`、暗号鍵、OIDC/connector接続情報はsecret managerから注入する。
 
 ## API・DB・認証・制限
 
@@ -35,7 +69,7 @@ FEEDBACK_WRITE_RATE_LIMIT_PER_IP_PER_MINUTE
 
 `FEEDBACK_DEPLOYMENT_PROFILE`は `full`（既定）または `core` を指定する。`full`は従来どおりEvidence、Export/Backup、
 Notification/Connectorをすべて有効にする。`core`はコメント・session・manifest・membership・retention APIだけを配線し、
-拡張機能のAPIパスは互換性のため残したまま501で拒否する。`/capabilities`からも無効なfeatureを除外し、
+full profile専用のAPIパスは互換性のため残したまま501で拒否する。`/capabilities`からも無効なfeatureを除外し、
 `/health/ready`では該当依存を`disabled`と報告する。
 
 `FEEDBACK_DATABASE_PASSWORD`はAPIで必須であり、secretに既定値を置かない。認証は次のいずれか一方以上を必須とする。
@@ -222,34 +256,6 @@ FEEDBACK_EXTRACTION_SKIP_STANDALONE_SMOKE
 
 `FEEDBACK_VERIFY_SKIP_NPM_CI`と`FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS`は局所切り分け用で、release/CIの合格証跡では
 使用しない。
-
-## Redmine正本client・検証
-
-Feedback Redmine gateway referenceは次を使用する。
-
-```text
-FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
-FEEDBACK_REDMINE_GATEWAY_API_KEY
-FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET
-```
-
-`FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`はread-only server profile JSONへのabsolute pathで必須である。
-`FEEDBACK_REDMINE_GATEWAY_API_KEY`はFeedback専用integration userのRedmine API key、
-`FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET`はreference appのdemo session署名鍵であり、いずれも必須かつ既定値を持たない。
-本番ではreferenceのdemo session adapterを使わず、業務アプリケーションの既存session・resource authorization・CSRF実装を
-`FeedbackRedmineGatewayHost`へ注入する。API keyと署名鍵はsecret managerからprocessへ注入し、profile fileへ記載しない。
-
-次はRedmine Docker適合性試験だけが使用し、本番runtimeへ設定しない。
-
-```text
-FEEDBACK_REDMINE_IMAGE
-FEEDBACK_REDMINE_CONFORMANCE_SECRET
-FEEDBACK_REDMINE_CONFORMANCE_RUN_ID
-```
-
-`FEEDBACK_REDMINE_IMAGE`は検証対象のdigest固定Docker Official Image、`FEEDBACK_REDMINE_CONFORMANCE_SECRET`は試験中に
-生成する一時API key、`FEEDBACK_REDMINE_CONFORMANCE_RUN_ID`はproject/user名を分離する一時識別子である。
-通常は`tests/redmine-conformance/run-local-matrix.sh`が暗号学的乱数で生成するため、固定値をrepositoryやCI定義へ保存しない。
 
 ## Service storage
 

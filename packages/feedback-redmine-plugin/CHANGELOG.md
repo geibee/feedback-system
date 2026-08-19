@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- SPAのfeature flagからdynamic import、mount、無効化、再有効化を制御する`@feedback/redmine-plugin/loader`を追加。
+- 無効化時の通信・購読・timer・controller所有DOMの破棄と、完全撤去用の明示的なbrowser state削除を追加。
+- React 18/19をpeer dependencyに変更し、React runtime入りself-hosted ESM bundleを廃止。
+- mount途中の失敗時にもstyle、container、React rootをrollbackするようにした。
+
 ## 1.0.0-alpha.1
 
 - Shadow DOM mount facade、same-origin gateway transport、browser storage fallback、self-hosted ESM bundleを追加。

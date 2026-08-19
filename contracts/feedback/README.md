@@ -1,7 +1,7 @@
 # @feedback/contracts
 
 Feedback Service v1 とDBレスRedmine gatewayのOpenAPI 3.1、application manifest/location/target/webhook、
-Redmine operation/context/profileのJSON Schema、生成済みTypeScript/Kotlin型を提供する契約packageです。
+Redmine context/profile/modelのJSON Schema、生成済みTypeScript/Kotlin型を提供する契約packageです。
 GIS APIや特定ホストのroute型には依存しません。
 
 ```ts
@@ -10,9 +10,10 @@ import type { FeedbackLocationV1, FeedbackTargetV1 } from "@feedback/contracts";
 
 OpenAPI と各 schema は `@feedback/contracts/openapi.yaml`、`@feedback/contracts/schemas/*` から参照できます。
 Redmine gatewayはlegacy Feedback Serviceへ混在させず、`@feedback/contracts/redmine-gateway.openapi.yaml`を正本にします。
-共通operation、extension message、context attachmentはすべてversion `1`で、unknown propertyを拒否します。
-正規化済みresponseは`schemas/redmine-model.schema.json`、端末内状態messageは
-`schemas/redmine-client-state-message.schema.json`を正本にし、operation成功resultもoperation別に閉じています。
+gateway HTTP契約とcontext attachmentはversion `1`で、unknown propertyを拒否します。
+正規化済みresponseは`schemas/redmine-model.schema.json`、Redmineへ保存するcontext attachmentは
+`schemas/redmine-feedback-context.schema.json`を正本にします。principal sourceはsame-origin gatewayが注入する
+`host-session`だけを許可します。
 直接OIDC JWTはOpenAPIの `bearerAuth` に従い、固定語彙の `feedback_permissions`文字列配列を必須とします。
 CI/CDでresourceを同期するinstallation manifestのschemaも`schemas/installation-manifest.schema.json`に含みます。
 `npm run generate`はlegacy `src/generated.ts`とRedmine専用`src/redmine-gateway.generated.ts`を生成します。

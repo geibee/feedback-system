@@ -77,8 +77,7 @@ field_specs = {
   perspectiveCode: ["Feedback Perspective", "string", true],
   locator: ["Feedback Locator", "text", false],
   submittedById: ["Feedback Submitted By ID", "string", false],
-  submittedByName: ["Feedback Submitted By Name", "string", false],
-  submissionChannel: ["Feedback Submission Channel", "string", true]
+  submittedByName: ["Feedback Submitted By Name", "string", false]
 }
 custom_field_ids = field_specs.to_h do |key, (name, format, filter)|
   field = IssueCustomField.find_or_initialize_by(name: name)

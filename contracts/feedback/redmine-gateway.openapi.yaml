@@ -404,7 +404,7 @@ components:
         subjectId: { type: string, minLength: 1, maxLength: 200 }
         displayName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
         redmineUserId: { type: [integer, 'null'], minimum: 1 }
-        source: { type: string, enum: [host-session, redmine-api-key] }
+        source: { type: string, const: host-session }
     CurrentUserResult:
       type: object
       additionalProperties: false

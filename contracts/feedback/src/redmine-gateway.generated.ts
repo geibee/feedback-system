@@ -143,8 +143,8 @@ export interface components {
             subjectId: string;
             displayName: string | null;
             redmineUserId: number | null;
-            /** @enum {string} */
-            source: "host-session" | "redmine-api-key";
+            /** @constant */
+            source: "host-session";
         };
         CurrentUserResult: {
             principal: components["schemas"]["Principal"];

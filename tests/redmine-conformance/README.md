@@ -1,8 +1,8 @@
 # Redmine実REST conformance
 
 Docker Official Imageをdigestで固定し、throw-away SQLite containerでissue作成、journal、attachment、
-Redmineだけからのthread再構築を確認する。再構築結果はgateway handlerと実extension message handlerの両経路で
-同一になることも確認する。既存のRedmineやvolumeには接続しない。
+Redmineだけからのthread再構築を確認する。作成、一覧、詳細、attachment取得はすべて業務アプリケーションと
+同一originのgateway handlerを経由する。既存のRedmineやvolumeには接続しない。
 
 ```bash
 bash tests/redmine-conformance/run-local-matrix.sh

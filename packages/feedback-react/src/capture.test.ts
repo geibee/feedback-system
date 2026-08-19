@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { createDomEvidenceProvider as createSharedDomEvidenceProvider } from "@feedback/dom-capture";
 import { createDomEvidenceProvider } from "./capture";
 
 describe("DOM evidence provider", () => {
+  it("共有packageの実装を後方互換のため再exportする", () => {
+    expect(createDomEvidenceProvider).toBe(createSharedDomEvidenceProvider);
+  });
+
   it("maskを外部CSS classで一時適用しexcludeをcapture対象から外す", async () => {
     const root = document.createElement("main");
     const masked = document.createElement("p");

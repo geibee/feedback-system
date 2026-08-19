@@ -2,7 +2,7 @@
 
 React 18/19 用の `FeedbackProvider`、`FeedbackOverlay`、DOM/screen／host解決pin、Thread Drawer、DOM capture provider
 を提供します。利用側は `@feedback/react/styles.css` を読み込み、`@feedback/core` の host adapter と transport
-を渡します。MapLibre は依存に含まれません。
+を渡します。DOM captureは`@feedback/dom-capture`のAPIを後方互換のため再exportします。MapLibre は依存に含まれません。
 
 ```tsx
 import { FeedbackOverlay, FeedbackProvider } from "@feedback/react";

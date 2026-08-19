@@ -244,6 +244,56 @@ describe("plugin lifecycleとstorage", () => {
     expect(unavailable).toHaveBeenCalledTimes(1);
   });
 
+  it("destroy時にrequest、polling、host購読を停止する", async () => {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      if (init?.signal instanceof AbortSignal) signals.push(init.signal);
+      const url = String(input);
+      if (url.endsWith("/me")) return new Response(JSON.stringify({
+        principal: { subjectId: "subject-1", displayName: "利用者", redmineUserId: 7, source: "host-session" }
+      }), { headers: { "content-type": "application/json" } });
+      if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], nextCursor: null }), {
+        headers: { "content-type": "application/json" }
+      });
+      return new Response(JSON.stringify({
+        profile,
+        capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+      }), { headers: { "content-type": "application/json" } });
+    }));
+    let activeSubscriptions = 0;
+    const unsubscribe = vi.fn(() => { activeSubscriptions -= 1; });
+    const lifecycleAdapter: FeedbackRedmineHostAdapter = {
+      ...adapter,
+      subscribe: () => {
+        activeSubscriptions += 1;
+        return unsubscribe;
+      }
+    };
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    const removeListenerSpy = vi.spyOn(document, "removeEventListener");
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const mountedPlugin = createRedmineFeedbackPlugin({
+      mount,
+      profileId: profile.id,
+      adapter: lifecycleAdapter,
+      getCsrfToken: () => "csrf"
+    });
+    await waitFor(() => expect(mount.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")).toBeTruthy());
+    fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")!);
+    await waitFor(() => expect(setIntervalSpy).toHaveBeenCalled());
+
+    mountedPlugin.destroy();
+
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(activeSubscriptions).toBe(0);
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    expect(removeListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+  });
+
   it("改ざんされたbrowser stateを検証してmemory-onlyへfallbackする", async () => {
     localStorage.clear();
     sessionStorage.clear();

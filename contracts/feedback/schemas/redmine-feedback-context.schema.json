@@ -60,7 +60,7 @@
       "additionalProperties": false,
       "required": ["source", "subjectId", "displayName", "redmineUserId"],
       "properties": {
-        "source": { "enum": ["host-session", "redmine-api-key"] },
+        "source": { "const": "host-session" },
         "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
         "displayName": {
           "oneOf": [
@@ -74,20 +74,7 @@
             { "type": "null" }
           ]
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": { "source": { "const": "redmine-api-key" } },
-            "required": ["source"]
-          },
-          "then": {
-            "properties": {
-              "redmineUserId": { "type": "integer", "minimum": 1 }
-            }
-          }
-        }
-      ]
+      }
     },
     "evidence": {
       "type": "object",

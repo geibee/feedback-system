@@ -1,5 +1,7 @@
 # Azure Container Appsへの配備
 
+> **Legacy Feedback Service:** この文書はDB、object storage、workerを持つ従来runtime向けで、新規導入の標準ではありません。
+
 Feedback Systemは既存アプリと同じAzure Container Apps環境へ追加し、既存Azure Front Door Premiumを公開入口として使う。
 利用者認証は既存OIDCまたは契約済みtoken exchangeを維持し、Microsoft Entra IDへの移行や認証無効化は行わない。
 Entra IDはUser Assigned Managed IdentityによるACR、Key Vault、Azure Blobへのworkload認証にだけ使用する。

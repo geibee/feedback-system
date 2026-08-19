@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- DOM capture実装を`@feedback/dom-capture`へ分離し、既存APIを後方互換のため再exportするようにしました。
 - `FeedbackHostAdapter.subscribe`を購読し、route／workspace変更時に進行中のcontext HTTP requestを`AbortSignal`で中断して再取得するようにしました。
 - context変更時にOverlayの選択、投稿、thread表示stateを閉じ、変更前画面の操作を持ち越さないようにしました。
 - `FeedbackOverlay.pinPositionProvider`を追加し、hostが解決した`map-position`／`map-feature`を通常の番号付きpinとして表示できるようにしました。

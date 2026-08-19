@@ -1,5 +1,8 @@
 # Go canaryとrollback
 
+> **Legacy Feedback Service:** この文書は従来Go runtime向けです。本番投入済み環境はないため、Redmine標準構成への
+> migration/rollback手順としては使用しません。
+
 このrepositoryは未投入環境へGo-onlyで初回導入する。workspace単位の段階的routingを使い、workerはrole単位で
 1 replicaから開始する。切替順はnotification、export/backup、retention、bootstrap/connector/CLIとする。
 

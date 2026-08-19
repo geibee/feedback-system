@@ -8,6 +8,7 @@ import {
   decodeListCursor,
   encodeListCursor,
   initialCommentFromDescription,
+  parseCurrentUserResult,
   parseFeedbackMetadata,
   serializeFeedbackContext,
   validateClientProfile
@@ -53,6 +54,19 @@ const target = {
 };
 
 describe("Redmine core deterministic model", () => {
+  it("gateway principalはhost session由来だけを受ける", () => {
+    const principal = {
+      subjectId: "subject-1",
+      displayName: "利用者",
+      redmineUserId: null,
+      source: "host-session"
+    };
+    expect(parseCurrentUserResult({ principal })).toEqual(principal);
+    expect(() => parseCurrentUserResult({
+      principal: { ...principal, source: "unsupported", redmineUserId: 7 }
+    })).toThrow(/principal source/u);
+  });
+
   it("subjectをUnicode scalar 255文字で省略しcontrol文字を除く", () => {
     const subject = buildRedmineSubject({
       comment: `\n \u0000${"😀".repeat(300)}`,
@@ -75,7 +89,6 @@ describe("Redmine core deterministic model", () => {
       pageKey: "orders.detail",
       hostResourceKey: "opaque-resource",
       perspectiveCode: "ux",
-      submissionChannel: "embedded" as const,
       submittedById: "subject-1",
       capturedAt: "2026-08-19T00:00:00Z"
     };
@@ -83,6 +96,7 @@ describe("Redmine core deterministic model", () => {
     expect(initialCommentFromDescription(description)).toBe("最初のコメント");
     expect(parseFeedbackMetadata(description)).toEqual(metadata);
     expect(description.indexOf("Thread ID:")).toBeLessThan(description.indexOf("Request hash:"));
+    expect(description).not.toContain("Submission channel:");
   });
 
   it("canonical JSONとrequest hashはkey順に依存せず決定的", async () => {
@@ -151,7 +165,7 @@ describe("Redmine profileとcursor", () => {
 
     const ids = Object.fromEntries([
       "threadId", "requestHash", "applicationKey", "environmentKey", "externalWorkspaceKey", "pageKey",
-      "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName", "submissionChannel"
+      "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName"
     ].map((key, index) => [key, index + 1])) as RedmineCustomFieldIds;
     const connector: RedmineConnectorProfile = {
       profileId: clientProfile.id,
@@ -165,6 +179,7 @@ describe("Redmine profileとcursor", () => {
       showRedmineLink: false
     };
     expect(validateConnectorProfile(connector)).toEqual(connector);
+    expect(Object.keys(connector.customFieldIds)).toHaveLength(11);
     expect(() => validateConnectorProfile({
       ...connector,
       customFieldIds: { ...connector.customFieldIds, requestHash: connector.customFieldIds.threadId }

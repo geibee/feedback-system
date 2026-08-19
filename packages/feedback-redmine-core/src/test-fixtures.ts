@@ -29,8 +29,7 @@ export const profile: RedmineConnectorProfile = {
     perspectiveCode: 28,
     locator: 29,
     submittedById: 30,
-    submittedByName: 31,
-    submissionChannel: 32
+    submittedByName: 31
   },
   showRedmineLink: true
 };
@@ -78,8 +77,7 @@ export function issueFixture(id = 123) {
         })
       },
       { id: 30, value: "subject-1" },
-      { id: 31, value: "利用者" },
-      { id: 32, value: "embedded" }
+      { id: 31, value: "利用者" }
     ],
     attachments: [{
       id: 90,

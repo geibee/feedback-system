@@ -130,8 +130,7 @@ export function createFeedbackRedmineGatewayHandler(dependencies: GatewayDepende
             subjectId: principal.subjectId,
             displayName: principal.displayName,
             redmineUserId: principal.redmineUserId
-          },
-          submissionChannel: "embedded"
+          }
         }, multipart.evidence?.bytes ?? null, request.signal);
         const response = jsonResponse(
           { thread: created.thread },

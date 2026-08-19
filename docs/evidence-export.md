@@ -1,5 +1,8 @@
 # 証跡エクスポート
 
+> **Legacy Feedback Service:** この文書は従来Admin Consoleとexport worker向けです。Redmine正本構成の証跡は
+> Redmine attachmentに保存します。
+
 管理画面の「保存・エクスポート」で「証跡パッケージ（Power BI向けZIP）」を選ぶと、認可対象workspaceの
 レビュー記録を1つのZIPとして出力する。`sessionId`をAPIで指定した場合は、そのレビューセッションだけを対象にする。
 

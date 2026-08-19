@@ -6,12 +6,12 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 packages=(
+  @feedback/dom-capture
   @feedback/redmine-core
   @feedback/redmine-react
   @feedback/redmine-plugin
   @feedback/redmine-gateway
   @feedback/redmine-gateway-reference
-  @feedback/redmine-extension
   feedback-redmine-plugin-vanilla-fixture
   @feedback/redmine-browser-e2e
   @feedback/redmine-conformance

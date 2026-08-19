@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redmine plugin/gateway/extensionのbundleとbrowser security invariantを検証する。
+# Redmine SPA plugin/gatewayのbundleとbrowser security invariantを検証する。
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && pwd))
@@ -8,46 +8,18 @@ cd "$ROOT"
 fail() { echo "[feedback-redmine-security] FAIL: $*" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || fail "Dockerが見つかりません"
 
-node <<'NODE'
-const fs = require("node:fs");
-const manifest = JSON.parse(fs.readFileSync("apps/feedback-redmine-extension/manifest.json", "utf8"));
-if (manifest.manifest_version !== 3) throw new Error("Manifest V3ではありません");
-if (JSON.stringify(manifest.permissions) !== JSON.stringify(["storage", "scripting", "activeTab"])) {
-  throw new Error("required permission allowlistが不正です");
-}
-if ("host_permissions" in manifest || JSON.stringify(manifest.optional_host_permissions) !== JSON.stringify(["https://*/*"])) {
-  throw new Error("host permissionがoptionalではありません");
-}
-if (manifest.content_security_policy?.extension_pages !== "script-src 'self'; object-src 'self'") {
-  throw new Error("extension CSPが不正です");
-}
-if (manifest.storage?.managed_schema !== "managed-policy-schema.json") {
-  throw new Error("managed policy schemaがmanifestへ接続されていません");
-}
-NODE
+bash scripts/smoke-feedback-redmine.sh
 
-npm --workspace @feedback/redmine-extension run build
-first_zip=$(sha256sum apps/feedback-redmine-extension/dist/feedback-redmine-extension.zip | cut -d' ' -f1)
-npm --workspace @feedback/redmine-extension run build
-second_zip=$(sha256sum apps/feedback-redmine-extension/dist/feedback-redmine-extension.zip | cut -d' ' -f1)
-[[ "$first_zip" == "$second_zip" ]] || fail "extension ZIPがdeterministicではありません"
-
-if find apps/feedback-redmine-extension/dist packages/feedback-redmine-plugin/dist -type f -name '*.map' -print -quit | grep -q .; then
+if find packages/feedback-redmine-plugin/dist -type f -name '*.map' -print -quit | grep -q .; then
   fail "browser artifactにsource mapが混入しています"
 fi
 if rg -n 'process\.env|eval\(|new Function\(|transient-test-key|expired-key|session-only-browser-key|local-conformance-password' \
-  apps/feedback-redmine-extension/dist packages/feedback-redmine-plugin/dist; then
+  packages/feedback-redmine-plugin/dist; then
   fail "browser artifactにNode runtime、dynamic code、test credentialが混入しています"
 fi
-if rg -n "https?://[^\"' ]+\\.js" apps/feedback-redmine-extension/dist packages/feedback-redmine-plugin/dist; then
+if rg -n "https?://[^\"' ]+\\.js" packages/feedback-redmine-plugin/dist; then
   fail "browser artifactにremote script URLが混入しています"
 fi
-
-playwright_image='mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e'
-docker run --rm --ipc=host \
-  -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-  -v "$ROOT:/work:ro" -w /work \
-  "$playwright_image" npm run test:chrome --workspace @feedback/redmine-browser-e2e
 
 gateway_image='feedback-redmine-gateway-reference:verification'
 docker build -f apps/feedback-redmine-gateway-reference/Dockerfile -t "$gateway_image" .
@@ -79,7 +51,7 @@ const profile = {
   projectId: 1, trackerId: 1, isPrivate: true, defaultPriorityId: null,
   customFieldIds: {
     threadId: 1, requestHash: 2, applicationKey: 3, environmentKey: 4, externalWorkspaceKey: 5, pageKey: 6,
-    hostResourceKey: 7, perspectiveCode: 8, locator: 9, submittedById: 10, submittedByName: 11, submissionChannel: 12
+    hostResourceKey: 7, perspectiveCode: 8, locator: 9, submittedById: 10, submittedByName: 11
   },
   authorizationMode: "resource-scoped", showRedmineLink: false, secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY"
 };

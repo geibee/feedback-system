@@ -6,6 +6,38 @@ import {
   type ClientStatePort
 } from "@feedback/redmine-core";
 
+export type PurgeBrowserClientStateOptions = {
+  profileId: string;
+  origin?: string;
+  localStorage?: Storage;
+  sessionStorage?: Storage;
+};
+
+/** 現在のoriginとprofileに属するbrowser stateだけを明示的に削除します。 */
+export function purgeBrowserClientState(options: PurgeBrowserClientStateOptions): void {
+  if (!/^[a-z0-9][a-z0-9._-]{0,99}$/u.test(options.profileId)) {
+    throw new Error("profileIdの形式が不正です");
+  }
+  const origin = options.origin ?? globalThis.location?.origin ?? "opaque-origin";
+  const local = options.localStorage ?? globalThis.localStorage;
+  const session = options.sessionStorage ?? globalThis.sessionStorage;
+  const keyPrefix = `feedback.redmine.v1:${origin}:${options.profileId}:`;
+  let firstError: unknown;
+  for (const storage of [local, session]) {
+    try {
+      const keys: string[] = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key?.startsWith(keyPrefix)) keys.push(key);
+      }
+      keys.forEach((key) => storage.removeItem(key));
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) throw firstError;
+}
+
 export function createBrowserClientState(options: {
   origin?: string;
   localStorage?: Storage;

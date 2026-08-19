@@ -14,11 +14,12 @@ cleanup_consumer() {
 trap cleanup_consumer EXIT
 
 tarball_dir="$consumer_tmp/tarballs"
-mkdir -p "$tarball_dir"
+feedback_npm_cache="$consumer_tmp/npm-cache"
+mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
   @feedback/contracts
   @feedback/core
-  @feedback/react
+  @feedback/dom-capture
   @feedback/redmine-core
   @feedback/redmine-react
   @feedback/redmine-plugin
@@ -26,7 +27,7 @@ packages=(
 declare -a tarballs=()
 
 for package_name in "${packages[@]}"; do
-  pack_result=$(npm --workspace "$package_name" pack --pack-destination "$tarball_dir" --json)
+  pack_result=$(npm_config_cache="$feedback_npm_cache" npm --workspace "$package_name" pack --pack-destination "$tarball_dir" --json)
   tarball_file=$(PACK_RESULT="$pack_result" PACKAGE_NAME="$package_name" node -e '
     const [result] = JSON.parse(process.env.PACK_RESULT);
     const files = new Set(result.files.map((file) => file.path));
@@ -35,7 +36,6 @@ for package_name in "${packages[@]}"; do
       required.push(
         "redmine-gateway.openapi.yaml",
         "schemas/redmine-model.schema.json",
-        "schemas/redmine-operation.schema.json",
         "dist/redmine-gateway.generated.js",
         "dist/redmine-gateway.generated.d.ts"
       );
@@ -45,7 +45,8 @@ for package_name in "${packages[@]}"; do
     }
     if (process.env.PACKAGE_NAME === "@feedback/redmine-react") required.push("dist/styles.css");
     if (process.env.PACKAGE_NAME === "@feedback/redmine-plugin") {
-      required.push("dist/feedback-redmine-plugin-with-react.es.js");
+      required.push("dist/loader.js", "dist/loader.d.ts");
+      if (files.has("dist/feedback-redmine-plugin-with-react.es.js")) process.exit(1);
     }
     if (required.some((path) => !files.has(path))) process.exit(1);
     process.stdout.write(result.filename);
@@ -56,21 +57,31 @@ for package_name in "${packages[@]}"; do
   tarballs+=("$tarball_dir/$tarball_file")
 done
 
-fixture="$consumer_tmp/fixture"
-cp -R tests/fixtures/feedback-redmine-plugin-vanilla "$fixture"
-rm -rf -- "$fixture/dist"
-(
-  cd "$fixture"
-  npm install --ignore-scripts --no-audit --no-fund \
-    react@18.3.1 react-dom@18.3.1 @types/react@18.3.12 @types/react-dom@18.3.1 \
-    typescript@5.6.3 vite@5.4.21 vitest@4.1.9 jsdom@29.1.1 \
-    "${tarballs[@]}"
-  npm run typecheck
-  npm run test
-  npm run build
-  node --input-type=module -e 'await import("@feedback/redmine-plugin")'
-  test -f node_modules/@feedback/redmine-react/dist/styles.css
-  test -f node_modules/@feedback/redmine-core/dist/trusted.js
-)
+react_versions=(18.3.1 19.1.1)
+react_type_versions=(18.3.12 19.1.9)
+react_dom_type_versions=(18.3.1 19.1.7)
+typescript_versions=(5.6.3 5.9.3)
 
-echo "[feedback-redmine-consumer] PASS: clean vanilla Vite tarball consumer"
+for index in "${!react_versions[@]}"; do
+  react_version=${react_versions[$index]}
+  fixture="$consumer_tmp/react-$react_version"
+  cp -R tests/fixtures/feedback-redmine-plugin-vanilla "$fixture"
+  rm -rf -- "$fixture/dist"
+  (
+    cd "$fixture"
+    npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
+      "react@$react_version" "react-dom@$react_version" \
+      "@types/react@${react_type_versions[$index]}" "@types/react-dom@${react_dom_type_versions[$index]}" \
+      "typescript@${typescript_versions[$index]}" vite@5.4.21 vitest@4.1.9 jsdom@29.1.1 \
+      "${tarballs[@]}"
+    npm ls react react-dom --all >/dev/null
+    test ! -d node_modules/@feedback/react
+    npm run typecheck
+    npm run test
+    npm run build
+    node --input-type=module -e 'await import("@feedback/redmine-plugin/loader")'
+    test -f node_modules/@feedback/redmine-react/dist/styles.css
+    test -f node_modules/@feedback/redmine-core/dist/trusted.js
+  )
+  echo "[feedback-redmine-consumer] PASS: clean Vite React $react_version fixture"
+done

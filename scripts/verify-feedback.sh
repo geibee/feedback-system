@@ -21,19 +21,35 @@ if rg -n 'apps/feedback-service/Dockerfile|eclipse-temurin|openjdk|gradle:' depl
 fi
 log "Go-only Feedback ServiceをJDKなしで検証します"
 bash -n scripts/build-feedback-sdk-release.sh
+bash -n scripts/build-feedback-redmine-release.sh
+bash -n scripts/smoke-feedback-redmine.sh
 
 node_major=$(node -p 'Number(process.versions.node.split(".")[0])')
 (( node_major >= 22 )) || fail "Node.js 22以上が必要です"
-
-bash scripts/check-feedback-container-platforms.sh
-bash scripts/verify-feedback-go.sh
 
 if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   log "clean npm install"
   npm ci --ignore-scripts --no-audit --no-fund
 fi
 
-for package_name in @feedback/contracts @feedback/core @feedback/react @feedback/maplibre @feedback/admin-react; do
+for package_name in @feedback/contracts @feedback/core; do
+  log "$package_name"
+  npm --workspace "$package_name" run typecheck
+  npm --workspace "$package_name" run test
+  npm --workspace "$package_name" run build
+done
+
+bash scripts/check-feedback-redmine-packages.sh
+
+bash scripts/check-feedback-contracts.sh
+bash scripts/check-feedback-redmine-security.sh
+bash scripts/check-feedback-redmine-conformance.sh
+bash scripts/check-feedback-redmine-release.sh
+
+bash scripts/check-feedback-container-platforms.sh
+bash scripts/verify-feedback-go.sh
+
+for package_name in @feedback/react @feedback/maplibre @feedback/admin-react; do
   log "$package_name"
   npm --workspace "$package_name" run typecheck
   npm --workspace "$package_name" run test
@@ -46,16 +62,10 @@ for application in @feedback/admin-console @feedback/token-broker-reference @fee
   npm --workspace "$application" run test
   npm --workspace "$application" run build
 done
-
-bash scripts/check-feedback-redmine-packages.sh
-
-bash scripts/check-feedback-contracts.sh
 if [[ "${FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS:-0}" != "1" ]]; then
   bash scripts/check-feedback-packages.sh
 fi
 bash scripts/check-feedback-conformance.sh
-bash scripts/check-feedback-redmine-security.sh
-bash scripts/check-feedback-redmine-conformance.sh
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet

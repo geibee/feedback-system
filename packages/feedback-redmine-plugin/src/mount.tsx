@@ -36,32 +36,45 @@ export function createRedmineFeedbackPlugin(
   }
   const shadow = existingShadow ?? options.mount.attachShadow({ mode: "open" });
   ownedShadowRoots.add(shadow);
-  const removeStyles = installRedmineFeedbackStyles(shadow);
-  const container = document.createElement("div");
-  container.dataset.feedbackRedmineMount = "true";
-  shadow.append(container);
-
-  const diagnostics = new RedmineDiagnosticBuffer();
-  const transport = new GatewayRedmineFeedbackTransport({
-    profileId: options.profileId,
-    gatewayBasePath: options.gatewayBasePath,
-    getCsrfToken: options.getCsrfToken,
-    diagnostics
-  });
-  const clientState = createBrowserClientState({
-    onFallback: (error) => options.onUnavailable?.(error)
-  });
+  let removeStyles: (() => void) | null = null;
+  let container: HTMLDivElement | null = null;
+  let root: Root | null = null;
+  let diagnostics: RedmineDiagnosticBuffer;
+  let clientState: ReturnType<typeof createBrowserClientState>;
   const overlay = createRef<RedmineFeedbackOverlayHandle>();
-  const root = createRoot(container);
-  root.render(<RedmineFeedbackProvider runtime={{
-    port: transport,
-    clientState,
-    adapter: options.adapter,
-    profileId: options.profileId
-  }}>
-    <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
-  </RedmineFeedbackProvider>);
-  mounted.set(options.mount, { root, container });
+  try {
+    removeStyles = installRedmineFeedbackStyles(shadow);
+    container = document.createElement("div");
+    container.dataset.feedbackRedmineMount = "true";
+    shadow.append(container);
+
+    diagnostics = new RedmineDiagnosticBuffer();
+    const transport = new GatewayRedmineFeedbackTransport({
+      profileId: options.profileId,
+      gatewayBasePath: options.gatewayBasePath,
+      getCsrfToken: options.getCsrfToken,
+      diagnostics
+    });
+    clientState = createBrowserClientState({
+      onFallback: (error) => options.onUnavailable?.(error)
+    });
+    root = createRoot(container);
+    root.render(<RedmineFeedbackProvider runtime={{
+      port: transport,
+      clientState,
+      adapter: options.adapter,
+      profileId: options.profileId
+    }}>
+      <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
+    </RedmineFeedbackProvider>);
+    mounted.set(options.mount, { root, container });
+  } catch (error) {
+    try { root?.unmount(); } catch { /* 元のmount errorを維持する。 */ }
+    container?.remove();
+    try { removeStyles?.(); } catch { /* 元のmount errorを維持する。 */ }
+    mounted.delete(options.mount);
+    throw error;
+  }
   let destroyed = false;
 
   const active = () => {
@@ -90,10 +103,19 @@ export function createRedmineFeedbackPlugin(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      root.unmount();
-      container.remove();
-      removeStyles();
-      mounted.delete(options.mount);
+      try {
+        root.unmount();
+      } catch (error) {
+        try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
+      } finally {
+        container.remove();
+        try {
+          removeStyles();
+        } catch (error) {
+          try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
+        }
+        mounted.delete(options.mount);
+      }
     }
   };
 }

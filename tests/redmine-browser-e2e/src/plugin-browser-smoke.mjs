@@ -52,6 +52,17 @@ const threadSummary = Object.fromEntries(Object.entries(thread).filter(([key]) =
 const repositoryRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const consumerDirectory = join(repositoryRoot, "tests/fixtures/feedback-redmine-plugin-vanilla/dist");
 const hostileCss = readFileSync(join(repositoryRoot, "tests/redmine-security/hostile-host.css"));
+/** @type {Record<string, {file: string; name?: string; isDynamicEntry?: boolean; dynamicImports?: string[]}>} */
+const manifest = JSON.parse(readFileSync(join(consumerDirectory, ".vite/manifest.json"), "utf8"));
+const entry = manifest["index.html"];
+if (!entry) throw new Error("fixtureのVite manifestにindex entryがありません");
+const lazyAssetPaths = (entry.dynamicImports ?? []).map((key) => {
+  const chunk = manifest[key];
+  if (!chunk?.isDynamicEntry) throw new Error(`dynamic chunkがmanifestにありません: ${key}`);
+  return `/${chunk.file}`;
+});
+const mountAssetPath = Object.values(manifest).find((chunk) => chunk.isDynamicEntry && chunk.name === "mount")?.file;
+if (!mountAssetPath) throw new Error("plugin mountのlazy chunkがmanifestにありません");
 /** @type {Array<{method: string; path: string; origin: string | null; fetchSite: string | null; csrf: string | null; idempotencyKey: string | null; contentType: string | null; bodyBytes: number}>} */
 const requests = [];
 const server = createServer(async (request, response) => {
@@ -118,38 +129,104 @@ const browser = await chromium.launch({ channel: "chromium", headless: true });
 
 try {
   const page = await browser.newPage();
+  await page.addInitScript(() => {
+    const active = new Set();
+    const nativeSetInterval = window.setInterval.bind(window);
+    const nativeClearInterval = window.clearInterval.bind(window);
+    const browserWindow = /** @type {any} */ (window);
+    browserWindow.__feedbackIntervalProbe = { active: () => active.size };
+    /** @param {any} handler @param {number | undefined} timeout @param {...any} arguments_ */
+    browserWindow.setInterval = (handler, timeout, ...arguments_) => {
+      const timer = nativeSetInterval(handler, timeout, ...arguments_);
+      active.add(timer);
+      return timer;
+    };
+    /** @param {any} timer */
+    browserWindow.clearInterval = (timer) => {
+      active.delete(timer);
+      nativeClearInterval(timer);
+    };
+  });
   /** @type {string[]} */
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(origin);
-  await page.waitForFunction(() => Boolean(document.querySelector("#feedback-root")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")));
-  const mountCount = await page.locator("#feedback-root").evaluate((element) =>
-    element.shadowRoot?.querySelectorAll("[data-feedback-redmine-mount]").length ?? 0
-  );
-  assert.equal(mountCount, 1);
+  await page.waitForFunction(() => (/** @type {any} */ (window)).feedbackFixture?.state() === "disabled");
+
+  assert.equal(requests.filter(isApiRequest).length, 0, "初期disabledでgateway通信を開始してはいけません");
+  assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 0, "初期disabledでmount要素を作ってはいけません");
+  assert(lazyAssetPaths.length > 0, "lazy chunkが少なくとも1つ必要です");
+  assert(lazyAssetPaths.every((path) => !requests.some((entry) => entry.path === path)), "初期disabledでlazy chunkを読込んではいけません");
+
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
+  await page.waitForFunction(() => Boolean(
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+  ));
+  assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 1);
+  assert(requests.some((entry) => entry.path === `/${mountAssetPath}`), "enable時にmount lazy chunkを読み込む必要があります");
   try {
     await waitUntil(() => requests.some((entry) => entry.method === "GET" && entry.path.endsWith("/threads")));
   } catch {
-    const shadowText = await page.locator("#feedback-root").evaluate((element) => element.shadowRoot?.textContent ?? "");
+    const shadowText = await page.locator("[data-feedback-redmine-host]").evaluate((element) => element.shadowRoot?.textContent ?? "");
     throw new Error(`plugin API初期化がtimeoutしました: errors=${JSON.stringify(errors)} shadow=${JSON.stringify(shadowText)} requests=${JSON.stringify(requests)}`);
   }
-  const launcherBackground = await page.locator("#feedback-root").evaluate((element) => {
+  const launcherBackground = await page.locator("[data-feedback-redmine-host]").evaluate((element) => {
     const launcher = element.shadowRoot?.querySelector(".feedback-redmine-launcher");
     return launcher ? getComputedStyle(launcher).backgroundColor : "";
   });
   assert.equal(launcherBackground, "rgb(23, 70, 162)");
-  await page.locator("#feedback-root").evaluate((element) => {
+  await page.locator("[data-feedback-redmine-host]").evaluate((element) => {
     const launcher = element.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']");
     if (!(launcher instanceof HTMLButtonElement)) throw new Error("launcherがありません");
     launcher.click();
   });
-  await page.waitForFunction(() => Boolean(document.querySelector("#feedback-root")?.shadowRoot?.querySelector("textarea")));
+  await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   await page.getByLabel("最初のコメント").fill("実ブラウザからの初回投稿");
   await page.getByRole("button", { name: "最初の投稿をRedmineへ送信" }).click();
-  await page.waitForFunction(() => document.querySelector("#feedback-root")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
+  await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
+
+  await page.getByRole("button", { name: "閉じる" }).click();
+  const retainedDraft = "feature flag無効化後も保持するdraft";
+  await page.getByLabel("最初のコメント").fill(retainedDraft);
+  await page.waitForFunction((draft) => Object.keys(sessionStorage).some((key) =>
+    key.startsWith(`feedback.redmine.v1:${location.origin}:inventory-production:`) &&
+    key.endsWith(":draft") && sessionStorage.getItem(key) === draft
+  ), retainedDraft);
+  await page.waitForFunction(() => (/** @type {any} */ (window)).__feedbackIntervalProbe.active() > 0);
+
+  await page.waitForTimeout(100);
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(false));
+  assert.equal(await page.evaluate(() => (/** @type {any} */ (window)).feedbackFixture.state()), "disabled");
+  assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 0, "disableでcontroller所有DOMを削除する必要があります");
+  assert.equal(await page.evaluate(() => (/** @type {any} */ (window)).feedbackFixture.activeSubscriptions()), 0, "disableでhost購読を解除する必要があります");
+  assert.equal(await page.evaluate(() => (/** @type {any} */ (window)).__feedbackIntervalProbe.active()), 0, "disableでpolling timerを解除する必要があります");
+  const disabledRequestCount = requests.filter(isApiRequest).length;
+  await page.evaluate(() => (/** @type {any} */ (window)).feedbackFixture.emitHostLocationChange());
+  await page.waitForTimeout(250);
+  assert.equal(requests.filter(isApiRequest).length, disabledRequestCount, "disabled中にgateway通信を再開してはいけません");
+
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
+  await page.waitForFunction(() => Boolean(
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+  ));
+  await page.getByRole("button", { name: "Feedbackを開く" }).click();
+  await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
+  assert.equal(await page.getByLabel("最初のコメント").inputValue(), retainedDraft, "re-enableでdraftを復元する必要があります");
+
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(false));
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.purgeLocalState());
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
+  await page.waitForFunction(() => Boolean(
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+  ));
+  await page.getByRole("button", { name: "Feedbackを開く" }).click();
+  await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
+  assert.equal(await page.getByLabel("最初のコメント").inputValue(), "", "purge後にdraftを復元してはいけません");
+  assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 1, "再enable後もmountは1つだけである必要があります");
+
   assert.deepEqual(errors, []);
-  const apiRequests = requests.filter((entry) => entry.path.startsWith("/internal/feedback-redmine/"));
+  const apiRequests = requests.filter(isApiRequest);
   assert(apiRequests.some((entry) => entry.method === "GET" && entry.path.endsWith("/threads")));
   assert(apiRequests.every((entry) => entry.fetchSite === "same-origin"));
   assert(apiRequests.filter((entry) => entry.method === "GET").every((entry) => entry.origin === null || entry.origin === origin));
@@ -194,6 +271,11 @@ function contentType(path) {
 /** @param {string | string[] | undefined} value */
 function headerValue(value) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+/** @param {{path: string}} entry */
+function isApiRequest(entry) {
+  return entry.path.startsWith("/internal/feedback-redmine/");
 }
 
 /** @param {() => boolean} predicate */

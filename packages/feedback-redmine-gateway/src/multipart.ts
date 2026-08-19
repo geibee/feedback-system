@@ -51,9 +51,10 @@ function parseMultipartBytes(bytes: Uint8Array, boundary: string): ParsedMultipa
   let requestPart: unknown;
   let evidence: ParsedMultipart["evidence"] = null;
   let searchOffset = delimiter.length + 2;
-  for (const rawPart of rawParts) {
+  for (const [partIndex, rawPart] of rawParts.entries()) {
     const separator = rawPart.indexOf("\r\n\r\n");
-    if (separator < 0 || !rawPart.endsWith("\r\n")) {
+    const finalPart = partIndex === rawParts.length - 1;
+    if (separator < 0 || (finalPart && !rawPart.endsWith("\r\n"))) {
       throw new GatewayHttpError(400, "redmine.contract_invalid", "multipart partが不正です");
     }
     const headers = parseHeaders(rawPart.slice(0, separator));
@@ -61,7 +62,7 @@ function parseMultipartBytes(bytes: Uint8Array, boundary: string): ParsedMultipa
     if (rawIndex < 0) throw new GatewayHttpError(400, "redmine.contract_invalid", "multipart part位置が不正です");
     searchOffset = rawIndex + rawPart.length;
     const bodyStart = rawIndex + separator + 4;
-    const bodyLength = rawPart.length - separator - 6;
+    const bodyLength = rawPart.length - separator - 4 - (finalPart ? 2 : 0);
     const disposition = headers.get("content-disposition") ?? "";
     const name = /(?:^|;)\s*name="([^"]+)"/u.exec(disposition)?.[1];
     if (name === "request") {

@@ -32,8 +32,7 @@ const createInput = {
     subjectId: "subject-1",
     displayName: "利用者",
     redmineUserId: null
-  },
-  submissionChannel: "embedded" as const
+  }
 };
 
 function client(fetch: RedmineFetch) {
@@ -213,9 +212,9 @@ describe("Redmine trusted HTTP policy", () => {
         const request = JSON.parse(init.body as string) as { issue: ReturnType<typeof issueFixture> & { uploads: unknown[] } };
         expect(request.issue.uploads).toEqual([expect.objectContaining({ token: "context-upload-token" })]);
         expect(request.issue.custom_fields).toEqual(expect.arrayContaining([
-          { id: profile.customFieldIds.submittedById, value: "subject-1" },
-          { id: profile.customFieldIds.submissionChannel, value: "embedded" }
+          { id: profile.customFieldIds.submittedById, value: "subject-1" }
         ]));
+        expect(request.issue.custom_fields).toHaveLength(11);
         createdIssue = {
           ...issueFixture(),
           subject: request.issue.subject,

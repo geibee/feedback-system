@@ -47,12 +47,14 @@ trap cleanup EXIT
 packages=(
   @feedback/contracts
   @feedback/core
+  @feedback/dom-capture
   @feedback/react
   @feedback/maplibre
   @feedback/admin-react
 )
 
-npm run build:packages
+npm run build:shared
+npm run build:legacy:packages
 
 artifacts_file="$release_root/artifacts.tsv"
 : >"$artifacts_file"

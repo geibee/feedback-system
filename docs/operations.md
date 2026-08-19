@@ -1,5 +1,8 @@
 # 運用
 
+> **Legacy Feedback Service:** この文書はPostgreSQL、object storage、workerを持つ従来runtime向けです。
+> Redmine正本構成ではRedmine DB/filesのbackup、gateway、host sessionを運用対象にします。
+
 API、notification worker、export worker、retention worker、bootstrapは同じService imageの別commandで起動する。
 既定の`full` profileではDB、Evidence storage、Export storageが必須依存で、`/health/ready` が個別状態を報告する。
 コメント中心の`core` profileはPostgreSQLだけを必須とし、Evidence／Export／Notificationを`disabled`と報告する。notification backlogは

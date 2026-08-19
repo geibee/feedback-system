@@ -1,5 +1,8 @@
 # 証跡バックアップと通知コネクタ
 
+> **Legacy Feedback Service:** この文書は従来runtimeのexport/backup/connector向けです。Redmine正本構成のbackupは
+> Redmine DBとfilesの運用で行います。
+
 workspaceの自動backupは既定で無効である。管理者が有効化すると、Asia/Tokyoの日次02:00フルと60分差分を
 private object storageへ一意なZIPとして保存する。ZIPにはthread、message全版、状態変更、監査ログ、evidence
 metadataと画像、各entryのSHA-256を持つmanifestを含む。V5以前を推測せず、manifestに履歴保証開始時点を記録する。

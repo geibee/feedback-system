@@ -37,7 +37,6 @@ export type TrustedThreadInput = {
 export type TrustedCreateInput = Omit<RedmineThreadCreateInput, "resourceRef"> & {
   hostResourceKey: string;
   author: TrustedFeedbackAuthor;
-  submissionChannel: "embedded" | "extension";
 };
 
 export type TrustedCreateResult = {
@@ -266,7 +265,6 @@ export class RedmineTrustedClient {
       pageKey: input.location.pageKey,
       hostResourceKey: input.hostResourceKey,
       perspectiveCode: input.perspectiveCode,
-      submissionChannel: input.submissionChannel,
       submittedById: input.author.subjectId,
       capturedAt: input.capturedAt
     });
@@ -418,8 +416,7 @@ export class RedmineTrustedClient {
       ["perspectiveCode", input.perspectiveCode],
       ["locator", buildLocator(input.location, input.target)],
       ["submittedById", input.author.subjectId],
-      ["submittedByName", input.author.displayName ?? ""],
-      ["submissionChannel", input.submissionChannel]
+      ["submittedByName", input.author.displayName ?? ""]
     ];
     return values.map(([key, value]) => ({ id: ids[key], value }));
   }

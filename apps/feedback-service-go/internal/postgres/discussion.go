@@ -36,11 +36,36 @@ func (d *Database) ListThreads(
 	ctx context.Context,
 	input discussion.ListThreadsInput,
 ) (discussion.ThreadPage, error) {
-	filter := ""
+	filters := make([]string, 0, 8)
 	arguments := []any{input.SessionID}
+	add := func(sql string, value any) {
+		arguments = append(arguments, value)
+		filters = append(filters, fmt.Sprintf(sql, len(arguments)))
+	}
 	if input.Status != nil {
-		filter = " AND thread.status = $2"
-		arguments = append(arguments, *input.Status)
+		add("thread.status = $%d", *input.Status)
+	}
+	if input.PerspectiveCode != nil {
+		add("thread.perspective_code = $%d", *input.PerspectiveCode)
+	}
+	if input.AssigneeUserID != nil {
+		add("thread.assignee_user_id = $%d::uuid", *input.AssigneeUserID)
+	}
+	if input.Priority != nil {
+		add("thread.priority = $%d", *input.Priority)
+	}
+	if input.Label != nil {
+		add("$%d = ANY(thread.labels)", *input.Label)
+	}
+	if input.EvidenceAvailable != nil {
+		add("EXISTS (SELECT 1 FROM feedback.review_evidence evidence WHERE evidence.thread_id = thread.id) = $%d", *input.EvidenceAvailable)
+	}
+	if input.Query != nil {
+		add("EXISTS (SELECT 1 FROM feedback.feedback_messages message WHERE message.thread_id = thread.id AND message.body ILIKE '%%' || $%d || '%%')", *input.Query)
+	}
+	filter := ""
+	if len(filters) > 0 {
+		filter = " AND " + strings.Join(filters, " AND ")
 	}
 	var total int64
 	if err := d.QueryRow(ctx, `SELECT count(*)
@@ -51,14 +76,23 @@ WHERE thread.session_id = $1::uuid`+filter, arguments...).Scan(&total); err != n
 
 	limitPosition := len(arguments) + 1
 	offsetPosition := limitPosition + 1
+	orderBy := "thread.created_at DESC, thread.id DESC"
+	if input.Sort == "created_asc" {
+		orderBy = "thread.created_at, thread.id"
+	}
+	if input.Sort == "updated_desc" {
+		orderBy = "thread.updated_at DESC, thread.id DESC"
+	}
 	query := fmt.Sprintf(`SELECT thread.id::text, thread.session_id::text, thread.display_number,
        thread.location, thread.target, thread.perspective_code, thread.status,
        thread.reporter_principal_id, thread.reporter_display_name, thread.reporter_participant_name,
-       thread.created_at, thread.updated_at, thread.version
+       assignee.id::text, COALESCE(assignee.display_name, assignee.email, assignee.subject),
+       thread.priority, thread.labels, thread.created_at, thread.updated_at, thread.version
 FROM feedback.feedback_threads thread
+LEFT JOIN feedback.users assignee ON assignee.id = thread.assignee_user_id
 WHERE thread.session_id = $1::uuid%s
-ORDER BY thread.created_at DESC, thread.id DESC
-LIMIT $%d OFFSET $%d`, filter, limitPosition, offsetPosition)
+ORDER BY %s
+LIMIT $%d OFFSET $%d`, filter, orderBy, limitPosition, offsetPosition)
 	arguments = append(arguments, input.Limit, input.Offset)
 	rows, err := d.Query(ctx, query, arguments...)
 	if err != nil {
@@ -79,7 +113,7 @@ LIMIT $%d OFFSET $%d`, filter, limitPosition, offsetPosition)
 		return discussion.ThreadPage{}, fmt.Errorf("thread一覧の走査に失敗しました: %w", err)
 	}
 	for index := range items {
-		if err := loadDiscussionThreadRelations(ctx, d, &items[index]); err != nil {
+		if err := loadDiscussionThreadRelations(ctx, d, &items[index], input.ViewerUserID); err != nil {
 			return discussion.ThreadPage{}, err
 		}
 	}
@@ -91,8 +125,8 @@ LIMIT $%d OFFSET $%d`, filter, limitPosition, offsetPosition)
 	return page, nil
 }
 
-func (d *Database) GetThread(ctx context.Context, threadID string) (discussion.Thread, error) {
-	return readDiscussionThread(ctx, d, threadID)
+func (d *Database) GetThread(ctx context.Context, threadID, viewerUserID string) (discussion.Thread, error) {
+	return readDiscussionThreadForViewer(ctx, d, threadID, viewerUserID)
 }
 
 func (d *Database) GetThreadDeepLink(ctx context.Context, threadID string) (string, error) {
@@ -136,7 +170,11 @@ func (d *Database) CreateThread(
 		}
 		if replayed {
 			result.Replay = true
-			return nil
+			return insertAudit(txCtx, tx, usecase.AuditEvent{
+				Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "thread.create",
+				ResourceType: "thread", ResourceID: result.Value.ID,
+				Outcome: "succeeded", RequestID: input.RequestID,
+			})
 		}
 
 		var status, outOfScopePosting, manifestVersion string
@@ -262,6 +300,9 @@ RETURNING next_number - 1`, input.SessionID).Scan(&displayNumber); err != nil {
 		if err != nil {
 			return err
 		}
+		if err := upsertThreadParticipant(txCtx, tx, input.ThreadID, input.Principal.UserID); err != nil {
+			return err
+		}
 		if input.Evidence != nil {
 			if err := d.InsertEvidenceMetadata(txCtx, tx, input.ThreadID, *input.Evidence); err != nil {
 				return err
@@ -289,6 +330,13 @@ RETURNING next_number - 1`, input.SessionID).Scan(&displayNumber); err != nil {
 			txCtx, tx, input.Scope.TenantID, input.Principal.Subject, createThreadEndpoint,
 			input.IdempotencyKey, input.RequestHash, result.Value,
 		); err != nil {
+			return err
+		}
+		if err := insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "thread.create",
+			ResourceType: "thread", ResourceID: result.Value.ID,
+			Outcome: "succeeded", RequestID: input.RequestID,
+		}); err != nil {
 			return err
 		}
 		mutationReady = true
@@ -331,7 +379,11 @@ func (d *Database) CreateMessage(
 		}
 		if replayed {
 			result.Replay = true
-			return nil
+			return insertAudit(txCtx, tx, usecase.AuditEvent{
+				Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "message.create",
+				ResourceType: "message", ResourceID: result.Value.ID,
+				Outcome: "succeeded", RequestID: input.RequestID,
+			})
 		}
 		var sessionID string
 		err = tx.QueryRow(txCtx, `SELECT session_id::text
@@ -352,6 +404,12 @@ WHERE id = $1::uuid
 			txCtx, tx, input.ThreadID, input.Principal, input.Request.Body, input.Request.ParticipantName,
 		)
 		if err != nil {
+			return err
+		}
+		if err := createReplyNotifications(txCtx, tx, input.Scope.WorkspaceID, input.ThreadID, result.Value.ID, input.Principal.UserID); err != nil {
+			return err
+		}
+		if err := upsertThreadParticipant(txCtx, tx, input.ThreadID, input.Principal.UserID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(txCtx, `UPDATE feedback.feedback_threads
@@ -379,7 +437,11 @@ WHERE id = $1::uuid`, input.ThreadID); err != nil {
 		); err != nil {
 			return err
 		}
-		return nil
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "message.create",
+			ResourceType: "message", ResourceID: result.Value.ID,
+			Outcome: "succeeded", RequestID: input.RequestID,
+		})
 	})
 	return result, err
 }
@@ -436,9 +498,16 @@ WHERE id = (SELECT thread_id FROM feedback.feedback_messages WHERE id = $1::uuid
 		if err != nil {
 			return err
 		}
-		return appendDiscussionChange(txCtx, tx, input.Scope, "feedback.message.updated.v1", "message", input.MessageID,
+		if err := appendDiscussionChange(txCtx, tx, input.Scope, "feedback.message.updated.v1", "message", input.MessageID,
 			map[string]any{"threadId": updated.ThreadID, "fromVersion": current.Version, "toVersion": updated.Version},
-		)
+		); err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "message.patch",
+			ResourceType: "message", ResourceID: updated.ID,
+			Outcome: "succeeded", RequestID: input.RequestID,
+		})
 	})
 	return updated, err
 }
@@ -522,9 +591,202 @@ WHERE id = $2::uuid AND version = $3`, input.Status, input.ThreadID, input.Expec
 			return err
 		}
 		updated, err = readDiscussionThread(txCtx, tx, input.ThreadID)
-		return err
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "thread.status.patch",
+			ResourceType: "thread", ResourceID: updated.ID,
+			Outcome: "succeeded", RequestID: input.RequestID,
+		})
 	})
 	return updated, err
+}
+
+func (d *Database) PatchThreadTriage(
+	ctx context.Context,
+	input discussion.PatchThreadTriageInput,
+) (discussion.Thread, error) {
+	var updated discussion.Thread
+	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
+		if err := ensureDiscussionThreadScope(txCtx, tx, input.ThreadID, input.Scope); err != nil {
+			return err
+		}
+		current, err := readDiscussionThread(txCtx, tx, input.ThreadID)
+		if err != nil {
+			return err
+		}
+		if current.Version != input.ExpectedVersion {
+			return discussionVersionMismatch()
+		}
+		assigneeID := (*string)(nil)
+		if current.Assignee != nil {
+			value := current.Assignee.UserID
+			assigneeID = &value
+		}
+		priority := current.Priority
+		labels := append([]string(nil), current.Labels...)
+		if input.Patch.AssigneeSet {
+			assigneeID = input.Patch.AssigneeUserID
+		}
+		if input.Patch.PrioritySet {
+			priority = input.Patch.Priority
+		}
+		if input.Patch.LabelsSet {
+			labels = append([]string(nil), input.Patch.Labels...)
+		}
+		if assigneeID != nil {
+			var member bool
+			if err := tx.QueryRow(txCtx, `SELECT EXISTS (
+    SELECT 1 FROM feedback.workspace_memberships WHERE workspace_id = $1::uuid AND user_id = $2::uuid
+)`, input.Scope.WorkspaceID, *assigneeID).Scan(&member); err != nil {
+				return err
+			}
+			if !member {
+				return discussionInvalid("triage.assignee_not_member", "担当者はworkspace memberから選択してください")
+			}
+		}
+		tag, err := tx.Exec(txCtx, `UPDATE feedback.feedback_threads
+SET assignee_user_id = $1::uuid, priority = $2, labels = $3,
+    version = version + 1, updated_at = now()
+WHERE id = $4::uuid AND version = $5`, optionalString(assigneeID), optionalString(priority), labels,
+			input.ThreadID, input.ExpectedVersion)
+		if err != nil {
+			return fmt.Errorf("thread triageを更新できません: %w", err)
+		}
+		if tag.RowsAffected() != 1 {
+			return discussionVersionMismatch()
+		}
+		_, err = tx.Exec(txCtx, `INSERT INTO feedback.thread_triage_events (
+    id, workspace_id, thread_id, actor_user_id, assignee_user_id, priority, labels
+) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6, $7)`, uuid.NewString(),
+			input.Scope.WorkspaceID, input.ThreadID, input.Principal.UserID, optionalString(assigneeID),
+			optionalString(priority), labels)
+		if err != nil {
+			return fmt.Errorf("triage履歴を登録できません: %w", err)
+		}
+		if err := appendDiscussionChange(txCtx, tx, input.Scope, "feedback.thread.triaged.v1", "thread", input.ThreadID,
+			map[string]any{"assigneeUserId": assigneeID, "priority": priority, "labels": labels}); err != nil {
+			return err
+		}
+		updated, err = readDiscussionThread(txCtx, tx, input.ThreadID)
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "thread.triage.patch",
+			ResourceType: "thread", ResourceID: input.ThreadID, Outcome: "succeeded", RequestID: input.RequestID,
+		})
+	})
+	return updated, err
+}
+
+func (d *Database) SetMessageReaction(
+	ctx context.Context,
+	input discussion.ReactionInput,
+) (discussion.Message, error) {
+	var updated discussion.Message
+	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
+		if err := ensureDiscussionMessageScope(txCtx, tx, input.MessageID, input.Scope); err != nil {
+			return err
+		}
+		var tag pgconn.CommandTag
+		var err error
+		if input.Add {
+			tag, err = tx.Exec(txCtx, `INSERT INTO feedback.message_reactions (message_id, user_id, reaction)
+VALUES ($1::uuid, $2::uuid, $3) ON CONFLICT DO NOTHING`, input.MessageID, input.Principal.UserID, input.Reaction)
+		} else {
+			tag, err = tx.Exec(txCtx, `DELETE FROM feedback.message_reactions
+WHERE message_id = $1::uuid AND user_id = $2::uuid AND reaction = $3`, input.MessageID, input.Principal.UserID, input.Reaction)
+		}
+		if err != nil {
+			return fmt.Errorf("message reactionを更新できません: %w", err)
+		}
+		if tag.RowsAffected() > 0 {
+			var threadID string
+			if err := tx.QueryRow(txCtx, `SELECT thread_id::text FROM feedback.feedback_messages WHERE id = $1::uuid`, input.MessageID).Scan(&threadID); err != nil {
+				return err
+			}
+			action := "removed"
+			if input.Add {
+				action = "added"
+			}
+			_, err = tx.Exec(txCtx, `INSERT INTO feedback.reaction_events (
+    id, workspace_id, thread_id, message_id, user_id, reaction, action
+) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6, $7)`, uuid.NewString(),
+				input.Scope.WorkspaceID, threadID, input.MessageID, input.Principal.UserID, input.Reaction, action)
+			if err != nil {
+				return err
+			}
+		}
+		updated, err = readDiscussionMessage(txCtx, tx, input.MessageID, false)
+		if err != nil {
+			return err
+		}
+		return loadDiscussionMessageReactions(txCtx, tx, &updated, input.Principal.UserID)
+	})
+	return updated, err
+}
+
+func (d *Database) ListUnreadReplies(
+	ctx context.Context,
+	input discussion.UnreadRepliesInput,
+) (discussion.UnreadReplySummary, error) {
+	rows, err := d.Query(ctx, `SELECT notification.thread_id::text, count(*),
+       (array_agg(notification.message_id::text ORDER BY notification.created_at DESC, notification.id DESC))[1],
+       max(notification.created_at)
+FROM feedback.reply_notifications notification
+JOIN feedback.feedback_threads thread ON thread.id = notification.thread_id
+WHERE notification.workspace_id = $1::uuid AND notification.recipient_user_id = $2::uuid
+  AND thread.environment_id = $3::uuid AND notification.read_at IS NULL
+GROUP BY notification.thread_id ORDER BY max(notification.created_at) DESC`,
+		input.Scope.WorkspaceID, input.Principal.UserID, input.Scope.EnvironmentID)
+	if err != nil {
+		return discussion.UnreadReplySummary{}, fmt.Errorf("未読返信を取得できません: %w", err)
+	}
+	defer rows.Close()
+	result := discussion.UnreadReplySummary{Threads: make([]discussion.UnreadReplyThread, 0)}
+	for rows.Next() {
+		var item discussion.UnreadReplyThread
+		var latestAt time.Time
+		if err := rows.Scan(&item.ThreadID, &item.Count, &item.LatestMessageID, &latestAt); err != nil {
+			return discussion.UnreadReplySummary{}, err
+		}
+		item.LatestAt = javaInstant(latestAt)
+		result.TotalCount += item.Count
+		result.Threads = append(result.Threads, item)
+	}
+	return result, rows.Err()
+}
+
+func (d *Database) MarkThreadRead(ctx context.Context, input discussion.MarkThreadReadInput) error {
+	if err := ensureDiscussionThreadScope(ctx, d, input.ThreadID, input.Scope); err != nil {
+		return err
+	}
+	var messageExists bool
+	if err := d.QueryRow(ctx, `SELECT EXISTS (
+    SELECT 1 FROM feedback.feedback_messages WHERE id = $1::uuid AND thread_id = $2::uuid
+)`, input.ReadThroughMessageID, input.ThreadID).Scan(&messageExists); err != nil {
+		return fmt.Errorf("既読位置のmessageを確認できません: %w", err)
+	}
+	if !messageExists {
+		return discussionNotFound()
+	}
+	_, err := d.Exec(ctx, `UPDATE feedback.reply_notifications notification SET read_at = now()
+WHERE notification.workspace_id = $1::uuid AND notification.recipient_user_id = $2::uuid
+  AND notification.thread_id = $3::uuid AND notification.read_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM feedback.feedback_messages notified
+      JOIN feedback.feedback_messages read_through ON read_through.id = $4::uuid
+      WHERE notified.id = notification.message_id
+        AND read_through.thread_id = notification.thread_id
+        AND (notified.created_at, notified.id) <= (read_through.created_at, read_through.id)
+  )`, input.Scope.WorkspaceID, input.Principal.UserID, input.ThreadID, input.ReadThroughMessageID)
+	if err != nil {
+		return fmt.Errorf("未読返信を既読にできません: %w", err)
+	}
+	return nil
 }
 
 func ensureDiscussionThreadScope(
@@ -731,11 +993,22 @@ func readDiscussionThread(
 	querier discussionQuerier,
 	threadID string,
 ) (discussion.Thread, error) {
+	return readDiscussionThreadForViewer(ctx, querier, threadID, "")
+}
+
+func readDiscussionThreadForViewer(
+	ctx context.Context,
+	querier discussionQuerier,
+	threadID string,
+	viewerUserID string,
+) (discussion.Thread, error) {
 	row := querier.QueryRow(ctx, `SELECT thread.id::text, thread.session_id::text, thread.display_number,
        thread.location, thread.target, thread.perspective_code, thread.status,
        thread.reporter_principal_id, thread.reporter_display_name, thread.reporter_participant_name,
-       thread.created_at, thread.updated_at, thread.version
+       assignee.id::text, COALESCE(assignee.display_name, assignee.email, assignee.subject),
+       thread.priority, thread.labels, thread.created_at, thread.updated_at, thread.version
 FROM feedback.feedback_threads thread
+LEFT JOIN feedback.users assignee ON assignee.id = thread.assignee_user_id
 WHERE thread.id = $1::uuid`, threadID)
 	thread, err := scanDiscussionThread(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -744,7 +1017,7 @@ WHERE thread.id = $1::uuid`, threadID)
 	if err != nil {
 		return discussion.Thread{}, fmt.Errorf("threadを読み取れません: %w", err)
 	}
-	if err := loadDiscussionThreadRelations(ctx, querier, &thread); err != nil {
+	if err := loadDiscussionThreadRelations(ctx, querier, &thread, viewerUserID); err != nil {
 		return discussion.Thread{}, err
 	}
 	return thread, nil
@@ -758,10 +1031,12 @@ func scanDiscussionThread(scanner discussionScanner) (discussion.Thread, error) 
 	var thread discussion.Thread
 	var location, target []byte
 	var createdAt, updatedAt time.Time
+	var assigneeID, assigneeName, priority *string
 	err := scanner.Scan(
 		&thread.ID, &thread.SessionID, &thread.DisplayNumber, &location, &target,
 		&thread.PerspectiveCode, &thread.Status, &thread.Reporter.PrincipalID,
 		&thread.Reporter.DisplayName, &thread.Reporter.ParticipantName,
+		&assigneeID, &assigneeName, &priority, &thread.Labels,
 		&createdAt, &updatedAt, &thread.Version,
 	)
 	if err != nil {
@@ -772,6 +1047,13 @@ func scanDiscussionThread(scanner discussionScanner) (discussion.Thread, error) 
 	thread.CreatedAt = javaInstant(createdAt)
 	thread.UpdatedAt = javaInstant(updatedAt)
 	thread.Messages = make([]discussion.Message, 0)
+	thread.Priority = priority
+	if thread.Labels == nil {
+		thread.Labels = make([]string, 0)
+	}
+	if assigneeID != nil && assigneeName != nil {
+		thread.Assignee = &discussion.Assignee{UserID: *assigneeID, DisplayName: *assigneeName}
+	}
 	return thread, nil
 }
 
@@ -779,6 +1061,7 @@ func loadDiscussionThreadRelations(
 	ctx context.Context,
 	querier discussionQuerier,
 	thread *discussion.Thread,
+	viewerUserID string,
 ) error {
 	rows, err := querier.Query(ctx, `SELECT message.id::text, message.thread_id::text,
        message.author_principal_id, message.author_display_name, message.author_participant_name,
@@ -804,12 +1087,41 @@ ORDER BY message.created_at, message.id`, thread.ID)
 		return fmt.Errorf("thread messageの走査に失敗しました: %w", err)
 	}
 	thread.Messages = messages
+	for index := range thread.Messages {
+		if err := loadDiscussionMessageReactions(ctx, querier, &thread.Messages[index], viewerUserID); err != nil {
+			return err
+		}
+	}
 	if err := querier.QueryRow(ctx, `SELECT EXISTS (
     SELECT 1 FROM feedback.review_evidence WHERE thread_id = $1::uuid
 )`, thread.ID).Scan(&thread.EvidenceAvailable); err != nil {
 		return fmt.Errorf("thread evidence有無を取得できません: %w", err)
 	}
 	return nil
+}
+
+func loadDiscussionMessageReactions(
+	ctx context.Context,
+	querier discussionQuerier,
+	message *discussion.Message,
+	viewerUserID string,
+) error {
+	rows, err := querier.Query(ctx, `SELECT reaction, count(*), bool_or(user_id::text = NULLIF($2, ''))
+FROM feedback.message_reactions WHERE message_id = $1::uuid
+GROUP BY reaction ORDER BY reaction`, message.ID, viewerUserID)
+	if err != nil {
+		return fmt.Errorf("message reactionを取得できません: %w", err)
+	}
+	defer rows.Close()
+	message.Reactions = make([]discussion.ReactionSummary, 0)
+	for rows.Next() {
+		var value discussion.ReactionSummary
+		if err := rows.Scan(&value.Reaction, &value.Count, &value.ReactedByMe); err != nil {
+			return err
+		}
+		message.Reactions = append(message.Reactions, value)
+	}
+	return rows.Err()
 }
 
 func insertDiscussionMessage(
@@ -830,6 +1142,36 @@ func insertDiscussionMessage(
 		return discussion.Message{}, fmt.Errorf("messageを登録できません: %w", err)
 	}
 	return readDiscussionMessage(ctx, tx, messageID, false)
+}
+
+func upsertThreadParticipant(ctx context.Context, tx Tx, threadID, userID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO feedback.thread_participants (thread_id, user_id)
+VALUES ($1::uuid, $2::uuid)
+ON CONFLICT (thread_id, user_id) DO UPDATE SET participated_at = now()`, threadID, userID)
+	if err != nil {
+		return fmt.Errorf("thread参加者を登録できません: %w", err)
+	}
+	return nil
+}
+
+func createReplyNotifications(ctx context.Context, tx Tx, workspaceID, threadID, messageID, actorUserID string) error {
+	if strings.TrimSpace(actorUserID) == "" {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO feedback.reply_notifications (
+    id, workspace_id, recipient_user_id, thread_id, message_id
+)
+SELECT gen_random_uuid(), $1::uuid, participant.user_id, $2::uuid, $3::uuid
+FROM feedback.thread_participants participant
+WHERE participant.thread_id = $2::uuid AND participant.user_id <> $4::uuid
+ON CONFLICT (recipient_user_id, message_id) DO NOTHING`, workspaceID, threadID, messageID, actorUserID)
+	if err != nil {
+		return fmt.Errorf("返信通知を登録できません: %w", err)
+	}
+	return nil
 }
 
 func readDiscussionMessage(

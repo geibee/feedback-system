@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-19
+
+- スレッド一覧へ更新順・作成順、観点、担当者、優先度、ラベル、証跡、本文検索のfilterを後方互換で追加。
+- スレッドへ担当者・優先度・ラベル、メッセージへ固定リアクションを追加。
+- 参加スレッドへの未読返信件数と既読更新APIを追加。
+- 全コメント版履歴、トリアージ・状態・リアクション履歴、証跡画像、SHA-256 manifestを含む`evidence-package` exportを追加。
+
+## 2026-08-14
+
+- 直接OIDC access tokenで `feedback_permissions`を必須とし、DB membershipと常に交差する認可契約を明記。
+- workspace membershipを権限の正本とし、application権限を同一application内のworkspace権限の和集合として同期するように変更。PATCHを含め、workspace最後のadmin権限除去を拒否。
+
 ## 2026-08-13
 
 - tenant/application/environment/workspace/membershipをCI/CDから同期するinstallation manifest v1 schemaを追加。

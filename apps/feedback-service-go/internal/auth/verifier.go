@@ -78,7 +78,7 @@ func newExchangeVerifier(
 	return &ExchangeVerifier{settings: settings, source: source, now: now}, nil
 }
 
-// Verify は署名、algorithm、issuer、audience、時刻、subjectを検証する。
+// Verify は署名、algorithm、issuer、audience、時刻、subject、Feedback permissionを検証する。
 func (verifier *DirectVerifier) Verify(ctx context.Context, rawToken string) (Identity, error) {
 	token, err := verifyJWT(ctx, rawToken, verifier.source)
 	if err != nil {
@@ -100,11 +100,18 @@ func (verifier *DirectVerifier) Verify(ctx context.Context, rawToken string) (Id
 	if err != nil {
 		return Identity{}, err
 	}
+	permissions, err := requiredFeedbackPermissions(token)
+	if err != nil {
+		return Identity{}, err
+	}
 	return Identity{
 		Issuer:      verifier.settings.Issuer,
 		Subject:     subject,
 		Email:       email,
 		DisplayName: displayName,
+		TokenScope: &TokenScope{
+			Permissions: permissions,
+		},
 	}, nil
 }
 
@@ -160,13 +167,9 @@ func (verifier *ExchangeVerifier) Verify(ctx context.Context, rawToken string) (
 	if err != nil {
 		return Identity{}, err
 	}
-	permissionValues, err := requiredStringListClaim(token, "feedback_permissions")
+	permissions, err := requiredFeedbackPermissions(token)
 	if err != nil {
 		return Identity{}, err
-	}
-	permissions, err := ParsePermissions(permissionValues)
-	if err != nil {
-		return Identity{}, invalidToken("feedback_permissionsが不正です", err)
 	}
 	tenantKey, err := requiredStringClaim(token, "feedback_tenant")
 	if err != nil {
@@ -329,6 +332,18 @@ func requiredStringListClaim(token jwt.Token, name string) ([]string, error) {
 		values = append(values, value)
 	}
 	return values, nil
+}
+
+func requiredFeedbackPermissions(token jwt.Token) ([]Permission, error) {
+	values, err := requiredStringListClaim(token, "feedback_permissions")
+	if err != nil {
+		return nil, err
+	}
+	permissions, err := ParsePermissions(values)
+	if err != nil {
+		return nil, invalidToken("feedback_permissionsが不正です", err)
+	}
+	return permissions, nil
 }
 
 func invalidToken(message string, cause error) error {

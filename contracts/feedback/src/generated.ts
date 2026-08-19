@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/unread-replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFeedbackUnreadReplies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{applicationKey}/manifest": {
         parameters: {
             query?: never;
@@ -212,6 +228,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messages/{messageId}/reactions/{reaction}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: components["parameters"]["MessageId"];
+                reaction: components["schemas"]["FeedbackReactionKey"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putFeedbackMessageReaction"];
+        post?: never;
+        delete: operations["deleteFeedbackMessageReaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/threads/{threadId}/status": {
         parameters: {
             query?: never;
@@ -228,6 +263,42 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["patchFeedbackThreadStatus"];
+        trace?: never;
+    };
+    "/threads/{threadId}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                threadId: components["parameters"]["ThreadId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patchFeedbackThreadTriage"];
+        trace?: never;
+    };
+    "/threads/{threadId}/read-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                threadId: components["parameters"]["ThreadId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putFeedbackThreadReadState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/threads/{threadId}/evidence": {
@@ -587,6 +658,31 @@ export interface components {
             displayName?: string | null;
             participantName?: string | null;
         };
+        FeedbackAssignee: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+        };
+        /** @enum {string} */
+        FeedbackReactionKey: "thumbs_up" | "check" | "eyes" | "question";
+        FeedbackReactionSummary: {
+            reaction: components["schemas"]["FeedbackReactionKey"];
+            count: number;
+            reactedByMe: boolean;
+        };
+        FeedbackUnreadReplyThread: {
+            /** Format: uuid */
+            threadId: string;
+            count: number;
+            /** Format: uuid */
+            latestMessageId: string;
+            /** Format: date-time */
+            latestAt: string;
+        };
+        FeedbackUnreadReplySummary: {
+            totalCount: number;
+            threads: components["schemas"]["FeedbackUnreadReplyThread"][];
+        };
         FeedbackMembership: {
             applicationKey: string;
             externalWorkspaceKey: string;
@@ -728,6 +824,13 @@ export interface components {
         };
         /** @enum {string} */
         FeedbackThreadStatus: "open" | "resolved";
+        /**
+         * @default updated_desc
+         * @enum {string}
+         */
+        FeedbackThreadSort: "created_desc" | "created_asc" | "updated_desc";
+        /** @enum {string} */
+        FeedbackThreadPriority: "critical" | "high" | "medium" | "low";
         FeedbackMessageV1: {
             /** Format: uuid */
             id: string;
@@ -740,6 +843,7 @@ export interface components {
             /** Format: date-time */
             editedAt?: string | null;
             version: number;
+            reactions?: components["schemas"]["FeedbackReactionSummary"][];
         };
         FeedbackMessageVersionV1: {
             /** Format: uuid */
@@ -768,6 +872,9 @@ export interface components {
             reporter: components["schemas"]["FeedbackParticipant"];
             /** @default false */
             evidenceAvailable: boolean;
+            assignee?: components["schemas"]["FeedbackAssignee"] | null;
+            priority?: components["schemas"]["FeedbackThreadPriority"] | null;
+            labels?: string[];
             messages: components["schemas"]["FeedbackMessageV1"][];
             /** Format: date-time */
             createdAt: string;
@@ -779,6 +886,16 @@ export interface components {
             items: components["schemas"]["FeedbackThreadV1"][];
             nextCursor?: string | null;
             totalCount?: number;
+        };
+        FeedbackThreadTriagePatchRequest: {
+            /** Format: uuid */
+            assigneeUserId?: string | null;
+            priority?: components["schemas"]["FeedbackThreadPriority"] | null;
+            labels?: string[];
+        };
+        FeedbackThreadReadStateRequest: {
+            /** Format: uuid */
+            readThroughMessageId: string;
         };
         FeedbackDeepLink: {
             /** Format: uri */
@@ -816,7 +933,7 @@ export interface components {
             /** Format: uuid */
             sessionId?: string | null;
             /** @enum {unknown} */
-            format: "csv" | "xlsx";
+            format: "csv" | "xlsx" | "evidence-package";
             /** @default ja-JP */
             locale: string;
             /** @default Asia/Tokyo */
@@ -1339,6 +1456,32 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getFeedbackUnreadReplies: {
+        parameters: {
+            query: {
+                applicationKey: components["parameters"]["ApplicationKeyQuery"];
+                environmentKey: components["parameters"]["EnvironmentKeyQuery"];
+                externalWorkspaceKey: components["parameters"]["ExternalWorkspaceKeyQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 参加スレッドへの未読返信件数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackUnreadReplySummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getFeedbackApplicationManifest: {
         parameters: {
             query?: never;
@@ -1558,6 +1701,13 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["FeedbackThreadStatus"];
+                sort?: components["schemas"]["FeedbackThreadSort"];
+                perspectiveCode?: string;
+                assigneeUserId?: string;
+                priority?: components["schemas"]["FeedbackThreadPriority"];
+                label?: string;
+                evidenceAvailable?: boolean;
+                q?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
             };
@@ -1762,6 +1912,58 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    putFeedbackMessageReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: components["parameters"]["MessageId"];
+                reaction: components["schemas"]["FeedbackReactionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 更新したメッセージ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageV1"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteFeedbackMessageReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: components["parameters"]["MessageId"];
+                reaction: components["schemas"]["FeedbackReactionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 更新したメッセージ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackMessageV1"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     patchFeedbackThreadStatus: {
         parameters: {
             query?: never;
@@ -1796,6 +1998,69 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    patchFeedbackThreadTriage: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                threadId: components["parameters"]["ThreadId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/merge-patch+json": components["schemas"]["FeedbackThreadTriagePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description トリアージ情報を更新したスレッド */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackThreadV1"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    putFeedbackThreadReadState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                threadId: components["parameters"]["ThreadId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackThreadReadStateRequest"];
+            };
+        };
+        responses: {
+            /** @description 指定メッセージまで既読に更新 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getFeedbackEvidence: {
@@ -2487,6 +2752,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
         };
     };

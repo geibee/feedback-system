@@ -11,6 +11,7 @@ import (
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/admin"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 const membershipCreateEndpoint = "POST /memberships"
@@ -93,6 +94,9 @@ func (d *Database) CreateWorkspaceMember(
 ) (admin.StoreMutation, error) {
 	var mutation admin.StoreMutation
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
+		if err := lockMembershipMutation(txCtx, tx, scope.ApplicationID, scope.WorkspaceID); err != nil {
+			return err
+		}
 		lockValue := idempotencyLockValue(principal.Subject, membershipCreateEndpoint, command.IdempotencyKey)
 		if _, err := tx.Exec(txCtx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockValue); err != nil {
 			return fmt.Errorf("membership idempotency lockを取得できません: %w", err)
@@ -116,7 +120,10 @@ WHERE tenant_id = $1::uuid AND principal_id = $2 AND endpoint = $3 AND idempoten
 				return fmt.Errorf("membership idempotency responseを復元できません: %w", err)
 			}
 			mutation.Replayed = true
-			return nil
+			return recordMembershipSuccess(
+				txCtx, tx, scope, principal, "membership.create", command.Workspace.RequestID,
+				nil, &mutation.After,
+			)
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("membership idempotency recordを取得できません: %w", err)
@@ -142,6 +149,9 @@ VALUES ($1::uuid, $2::uuid, $3::text[])`, scope.WorkspaceID, userID, permissions
 		if err != nil {
 			return fmt.Errorf("workspace membershipを登録できません: %w", err)
 		}
+		if err := SyncApplicationMembership(txCtx, tx, scope.ApplicationID, userID); err != nil {
+			return err
+		}
 		mutation.After, err = readWorkspaceMember(txCtx, tx, scope.WorkspaceID, userID, false)
 		if err != nil {
 			return err
@@ -160,7 +170,10 @@ VALUES ($1::uuid, $2::uuid, $3::text[])`, scope.WorkspaceID, userID, permissions
 		if err != nil {
 			return fmt.Errorf("membership idempotency responseを登録できません: %w", err)
 		}
-		return nil
+		return recordMembershipSuccess(
+			txCtx, tx, scope, principal, "membership.create", command.Workspace.RequestID,
+			nil, &mutation.After,
+		)
 	})
 	if err != nil {
 		return admin.StoreMutation{}, err
@@ -171,12 +184,17 @@ VALUES ($1::uuid, $2::uuid, $3::text[])`, scope.WorkspaceID, userID, permissions
 func (d *Database) PatchWorkspaceMember(
 	ctx context.Context,
 	scope auth.ResourceScope,
+	principal auth.Principal,
+	requestID string,
 	userID string,
 	expectedVersion int,
 	patch admin.MembershipPatch,
 ) (admin.StoreMutation, error) {
 	var mutation admin.StoreMutation
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
+		if err := lockMembershipMutation(txCtx, tx, scope.ApplicationID, scope.WorkspaceID); err != nil {
+			return err
+		}
 		before, err := readWorkspaceMember(txCtx, tx, scope.WorkspaceID, userID, true)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && before.Version != expectedVersion) {
 			return &admin.Error{
@@ -187,6 +205,12 @@ func (d *Database) PatchWorkspaceMember(
 			return err
 		}
 		mutation.Before = &before
+		if slices.Contains(before.Permissions, auth.PermissionAdmin) &&
+			!slices.Contains(patch.Permissions, auth.PermissionAdmin) {
+			if err := ensureOtherWorkspaceAdmin(txCtx, tx, scope.WorkspaceID, userID); err != nil {
+				return err
+			}
+		}
 		_, err = tx.Exec(txCtx, `UPDATE feedback.workspace_memberships
 SET permissions = $1::text[], version = version + 1, updated_at = now()
 WHERE workspace_id = $2::uuid AND user_id = $3::uuid AND version = $4`,
@@ -195,8 +219,17 @@ WHERE workspace_id = $2::uuid AND user_id = $3::uuid AND version = $4`,
 		if err != nil {
 			return fmt.Errorf("workspace membershipを更新できません: %w", err)
 		}
+		if err := SyncApplicationMembership(txCtx, tx, scope.ApplicationID, userID); err != nil {
+			return err
+		}
 		mutation.After, err = readWorkspaceMember(txCtx, tx, scope.WorkspaceID, userID, false)
-		return err
+		if err != nil {
+			return err
+		}
+		return recordMembershipSuccess(
+			txCtx, tx, scope, principal, "membership.patch", requestID,
+			mutation.Before, &mutation.After,
+		)
 	})
 	if err != nil {
 		return admin.StoreMutation{}, err
@@ -207,11 +240,16 @@ WHERE workspace_id = $2::uuid AND user_id = $3::uuid AND version = $4`,
 func (d *Database) DeleteWorkspaceMember(
 	ctx context.Context,
 	scope auth.ResourceScope,
+	principal auth.Principal,
+	requestID string,
 	userID string,
 	expectedVersion int,
 ) (admin.Member, error) {
 	var before admin.Member
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
+		if err := lockMembershipMutation(txCtx, tx, scope.ApplicationID, scope.WorkspaceID); err != nil {
+			return err
+		}
 		var err error
 		before, err = readWorkspaceMember(txCtx, tx, scope.WorkspaceID, userID, true)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -220,18 +258,14 @@ func (d *Database) DeleteWorkspaceMember(
 		if err != nil {
 			return err
 		}
-		if slices.Contains(before.Permissions, auth.PermissionAdmin) {
-			var otherAdmins int64
-			if err := tx.QueryRow(txCtx, `SELECT count(*) FROM feedback.workspace_memberships
-WHERE workspace_id = $1::uuid AND user_id <> $2::uuid
-  AND permissions @> ARRAY['feedback.admin']::text[]`, scope.WorkspaceID, userID).Scan(&otherAdmins); err != nil {
-				return fmt.Errorf("workspace admin件数を取得できません: %w", err)
+		if before.Version != expectedVersion {
+			return &admin.Error{
+				Kind: admin.ErrVersionMismatch, Code: "resource.version_mismatch", Detail: "ETagが現在の版と一致しません",
 			}
-			if otherAdmins == 0 {
-				return &admin.Error{
-					Kind: admin.ErrConflict, Code: "membership.last_admin",
-					Detail: "workspace最後のadminは削除できません",
-				}
+		}
+		if slices.Contains(before.Permissions, auth.PermissionAdmin) {
+			if err := ensureOtherWorkspaceAdmin(txCtx, tx, scope.WorkspaceID, userID); err != nil {
+				return err
 			}
 		}
 		tag, err := tx.Exec(txCtx, `DELETE FROM feedback.workspace_memberships
@@ -246,12 +280,119 @@ WHERE workspace_id = $1::uuid AND user_id = $2::uuid AND version = $3`,
 				Kind: admin.ErrVersionMismatch, Code: "resource.version_mismatch", Detail: "ETagが現在の版と一致しません",
 			}
 		}
-		return nil
+		if err := SyncApplicationMembership(txCtx, tx, scope.ApplicationID, userID); err != nil {
+			return err
+		}
+		return recordMembershipSuccess(
+			txCtx, tx, scope, principal, "membership.delete", requestID,
+			&before, nil,
+		)
 	})
 	if err != nil {
 		return admin.Member{}, err
 	}
 	return before, nil
+}
+
+func recordMembershipSuccess(
+	ctx context.Context,
+	tx Tx,
+	scope auth.ResourceScope,
+	principal auth.Principal,
+	action string,
+	requestID string,
+	before *admin.Member,
+	after *admin.Member,
+) error {
+	changes, err := json.Marshal(struct {
+		Before *admin.Member `json:"before"`
+		After  *admin.Member `json:"after"`
+	}{Before: before, After: after})
+	if err != nil {
+		return fmt.Errorf("membership監査差分を生成できません: %w", err)
+	}
+	resourceID := ""
+	if after != nil {
+		resourceID = after.UserID
+	} else if before != nil {
+		resourceID = before.UserID
+	}
+	if err := insertAudit(ctx, tx, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: action,
+		ResourceType: "membership", ResourceID: resourceID, Outcome: "succeeded",
+		RequestID: requestID, Changes: changes,
+	}); err != nil {
+		return fmt.Errorf("membership成功監査を記録できません: %w", err)
+	}
+	return nil
+}
+
+// lockMembershipMutation はapplication集約とworkspace最後のadmin判定を直列化する。
+// lock順をapplication、workspaceで統一して別workspaceの同時変更でもdeadlockを避ける。
+func lockMembershipMutation(ctx context.Context, tx Tx, applicationID string, workspaceID string) error {
+	var lockedID string
+	if err := tx.QueryRow(ctx, `SELECT id::text FROM feedback.applications
+WHERE id = $1::uuid
+FOR UPDATE`, applicationID).Scan(&lockedID); err != nil {
+		return fmt.Errorf("application membership変更lockを取得できません: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT id::text FROM feedback.workspaces
+WHERE id = $1::uuid
+FOR UPDATE`, workspaceID).Scan(&lockedID); err != nil {
+		return fmt.Errorf("workspace membership変更lockを取得できません: %w", err)
+	}
+	return nil
+}
+
+func ensureOtherWorkspaceAdmin(ctx context.Context, tx Tx, workspaceID string, userID string) error {
+	var otherAdmins int64
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM feedback.workspace_memberships
+WHERE workspace_id = $1::uuid AND user_id <> $2::uuid
+  AND permissions @> ARRAY['feedback.admin']::text[]`, workspaceID, userID).Scan(&otherAdmins); err != nil {
+		return fmt.Errorf("workspace admin件数を取得できません: %w", err)
+	}
+	if otherAdmins == 0 {
+		return &admin.Error{
+			Kind: admin.ErrConflict, Code: "membership.last_admin",
+			Detail: "workspace最後のadmin権限は削除できません",
+		}
+	}
+	return nil
+}
+
+// SyncApplicationMembership はworkspace membershipを正本としてapplication権限を再集約する。
+// 同じapplicationのどのworkspaceにも所属しなくなった場合は派生行を削除する。
+func SyncApplicationMembership(ctx context.Context, tx Tx, applicationID string, userID string) error {
+	tag, err := tx.Exec(ctx, `INSERT INTO feedback.application_memberships (application_id, user_id, permissions)
+SELECT $1::uuid, $2::uuid, ARRAY(
+    SELECT DISTINCT permission
+    FROM feedback.workspace_memberships source_membership
+    JOIN feedback.workspaces source_workspace ON source_workspace.id = source_membership.workspace_id
+    CROSS JOIN LATERAL unnest(source_membership.permissions) permission
+    WHERE source_workspace.application_id = $1::uuid AND source_membership.user_id = $2::uuid
+    ORDER BY permission
+)
+WHERE EXISTS (
+    SELECT 1
+    FROM feedback.workspace_memberships source_membership
+    JOIN feedback.workspaces source_workspace ON source_workspace.id = source_membership.workspace_id
+    WHERE source_workspace.application_id = $1::uuid AND source_membership.user_id = $2::uuid
+)
+ON CONFLICT (application_id, user_id) DO UPDATE SET permissions = EXCLUDED.permissions`, applicationID, userID)
+	if err != nil {
+		return fmt.Errorf("application membershipをworkspaceから同期できません: %w", err)
+	}
+	if tag.RowsAffected() == 1 {
+		return nil
+	}
+	if tag.RowsAffected() != 0 {
+		return fmt.Errorf("application membership同期件数が不正です: %d", tag.RowsAffected())
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM feedback.application_memberships
+WHERE application_id = $1::uuid AND user_id = $2::uuid`, applicationID, userID); err != nil {
+		return fmt.Errorf("不要なapplication membershipを削除できません: %w", err)
+	}
+	return nil
 }
 
 type membershipScanner interface {

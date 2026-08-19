@@ -176,7 +176,10 @@ WHERE tenant_id = $1::uuid AND principal_id = $2 AND endpoint = $3 AND idempoten
 			if err := json.Unmarshal(existingBody, &saved); err != nil {
 				return fmt.Errorf("idempotency responseを復元できません: %w", err)
 			}
-			return nil
+			return insertAudit(txCtx, tx, usecase.AuditEvent{
+				Scope: &scope, PrincipalID: principal.Subject, Action: "session.create",
+				ResourceType: "session", ResourceID: saved.ID, Outcome: "succeeded", RequestID: command.RequestID,
+			})
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("idempotency recordを取得できません: %w", err)
@@ -245,7 +248,10 @@ WHERE tenant_id = $1::uuid AND principal_id = $2 AND endpoint = $3 AND idempoten
 		if err != nil {
 			return fmt.Errorf("idempotency responseを登録できません: %w", err)
 		}
-		return nil
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &scope, PrincipalID: principal.Subject, Action: "session.create",
+			ResourceType: "session", ResourceID: saved.ID, Outcome: "succeeded", RequestID: command.RequestID,
+		})
 	})
 	if err != nil {
 		if uniqueViolation(err) {
@@ -258,6 +264,9 @@ WHERE tenant_id = $1::uuid AND principal_id = $2 AND endpoint = $3 AND idempoten
 
 func (d *Database) PatchSession(
 	ctx context.Context,
+	scope auth.ResourceScope,
+	principal auth.Principal,
+	requestID string,
 	sessionID string,
 	patch sessiondomain.Patch,
 ) (sessiondomain.Session, error) {
@@ -325,7 +334,13 @@ WHERE id = $13::uuid AND version = $14`,
 			}
 		}
 		saved, err = readSessionByID(txCtx, tx, sessionID)
-		return err
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &scope, PrincipalID: principal.Subject, Action: "session.patch",
+			ResourceType: "session", ResourceID: saved.ID, Outcome: "succeeded", RequestID: requestID,
+		})
 	})
 	if err != nil {
 		if uniqueViolation(err) {

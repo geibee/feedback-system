@@ -84,7 +84,7 @@ func (store *serviceStoreFake) GetRetentionPolicy(context.Context, auth.Resource
 }
 
 func (store *serviceStoreFake) PatchRetentionPolicy(
-	_ context.Context, _ auth.ResourceScope, _ int, policy Policy,
+	_ context.Context, _ auth.ResourceScope, _ int, policy Policy, _ usecase.AuditEvent,
 ) (Policy, int, error) {
 	store.events = append(store.events, "patch")
 	return policy, 2, nil

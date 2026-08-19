@@ -31,7 +31,7 @@ type Store interface {
 	ListSessions(context.Context, auth.ResourceScope, *string, int, int) (Page, error)
 	GetSession(context.Context, string) (Session, error)
 	CreateSession(context.Context, auth.ResourceScope, auth.Principal, CreateCommand) (Session, error)
-	PatchSession(context.Context, string, Patch) (Session, error)
+	PatchSession(context.Context, auth.ResourceScope, auth.Principal, string, string, Patch) (Session, error)
 	RecordAudit(context.Context, usecase.AuditEvent) error
 }
 
@@ -105,6 +105,7 @@ func (service *Service) Create(
 	if err := ValidateRequestHash(command.RequestHash); err != nil {
 		return MutationResult{}, err
 	}
+	command.RequestID = requestID
 	saved, err := service.store.CreateSession(ctx, scope, principal, command)
 	if err != nil {
 		return MutationResult{}, err
@@ -160,7 +161,7 @@ func (service *Service) Patch(
 	if err != nil {
 		return MutationResult{}, err
 	}
-	saved, err := service.store.PatchSession(ctx, canonicalID, patch)
+	saved, err := service.store.PatchSession(ctx, scope, principal, requestID, canonicalID, patch)
 	if err != nil {
 		return MutationResult{}, err
 	}

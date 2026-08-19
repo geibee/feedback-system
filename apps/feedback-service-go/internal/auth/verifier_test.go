@@ -48,6 +48,9 @@ func TestDirectVerifier(t *testing.T) {
 	if identity.Email == nil || *identity.Email != "a@example.test" || identity.DisplayName == nil || *identity.DisplayName != "利用者A" {
 		t.Fatalf("optional identity claim=%+v", identity)
 	}
+	if identity.TokenScope == nil || !reflect.DeepEqual(identity.TokenScope.Permissions, []Permission{PermissionRead, PermissionAdmin}) {
+		t.Fatalf("direct permission scope=%+v", identity.TokenScope)
+	}
 }
 
 func TestDirectVerifierRejectsInvalidJWT(t *testing.T) {
@@ -134,6 +137,32 @@ func TestDirectVerifierRejectsInvalidJWT(t *testing.T) {
 			token: func(t *testing.T) string {
 				token := directToken(t, map[string]any{"email": 123})
 				return fixture.sign(t, token)
+			},
+		},
+		{
+			name: "permissionなし",
+			token: func(t *testing.T) string {
+				token := directToken(t, nil)
+				mustRemove(t, token, "feedback_permissions")
+				return fixture.sign(t, token)
+			},
+		},
+		{
+			name: "permissionが空",
+			token: func(t *testing.T) string {
+				return fixture.sign(t, directToken(t, map[string]any{"feedback_permissions": []string{}}))
+			},
+		},
+		{
+			name: "permission型不正",
+			token: func(t *testing.T) string {
+				return fixture.sign(t, directToken(t, map[string]any{"feedback_permissions": "feedback.admin"}))
+			},
+		},
+		{
+			name: "未知permission",
+			token: func(t *testing.T) string {
+				return fixture.sign(t, directToken(t, map[string]any{"feedback_permissions": []string{"host.admin"}}))
 			},
 		},
 		{
@@ -371,6 +400,7 @@ func directToken(t *testing.T, additional map[string]any) jwt.Token {
 	mustSet(t, token, jwt.SubjectKey, "subject-a")
 	mustSet(t, token, jwt.IssuedAtKey, verifierTestNow)
 	mustSet(t, token, jwt.ExpirationKey, verifierTestNow.Add(5*time.Minute))
+	mustSet(t, token, "feedback_permissions", []string{"feedback.admin", "feedback.read"})
 	for name, value := range additional {
 		mustSet(t, token, name, value)
 	}

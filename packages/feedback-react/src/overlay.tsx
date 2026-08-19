@@ -21,6 +21,7 @@ type MessageVersion = Schemas["FeedbackMessageVersionV1"];
 type Target = Schemas["FeedbackTargetV1"];
 type Session = Schemas["FeedbackSessionV1"];
 type Location = Schemas["FeedbackLocationV1"];
+type UnreadReplySummary = Schemas["FeedbackUnreadReplySummary"];
 
 type OverlayMode = "idle" | "picking" | "capturing" | "composing";
 
@@ -36,6 +37,22 @@ type ContextMenuState = {
   clientY: number;
   target: Target;
 };
+
+const reactionDefinitions = [
+  ["thumbs_up", "👍"],
+  ["check", "✅"],
+  ["eyes", "👀"],
+  ["question", "❓"]
+] as const;
+
+function reactionLabel(reaction: Schemas["FeedbackReactionKey"]): string {
+  switch (reaction) {
+    case "thumbs_up": return "賛成";
+    case "check": return "確認済み";
+    case "eyes": return "確認中";
+    case "question": return "質問";
+  }
+}
 
 export const feedbackElementKeyAttribute = "data-feedback-key";
 export const feedbackExcludeAttribute = "data-feedback-exclude";
@@ -90,6 +107,7 @@ export function FeedbackOverlay({
   const [threadListOpen, setThreadListOpen] = useState(false);
   const [activePanelSide, setActivePanelSide] = useState<"left" | "right">("right");
   const [error, setError] = useState<string | null>(null);
+  const [unreadReplies, setUnreadReplies] = useState<UnreadReplySummary>({ totalCount: 0, threads: [] });
   const captureGeneration = useRef(0);
   const threadRequestGeneration = useRef(0);
   const permissions = feedback.reviewContext?.permissions ?? [];
@@ -107,6 +125,27 @@ export function FeedbackOverlay({
       feedback.location.queryParameters ?? {}
     ])
     : null;
+  const unreadByThread = useMemo(() => new Map(
+    unreadReplies.threads.map((item) => [item.threadId, item.count])
+  ), [unreadReplies.threads]);
+
+  const refreshUnreadReplies = useCallback(async () => {
+    if (!canRead || !feedback.hostContext) {
+      setUnreadReplies({ totalCount: 0, threads: [] });
+      return;
+    }
+    const params = new URLSearchParams({
+      applicationKey: feedback.hostContext.applicationKey,
+      environmentKey: feedback.hostContext.environmentKey,
+      externalWorkspaceKey: feedback.hostContext.externalWorkspaceKey
+    });
+    try {
+      const resource = await feedback.transport.request<UnreadReplySummary>(`/me/unread-replies?${params}`);
+      setUnreadReplies(resource.value);
+    } catch {
+      // 未読数の一時的な取得失敗で、投稿・閲覧機能全体を利用不能にしない。
+    }
+  }, [canRead, feedback.hostContext, feedback.transport]);
 
   const refreshThreads = useCallback(async () => {
     const generation = ++threadRequestGeneration.current;
@@ -149,6 +188,21 @@ export function FeedbackOverlay({
     setActivePanelSide("right");
   }, [runtimeContextKey, session?.id]);
   useEffect(() => { void refreshThreads(); }, [refreshThreads]);
+  useEffect(() => {
+    if (!canRead || typeof document === "undefined") return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshUnreadReplies();
+    };
+    refreshWhenVisible();
+    const intervalId = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [canRead, refreshUnreadReplies]);
 
   const reset = useCallback(() => {
     captureGeneration.current += 1;
@@ -228,6 +282,24 @@ export function FeedbackOverlay({
       reset();
       setActive({ thread: resource.value, etag: resource.etag });
       setError(null);
+      const latestMessage = resource.value.messages[resource.value.messages.length - 1];
+      if (latestMessage) {
+        try {
+          await feedback.transport.request(`/threads/${encodeURIComponent(threadId)}/read-state`, {
+            method: "PUT",
+            body: { readThroughMessageId: latestMessage.id }
+          });
+          setUnreadReplies((current) => {
+            const read = current.threads.find((item) => item.threadId === threadId)?.count ?? 0;
+            return {
+              totalCount: Math.max(0, current.totalCount - read),
+              threads: current.threads.filter((item) => item.threadId !== threadId)
+            };
+          });
+        } catch {
+          // 既読更新に失敗してもスレッドの閲覧は継続する。
+        }
+      }
     } catch (nextError) {
       setError(messageOf(nextError));
     }
@@ -324,7 +396,8 @@ export function FeedbackOverlay({
               ) : null}
               {canRead ? (
                 <button type="button" className="feedback-thread-list-launcher" onClick={() => setThreadListOpen(true)}>
-                  {feedback.messages.browseThreads} <span>{threads.length}</span>
+                  {feedback.messages.browseThreads} <span className="feedback-thread-count">{threads.length}</span>
+                  {unreadReplies.totalCount > 0 ? <span className="feedback-unread-badge" aria-label={`未読の返信 ${unreadReplies.totalCount}件`}>{unreadReplies.totalCount}</span> : null}
                 </button>
               ) : null}
             </>
@@ -358,6 +431,7 @@ export function FeedbackOverlay({
             <ThreadList
               threads={threads}
               session={session}
+              unreadByThread={unreadByThread}
               onClose={() => setThreadListOpen(false)}
               onOpen={(id) => void openThread(id, true)}
             />
@@ -572,11 +646,13 @@ function Composer({
 function ThreadList({
   threads,
   session,
+  unreadByThread,
   onClose,
   onOpen
 }: {
   threads: Thread[];
   session: Session;
+  unreadByThread: ReadonlyMap<string, number>;
   onClose(): void;
   onOpen(threadId: string): void;
 }) {
@@ -599,6 +675,7 @@ function ThreadList({
                       <span>
                         <strong>#{thread.displayNumber} {perspectiveLabel(session, thread.perspectiveCode)}</strong>
                         <small>{thread.status === "resolved" ? "解決済み" : "未解決"}</small>
+                        {(unreadByThread.get(thread.id) ?? 0) > 0 ? <span className="feedback-unread-badge">未読 {unreadByThread.get(thread.id)}</span> : null}
                       </span>
                       <p>{lastMessageBody(thread)}</p>
                     </button>
@@ -817,10 +894,12 @@ function MessageItem({ message, onUpdated }: { message: Message; onUpdated(): vo
   const [versions, setVersions] = useState<MessageVersion[] | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reactionBusy, setReactionBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [principalId, setPrincipalId] = useState<string | null>(null);
   const permissions = feedback.reviewContext?.permissions ?? [];
   const canManage = permissions.includes("feedback.manage") || permissions.includes("feedback.admin");
+  const canReact = permissions.includes("feedback.comment");
   const canEdit = canManage || principalId === message.author.principalId;
   useEffect(() => {
     let mounted = true;
@@ -865,6 +944,20 @@ function MessageItem({ message, onUpdated }: { message: Message; onUpdated(): vo
       setLoadingHistory(false);
     }
   };
+  const toggleReaction = async (reaction: Schemas["FeedbackReactionKey"], reactedByMe: boolean) => {
+    setReactionBusy(reaction);
+    setError(null);
+    try {
+      await feedback.transport.request<Message>(`/messages/${encodeURIComponent(message.id)}/reactions/${reaction}`, {
+        method: reactedByMe ? "DELETE" : "PUT"
+      });
+      onUpdated();
+    } catch (nextError) {
+      setError(messageOf(nextError));
+    } finally {
+      setReactionBusy(null);
+    }
+  };
   return (
     <li>
       <div className="feedback-message-heading">
@@ -887,6 +980,20 @@ function MessageItem({ message, onUpdated }: { message: Message; onUpdated(): vo
           </div>
         </div>
       ) : <p>{message.body}</p>}
+      {canReact ? <div className="feedback-reactions" aria-label="コメントへのリアクション">
+        {reactionDefinitions.map(([reaction, emoji]) => {
+          const summary = message.reactions?.find((item) => item.reaction === reaction);
+          return <button
+            key={reaction}
+            type="button"
+            className={summary?.reactedByMe ? "is-selected" : ""}
+            aria-label={`${emoji} ${reactionLabel(reaction)}${summary ? ` ${summary.count}件` : ""}`}
+            aria-pressed={summary?.reactedByMe ?? false}
+            disabled={reactionBusy === reaction}
+            onClick={() => void toggleReaction(reaction, summary?.reactedByMe ?? false)}
+          >{emoji}{summary ? <span>{summary.count}</span> : null}</button>;
+        })}
+      </div> : null}
       {error ? <p className="feedback-error" role="alert">{error}</p> : null}
       <div className="feedback-message-actions">
         {message.editedAt ? (

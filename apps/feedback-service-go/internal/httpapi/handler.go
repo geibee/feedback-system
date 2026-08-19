@@ -63,6 +63,7 @@ type mutationAuditor interface {
 
 type resourceScopeResolver interface {
 	ResolveResourceScope(context.Context, string, string, string) (auth.ResourceScope, error)
+	ResolveWorkspaceScope(context.Context, string, string, string, string) (auth.ResourceScope, error)
 }
 
 type adminWorkspaceScopeResolver interface {

@@ -49,6 +49,23 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /me/unread-replies:
+    get:
+      tags: [identity]
+      operationId: getFeedbackUnreadReplies
+      parameters:
+        - $ref: "#/components/parameters/ApplicationKeyQuery"
+        - $ref: "#/components/parameters/EnvironmentKeyQuery"
+        - $ref: "#/components/parameters/ExternalWorkspaceKeyQuery"
+      responses:
+        "200":
+          description: 参加スレッドへの未読返信件数
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackUnreadReplySummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /applications/{applicationKey}/manifest:
     parameters:
       - $ref: "#/components/parameters/ApplicationKey"
@@ -268,6 +285,27 @@ paths:
         - name: status
           in: query
           schema: { $ref: "#/components/schemas/FeedbackThreadStatus" }
+        - name: sort
+          in: query
+          schema: { $ref: "#/components/schemas/FeedbackThreadSort" }
+        - name: perspectiveCode
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: assigneeUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: priority
+          in: query
+          schema: { $ref: "#/components/schemas/FeedbackThreadPriority" }
+        - name: label
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 50 }
+        - name: evidenceAvailable
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 200 }
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -448,6 +486,38 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /messages/{messageId}/reactions/{reaction}:
+    parameters:
+      - $ref: "#/components/parameters/MessageId"
+      - name: reaction
+        in: path
+        required: true
+        schema: { $ref: "#/components/schemas/FeedbackReactionKey" }
+    put:
+      tags: [threads]
+      operationId: putFeedbackMessageReaction
+      responses:
+        "200":
+          description: 更新したメッセージ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackMessageV1" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [threads]
+      operationId: deleteFeedbackMessageReaction
+      responses:
+        "200":
+          description: 更新したメッセージ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackMessageV1" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /threads/{threadId}/status:
     parameters:
       - $ref: "#/components/parameters/ThreadId"
@@ -487,6 +557,52 @@ paths:
           $ref: "#/components/responses/NotFound"
         "412":
           $ref: "#/components/responses/PreconditionFailed"
+
+  /threads/{threadId}/triage:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+    patch:
+      tags: [threads]
+      operationId: patchFeedbackThreadTriage
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: "#/components/schemas/FeedbackThreadTriagePatchRequest" }
+      responses:
+        "200":
+          description: トリアージ情報を更新したスレッド
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackThreadV1" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /threads/{threadId}/read-state:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+    put:
+      tags: [threads]
+      operationId: putFeedbackThreadReadState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FeedbackThreadReadStateRequest" }
+      responses:
+        "204": { description: 指定メッセージまで既読に更新 }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /threads/{threadId}/evidence:
     parameters:
@@ -996,6 +1112,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "412": { $ref: "#/components/responses/PreconditionFailed" }
     delete:
       tags: [administration]
@@ -1060,6 +1177,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        直接OIDC JWTまたは契約済みtoken exchange JWT。直接OIDC JWTは検証対象のissuer、audience、
+        時刻、設定済みsubject claimに加え、`feedback_permissions`を1件以上のFeedbackPermissionからなる
+        文字列配列として必須とする。直接OIDCのpermissionは全resourceでDB membershipと交差する。
+        token exchange JWTのresource scopeとclaimはtoken exchange公開契約に従う。
 
   parameters:
     ApplicationKey:
@@ -1275,6 +1397,47 @@ components:
         principalId: { type: string, minLength: 1, maxLength: 200 }
         displayName: { type: [string, "null"], maxLength: 200 }
         participantName: { type: [string, "null"], maxLength: 100 }
+
+    FeedbackAssignee:
+      type: object
+      additionalProperties: false
+      required: [userId, displayName]
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+
+    FeedbackReactionKey:
+      type: string
+      enum: [thumbs_up, check, eyes, question]
+
+    FeedbackReactionSummary:
+      type: object
+      additionalProperties: false
+      required: [reaction, count, reactedByMe]
+      properties:
+        reaction: { $ref: "#/components/schemas/FeedbackReactionKey" }
+        count: { type: integer, minimum: 1 }
+        reactedByMe: { type: boolean }
+
+    FeedbackUnreadReplyThread:
+      type: object
+      additionalProperties: false
+      required: [threadId, count, latestMessageId, latestAt]
+      properties:
+        threadId: { type: string, format: uuid }
+        count: { type: integer, minimum: 1 }
+        latestMessageId: { type: string, format: uuid }
+        latestAt: { type: string, format: date-time }
+
+    FeedbackUnreadReplySummary:
+      type: object
+      additionalProperties: false
+      required: [totalCount, threads]
+      properties:
+        totalCount: { type: integer, minimum: 0 }
+        threads:
+          type: array
+          items: { $ref: "#/components/schemas/FeedbackUnreadReplyThread" }
 
     FeedbackMembership:
       type: object
@@ -1503,6 +1666,15 @@ components:
       type: string
       enum: [open, resolved]
 
+    FeedbackThreadSort:
+      type: string
+      enum: [created_desc, created_asc, updated_desc]
+      default: updated_desc
+
+    FeedbackThreadPriority:
+      type: string
+      enum: [critical, high, medium, low]
+
     FeedbackMessageV1:
       type: object
       additionalProperties: false
@@ -1515,6 +1687,9 @@ components:
         createdAt: { type: string, format: date-time }
         editedAt: { type: [string, "null"], format: date-time }
         version: { type: integer, minimum: 1 }
+        reactions:
+          type: array
+          items: { $ref: "#/components/schemas/FeedbackReactionSummary" }
 
     FeedbackMessageVersionV1:
       type: object
@@ -1546,6 +1721,19 @@ components:
         status: { $ref: "#/components/schemas/FeedbackThreadStatus" }
         reporter: { $ref: "#/components/schemas/FeedbackParticipant" }
         evidenceAvailable: { type: boolean, default: false }
+        assignee:
+          oneOf:
+            - $ref: "#/components/schemas/FeedbackAssignee"
+            - type: "null"
+        priority:
+          oneOf:
+            - $ref: "#/components/schemas/FeedbackThreadPriority"
+            - type: "null"
+        labels:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 50 }
         messages:
           type: array
           items: { $ref: "#/components/schemas/FeedbackMessageV1" }
@@ -1563,6 +1751,29 @@ components:
           items: { $ref: "#/components/schemas/FeedbackThreadV1" }
         nextCursor: { type: [string, "null"] }
         totalCount: { type: integer, minimum: 0 }
+
+    FeedbackThreadTriagePatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        assigneeUserId: { type: [string, "null"], format: uuid }
+        priority:
+          oneOf:
+            - $ref: "#/components/schemas/FeedbackThreadPriority"
+            - type: "null"
+        labels:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 50 }
+
+    FeedbackThreadReadStateRequest:
+      type: object
+      additionalProperties: false
+      required: [readThroughMessageId]
+      properties:
+        readThroughMessageId: { type: string, format: uuid }
 
     FeedbackDeepLink:
       type: object
@@ -1618,7 +1829,7 @@ components:
         environmentKey: { type: string }
         externalWorkspaceKey: { type: string }
         sessionId: { type: [string, "null"], format: uuid }
-        format: { enum: [csv, xlsx] }
+        format: { enum: [csv, xlsx, evidence-package] }
         locale: { type: string, default: ja-JP }
         timezone: { type: string, default: Asia/Tokyo }
 

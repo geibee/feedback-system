@@ -45,6 +45,17 @@ func TestValidateRequestAcceptsUUIDTextAcceptedByParser(t *testing.T) {
 	}
 }
 
+func TestValidateRequestAcceptsEvidencePackage(t *testing.T) {
+	t.Parallel()
+	request := Request{
+		ApplicationKey: "app", EnvironmentKey: "production", ExternalWorkspaceKey: "workspace",
+		Format: FormatEvidencePackage, Locale: "ja-JP", Timezone: "Asia/Tokyo",
+	}
+	if err := ValidateRequest(request); err != nil {
+		t.Fatalf("evidence-packageが拒否されました: %v", err)
+	}
+}
+
 func TestValidateIdempotencyAndHash(t *testing.T) {
 	t.Parallel()
 	for _, value := range []string{"", "short", strings.Repeat("x", 201)} {

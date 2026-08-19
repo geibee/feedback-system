@@ -76,13 +76,6 @@ func (handler *APIHandler) PatchFeedbackRetentionPolicy(
 		WriteError(writer, request, mapRetentionError(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, result.Scope, principal.Subject,
-		"retention.patch", "retention-policy", result.Scope.WorkspaceID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.Version))
 	respondJSONOrError(writer, request, http.StatusOK, result.Policy, nil)
 }

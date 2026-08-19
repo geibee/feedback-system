@@ -29,8 +29,8 @@ func ValidateRequest(request Request) error {
 			return invalid("request.invalid", "sessionId は UUID で指定してください")
 		}
 	}
-	if request.Format != FormatCSV && request.Format != FormatXLSX {
-		return invalid("request.invalid", "format は csv または xlsx を指定してください")
+	if request.Format != FormatCSV && request.Format != FormatXLSX && request.Format != FormatEvidencePackage {
+		return invalid("request.invalid", "format は csv、xlsx または evidence-package を指定してください")
 	}
 	if _, err := ValidateKey(request.Locale, "locale", 35); err != nil {
 		return err

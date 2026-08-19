@@ -170,10 +170,11 @@ func TestPutManifestRecordsAllowedThenSucceeded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.Version != 2 || store.put.ManifestVersion != "v2" || store.put.ExpectedVersion == nil || *store.put.ExpectedVersion != 1 {
+	if record.Version != 2 || store.put.ManifestVersion != "v2" || store.put.ExpectedVersion == nil ||
+		*store.put.ExpectedVersion != 1 || store.put.RequestID != "request-id" {
 		t.Fatalf("record=%+v put=%+v", record, store.put)
 	}
-	if len(store.audits) != 2 || store.audits[0].Outcome != "allowed" || store.audits[1].Outcome != "succeeded" {
+	if len(store.audits) != 1 || store.audits[0].Outcome != "allowed" {
 		t.Fatalf("audits = %+v", store.audits)
 	}
 }

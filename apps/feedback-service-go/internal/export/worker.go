@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/objectstore"
 )
@@ -17,19 +19,32 @@ type WorkerStore interface {
 }
 
 type Worker struct {
-	store     WorkerStore
-	objects   objectstore.Store
-	keyPrefix string
+	store           WorkerStore
+	objects         objectstore.Store
+	evidenceObjects objectstore.Store
+	keyPrefix       string
 }
 
-func NewWorker(store WorkerStore, objects objectstore.Store, keyPrefix string) (*Worker, error) {
+func NewWorker(
+	store WorkerStore,
+	objects objectstore.Store,
+	keyPrefix string,
+	evidenceObjects ...objectstore.Store,
+) (*Worker, error) {
 	if store == nil || objects == nil {
 		return nil, errors.New("export worker dependencyが未設定です")
 	}
 	if !strings.HasSuffix(keyPrefix, "/") || objectstore.ValidatePrefix(keyPrefix) != nil {
 		return nil, errors.New("export key prefixが不正です")
 	}
-	return &Worker{store: store, objects: objects, keyPrefix: keyPrefix}, nil
+	evidence := objects
+	if len(evidenceObjects) > 1 || (len(evidenceObjects) == 1 && evidenceObjects[0] == nil) {
+		return nil, errors.New("export evidence storageが不正です")
+	}
+	if len(evidenceObjects) == 1 {
+		evidence = evidenceObjects[0]
+	}
+	return &Worker{store: store, objects: objects, evidenceObjects: evidence, keyPrefix: keyPrefix}, nil
 }
 
 func (worker *Worker) RunOnce(ctx context.Context) (bool, error) {
@@ -38,7 +53,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	objectKey := fmt.Sprintf("%s%s/%s/%s-%s.%s", worker.keyPrefix, claimed.TenantID, claimed.WorkspaceID,
-		claimed.ID, claimed.ClaimToken, claimed.Format)
+		claimed.ID, claimed.ClaimToken, exportFileExtension(claimed.Format))
 	if err := worker.runClaimed(ctx, *claimed, objectKey); err != nil {
 		message := fmt.Sprintf("export generation failed (%T)", err)
 		if failErr := worker.store.FailExport(ctx, *claimed, message); failErr != nil {
@@ -54,7 +69,13 @@ func (worker *Worker) runClaimed(ctx context.Context, claimed Claimed, objectKey
 	if err != nil {
 		return err
 	}
-	bytes, err := Render(claimed.Format, claimed.Locale, claimed.Timezone, prepared.Rows)
+	if claimed.Format == FormatEvidencePackage {
+		if prepared.EvidencePackage == nil {
+			return errors.New("evidence package dataがありません")
+		}
+		return worker.storeEvidencePackage(ctx, claimed, prepared, objectKey)
+	}
+	data, err := Render(claimed.Format, claimed.Locale, claimed.Timezone, prepared.Rows)
 	if err != nil {
 		return err
 	}
@@ -63,7 +84,7 @@ func (worker *Worker) runClaimed(ctx context.Context, claimed Claimed, objectKey
 		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 	}
 	_ = worker.objects.Delete(ctx, objectKey)
-	if err := worker.objects.Put(ctx, objectKey, contentType, bytes); err != nil {
+	if err := worker.objects.Put(ctx, objectKey, contentType, data); err != nil {
 		return err
 	}
 	if err := worker.store.CompleteExport(ctx, claimed, objectKey, prepared.RetentionDays); err != nil {
@@ -72,4 +93,43 @@ func (worker *Worker) runClaimed(ctx context.Context, claimed Claimed, objectKey
 		return err
 	}
 	return nil
+}
+
+func (worker *Worker) storeEvidencePackage(
+	ctx context.Context,
+	claimed Claimed,
+	prepared Prepared,
+	objectKey string,
+) error {
+	temporary, err := os.CreateTemp("", "feedback-evidence-export-"+claimed.ID+"-*.zip")
+	if err != nil {
+		return err
+	}
+	path := temporary.Name()
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	defer os.Remove(path)
+	size, err := WriteEvidencePackage(ctx, *prepared.EvidencePackage, worker.evidenceObjects, path, time.Now())
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_ = worker.objects.Delete(ctx, objectKey)
+	if err := worker.objects.PutReader(ctx, objectKey, "application/zip", file, size); err != nil {
+		return err
+	}
+	return worker.store.CompleteExport(ctx, claimed, objectKey, prepared.RetentionDays)
+}
+
+func exportFileExtension(format string) string {
+	if format == FormatEvidencePackage {
+		return "zip"
+	}
+	return format
 }

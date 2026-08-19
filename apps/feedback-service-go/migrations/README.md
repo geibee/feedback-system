@@ -14,4 +14,5 @@ fresh installの正本はV1〜V6を収束し、旧consumer移行台帳を除い�
   Flyway互換V1履歴を作る。二度目と同時起動はadvisory lock下でno-opになり、部分schema、履歴片側だけ、baseline未同梱は拒否する。
 - 既存V1〜V6 DBへ埋め込みbaselineを再適用しない。既存環境では従来どおりV6 marker/fingerprintをread-only検証する。
 - migrationはPostgreSQL advisory lock下でversion順に適用し、SQLのSHA-256と開始・完了状態を記録する。
+- V9はトリアージ、リアクション、参加スレッドの未読返信、`evidence-package` export形式を追加する。
 - `migrations/flyway-v1-v6`は既存履歴照合専用で、編集・再生成しない。修正はGo所有の新しいversioned migrationを追加する。

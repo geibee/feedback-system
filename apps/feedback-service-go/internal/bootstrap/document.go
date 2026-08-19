@@ -69,7 +69,6 @@ func validateDocument(document Document) ([]validatedInput, error) {
 	environments := make(map[string]string)
 	workspaces := make(map[string]string)
 	principals := make(map[string]string)
-	applicationMemberships := make(map[string]string)
 	memberships := make(map[string]string)
 	for index, input := range document.Entries {
 		entry, err := validateInput(input)
@@ -111,12 +110,6 @@ func validateDocument(document Document) ([]validatedInput, error) {
 			return nil, err
 		}
 		permissionValue := strings.Join(entry.permissions, "\x00")
-		applicationMembershipKey := entry.applicationKey + "\x00" + principalKey
-		if err := requireConsistent(
-			applicationMemberships, applicationMembershipKey, permissionValue, "application membership", index,
-		); err != nil {
-			return nil, err
-		}
 		membershipKey := workspaceKey + "\x00" + principalKey
 		if err := requireConsistent(
 			memberships, membershipKey, permissionValue, "workspace membership", index,

@@ -15,7 +15,7 @@ Admin Consoleを提供します。
 - React 18 / 19向けのコメントOverlay、DOM／画面座標pin、Thread Drawer
 - レビューセッション、確認観点、返信、解決状態の管理
 - 画像などの証跡をprivate object storageへ保存
-- メンバー、通知、保存期間、CSV／XLSX exportを扱うAdmin Console
+- メンバー、通知、保存期間、CSV／XLSX／証跡パッケージexportを扱うAdmin Console
 - OIDC Bearer JWT、またはmTLS token exchangeによる認証
 - 任意のMapLibre連携
 
@@ -151,7 +151,8 @@ resourceとmanifestの導入手順、v1のtenant境界は[`docs/installation.md`
 
 ### 認証と認可
 
-直接OIDCを使う場合、JWTにはFeedback Serviceが検証するissuerとaudienceが必要です。
+直接OIDCを使う場合、JWTにはFeedback Serviceが検証するissuerとaudienceに加え、
+`feedback_permissions`文字列配列が必要です。IdPはOAuth scopeをこのclaimへmappingします。
 
 ホストアプリの権限とFeedbackのmembershipは別に管理されます。Feedback Serviceの実効権限は、
 tokenに含まれるpermissionとFeedback DBのmembershipの積集合です。

@@ -47,7 +47,11 @@ WHERE tenant_id = $1::uuid AND principal_id = $2 AND endpoint = $3 AND idempoten
 			if err := json.Unmarshal(existingBody, &saved); err != nil {
 				return fmt.Errorf("export idempotency responseを復元できません: %w", err)
 			}
-			return nil
+			return insertAudit(txCtx, tx, usecase.AuditEvent{
+				Scope: &scope, PrincipalID: principal.Subject, Action: "export.create",
+				ResourceType: "export", ResourceID: saved.ID,
+				Outcome: "succeeded", RequestID: command.RequestID,
+			})
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("export idempotency recordを取得できません: %w", err)
@@ -92,7 +96,11 @@ RETURNING created_at`, id, scope.TenantID, scope.ApplicationID, scope.Environmen
 		if err != nil {
 			return fmt.Errorf("export idempotency responseを登録できません: %w", err)
 		}
-		return nil
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &scope, PrincipalID: principal.Subject, Action: "export.create",
+			ResourceType: "export", ResourceID: saved.ID,
+			Outcome: "succeeded", RequestID: command.RequestID,
+		})
 	})
 	return saved, err
 }
@@ -131,6 +139,9 @@ WHERE id = $2::uuid`, value.ClaimToken, value.ID)
 }
 
 func (d *Database) PrepareExport(ctx context.Context, claimed exportdomain.Claimed) (exportdomain.Prepared, error) {
+	if claimed.Format == exportdomain.FormatEvidencePackage {
+		return d.prepareEvidencePackageExport(ctx, claimed)
+	}
 	var retentionDays int
 	if err := d.QueryRow(ctx, `SELECT COALESCE((
     SELECT export_retention_days FROM feedback.retention_policies WHERE workspace_id = $1::uuid

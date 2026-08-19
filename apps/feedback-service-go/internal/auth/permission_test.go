@@ -84,6 +84,25 @@ func TestTokenScopeNarrowsDatabasePermissions(t *testing.T) {
 	}
 }
 
+func TestDirectTokenScopeNarrowsPermissionsWithoutRestrictingResource(t *testing.T) {
+	t.Parallel()
+
+	token := TokenScope{Permissions: []Permission{PermissionComment}}
+	if !token.Matches(ResourceScope{
+		TenantKey:            "tenant-a",
+		ApplicationKey:       "app-a",
+		EnvironmentKey:       "prod",
+		ExternalWorkspaceKey: "workspace-a",
+	}, false) {
+		t.Fatal("Direct OIDC permission scopeはDB resourceを限定しません")
+	}
+	effective := IntersectPermissions([]Permission{PermissionAdmin}, token.Permissions)
+	want := []Permission{PermissionRead, PermissionComment}
+	if !reflect.DeepEqual(effective, want) {
+		t.Fatalf("effective=%v; want %v", effective, want)
+	}
+}
+
 func TestRestrictMemberships(t *testing.T) {
 	t.Parallel()
 
@@ -115,6 +134,33 @@ func TestRestrictMemberships(t *testing.T) {
 	}
 	if !reflect.DeepEqual(memberships[0].Permissions, []Permission{PermissionAdmin}) {
 		t.Fatal("入力membershipを変更してはいけません")
+	}
+}
+
+func TestRestrictMembershipsWithDirectTokenScope(t *testing.T) {
+	t.Parallel()
+
+	memberships := []Membership{
+		{ApplicationKey: "app-a", ExternalWorkspaceKey: "workspace-a", Permissions: []Permission{PermissionAdmin}},
+		{ApplicationKey: "app-b", ExternalWorkspaceKey: "workspace-b", Permissions: []Permission{PermissionRead}},
+	}
+	actual := RestrictMemberships(Principal{TokenScope: &TokenScope{
+		Permissions: []Permission{PermissionComment},
+	}}, memberships)
+	want := []Membership{
+		{
+			ApplicationKey:       "app-a",
+			ExternalWorkspaceKey: "workspace-a",
+			Permissions:          []Permission{PermissionComment, PermissionRead},
+		},
+		{
+			ApplicationKey:       "app-b",
+			ExternalWorkspaceKey: "workspace-b",
+			Permissions:          []Permission{PermissionRead},
+		},
+	}
+	if !reflect.DeepEqual(actual, want) {
+		t.Fatalf("memberships=%+v; want %+v", actual, want)
 	}
 }
 
@@ -176,6 +222,20 @@ func TestAuthorizeBoundaries(t *testing.T) {
 			store:     authorizationStoreStub{permissions: []Permission{PermissionAdmin}, issuerAllowed: false},
 			principal: Principal{UserID: "user-id", Issuer: "https://other.example", Subject: "subject"},
 			required:  PermissionRead,
+			wantAudit: true,
+		},
+		{
+			name:  "Direct OIDC permissionで縮小",
+			store: authorizationStoreStub{permissions: []Permission{PermissionAdmin}, issuerAllowed: true},
+			principal: Principal{
+				UserID:  "user-id",
+				Issuer:  "https://issuer.example",
+				Subject: "subject",
+				TokenScope: &TokenScope{
+					Permissions: []Permission{PermissionComment},
+				},
+			},
+			required:  PermissionManage,
 			wantAudit: true,
 		},
 		{

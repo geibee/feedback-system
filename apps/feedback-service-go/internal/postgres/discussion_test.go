@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -43,7 +44,7 @@ func TestDiscussionIdempotencyReplayAndMismatch(t *testing.T) {
 		context.Background(), tx, "tenant", "principal", createMessageEndpoint,
 		"test-idempotency-key", strings.Repeat("a", 64), &got,
 	)
-	if err != nil || !replayed || got != want {
+	if err != nil || !replayed || !reflect.DeepEqual(got, want) {
 		t.Fatalf("replay=%v got=%+v err=%v", replayed, got, err)
 	}
 	if len(tx.execs) != 1 || !strings.Contains(tx.execs[0].sql, "pg_advisory_xact_lock") {
@@ -314,9 +315,10 @@ func TestCreateThreadCommitFailureDefersEvidenceCleanup(t *testing.T) {
 			*destinations[5].(*string) = "ux"
 			*destinations[6].(*string) = "open"
 			*destinations[7].(*string) = "principal"
-			*destinations[10].(*time.Time) = now
-			*destinations[11].(*time.Time) = now
-			*destinations[12].(*int) = 1
+			*destinations[13].(*[]string) = []string{}
+			*destinations[14].(*time.Time) = now
+			*destinations[15].(*time.Time) = now
+			*destinations[16].(*int) = 1
 			return nil
 		}},
 		discussionRow{scanFn: func(destinations ...any) error {
@@ -325,10 +327,13 @@ func TestCreateThreadCommitFailureDefersEvidenceCleanup(t *testing.T) {
 		}},
 	}
 	tx.queryFn = func(sql string) (pgx.Rows, error) {
-		if !strings.Contains(sql, "FROM feedback.feedback_messages") {
-			return nil, errors.New("unexpected Query")
+		if strings.Contains(sql, "FROM feedback.message_reactions") {
+			return &discussionRows{}, nil
 		}
-		return &discussionRows{scans: []func(...any) error{messageScan}}, nil
+		if strings.Contains(sql, "FROM feedback.feedback_messages") {
+			return &discussionRows{scans: []func(...any) error{messageScan}}, nil
+		}
+		return nil, errors.New("unexpected Query")
 	}
 	database := newTestDatabase(&discussionCreatePool{tx: tx})
 	attachment := validEvidenceAttachment()

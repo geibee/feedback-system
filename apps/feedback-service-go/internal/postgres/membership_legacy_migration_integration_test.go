@@ -2,7 +2,9 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -84,8 +86,8 @@ func TestMembershipAndLegacyMigrationWithPostgreSQL(t *testing.T) {
 
 	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 	ids := struct {
-		tenant, application, environment, workspace, manifest, owner, member, session, run string
-	}{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()}
+		tenant, application, environment, workspace, secondWorkspace, manifest, owner, member, session, run string
+	}{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()}
 	applicationKey := "w3-admin-" + suffix
 	workspaceKey := "workspace-" + suffix
 	issuer := "https://issuer-w3-admin.example"
@@ -107,6 +109,9 @@ VALUES ($1::uuid, $2::uuid, 'test', 'https://app.example', ARRAY[$3])`, ids.envi
 	mustExecW3(t, ctx, database, `INSERT INTO feedback.workspaces
     (id, tenant_id, application_id, external_workspace_key, display_name)
 VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'W3 admin')`, ids.workspace, ids.tenant, ids.application, workspaceKey)
+	mustExecW3(t, ctx, database, `INSERT INTO feedback.workspaces
+    (id, tenant_id, application_id, external_workspace_key, display_name)
+VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'W3 admin second')`, ids.secondWorkspace, ids.tenant, ids.application, workspaceKey+"-second")
 	mustExecW3(t, ctx, database, `INSERT INTO feedback.application_manifests
     (id, application_id, manifest_version, manifest, created_by)
 VALUES ($1::uuid, $2::uuid, 'v1', '{"routes":[]}'::jsonb, 'w3-admin')`, ids.manifest, ids.application)
@@ -128,14 +133,36 @@ VALUES ($1::uuid, $2::uuid, ARRAY['feedback.admin'])`, ids.workspace, ids.owner)
 	if err != nil || created.After.UserID != ids.member || created.After.Version != 1 {
 		t.Fatalf("CreateWorkspaceMember()=%+v error=%v", created, err)
 	}
-	patched, err := database.PatchWorkspaceMember(ctx, scope, ids.member, 1,
+	permissions, err := database.ApplicationPermissions(ctx, ids.member, ids.application)
+	if err != nil || !slices.Equal(permissions, []auth.Permission{auth.PermissionRead}) {
+		t.Fatalf("create後application permissions=%v error=%v", permissions, err)
+	}
+	mustExecW3(t, ctx, database, `INSERT INTO feedback.workspace_memberships (workspace_id, user_id, permissions)
+VALUES ($1::uuid, $2::uuid, ARRAY['feedback.admin'])`, ids.secondWorkspace, ids.member)
+	patched, err := database.PatchWorkspaceMember(ctx, scope, principal, "request-patch-"+suffix, ids.member, 1,
 		admin.MembershipPatch{Permissions: []auth.Permission{auth.PermissionComment, auth.PermissionRead}})
 	if err != nil || patched.Before == nil || patched.After.Version != 2 {
 		t.Fatalf("PatchWorkspaceMember()=%+v error=%v", patched, err)
 	}
-	deleted, err := database.DeleteWorkspaceMember(ctx, scope, ids.member, 2)
+	permissions, err = database.ApplicationPermissions(ctx, ids.member, ids.application)
+	if err != nil || !slices.Equal(permissions, []auth.Permission{
+		auth.PermissionAdmin, auth.PermissionComment, auth.PermissionRead,
+	}) {
+		t.Fatalf("patch後application permissions=%v error=%v", permissions, err)
+	}
+	var lastAdminError *admin.Error
+	if _, err := database.PatchWorkspaceMember(ctx, scope, principal, "request-last-admin-"+suffix, ids.owner, 1,
+		admin.MembershipPatch{Permissions: []auth.Permission{auth.PermissionRead}}); err == nil ||
+		!errors.As(err, &lastAdminError) || lastAdminError.Code != "membership.last_admin" {
+		t.Fatalf("最後のadmin権限除去 error=%v", err)
+	}
+	deleted, err := database.DeleteWorkspaceMember(ctx, scope, principal, "request-delete-"+suffix, ids.member, 2)
 	if err != nil || deleted.Version != 2 {
 		t.Fatalf("DeleteWorkspaceMember()=%+v error=%v", deleted, err)
+	}
+	permissions, err = database.ApplicationPermissions(ctx, ids.member, ids.application)
+	if err != nil || !slices.Equal(permissions, []auth.Permission{auth.PermissionAdmin}) {
+		t.Fatalf("delete後application permissions=%v error=%v", permissions, err)
 	}
 
 	retention := 30

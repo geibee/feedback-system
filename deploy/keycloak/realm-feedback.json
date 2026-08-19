@@ -3,6 +3,33 @@
   "enabled": true,
   "displayName": "Feedback standalone local",
   "sslRequired": "none",
+  "clientScopes": [
+    {
+      "name": "feedback.admin",
+      "description": "Feedback管理permissionをaccess tokenに発行するローカル開発用scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "feedback-permissions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "feedback_permissions",
+            "claim.value": "[\"feedback.admin\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
   "clients": [
     {
       "clientId": "feedback-admin",
@@ -13,6 +40,7 @@
       "directAccessGrantsEnabled": true,
       "redirectUris": ["http://localhost:5174/*"],
       "webOrigins": ["http://localhost:5174"],
+      "optionalClientScopes": ["feedback.admin"],
       "protocolMappers": [
         {
           "name": "feedback-service-audience",
@@ -35,6 +63,7 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
+      "optionalClientScopes": ["feedback.admin"],
       "protocolMappers": [
         {
           "name": "feedback-service-audience",

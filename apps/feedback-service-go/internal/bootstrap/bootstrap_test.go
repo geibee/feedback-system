@@ -23,6 +23,7 @@ func TestRunnerRunProvisionAllResourcesInOneTransaction(t *testing.T) {
 		rows: []pgx.Row{
 			staticRow{value: "tenant-id"},
 			staticRow{value: "application-id"},
+			staticRow{value: "application-id"},
 			staticRow{value: "environment-id"},
 			staticRow{value: "workspace-id"},
 			staticRow{value: "principal-id"},
@@ -70,31 +71,37 @@ func TestRunnerRunProvisionAllResourcesInOneTransaction(t *testing.T) {
 	if transactor.calls.Load() != 1 {
 		t.Fatalf("transaction count = %d, want 1", transactor.calls.Load())
 	}
-	if len(tx.queries) != 5 || len(tx.execs) != 2 {
-		t.Fatalf("queries=%d execs=%d, want 5/2", len(tx.queries), len(tx.execs))
+	if len(tx.queries) != 6 || len(tx.execs) != 2 {
+		t.Fatalf("queries=%d execs=%d, want 6/2", len(tx.queries), len(tx.execs))
 	}
 
 	if got := tx.queries[0].args[1]; got != "tenant" {
 		t.Errorf("tenant key = %#v", got)
 	}
-	if got := tx.queries[2].args[4]; !reflect.DeepEqual(got, []string{
+	if got := tx.queries[3].args[4]; !reflect.DeepEqual(got, []string{
 		"https://app.example.test", "https://admin.example.test:8443",
 	}) {
 		t.Errorf("allowed origins = %#v", got)
 	}
-	if got := tx.queries[2].args[5]; got != "https://id.example.test/issuer" {
+	if got := tx.queries[3].args[5]; got != "https://id.example.test/issuer" {
 		t.Errorf("issuer = %#v", got)
 	}
 	wantPermissions := []string{"feedback.comment", "feedback.read"}
+	if !reflect.DeepEqual(tx.execs[0].args[2], wantPermissions) {
+		t.Errorf("workspace permissions = %#v, want %#v", tx.execs[0].args[2], wantPermissions)
+	}
 	for index, call := range tx.execs {
-		if !reflect.DeepEqual(call.args[2], wantPermissions) {
-			t.Errorf("exec %d permissions = %#v, want %#v", index, call.args[2], wantPermissions)
-		}
 		if !strings.Contains(call.sql, "ON CONFLICT") {
 			t.Errorf("exec %d is not idempotent upsert: %s", index, call.sql)
 		}
 	}
+	if !strings.Contains(tx.queries[2].sql, "FOR UPDATE") {
+		t.Errorf("application membership lockがありません: %s", tx.queries[2].sql)
+	}
 	for index, call := range tx.queries {
+		if index == 2 {
+			continue
+		}
 		if !strings.Contains(call.sql, "ON CONFLICT") {
 			t.Errorf("query %d is not idempotent upsert: %s", index, call.sql)
 		}
@@ -240,28 +247,6 @@ func TestParseEnvironmentRequiresEveryMandatoryValue(t *testing.T) {
 	}
 }
 
-func TestRunnerRunRequiresSingleRowForMembership(t *testing.T) {
-	t.Parallel()
-
-	tx := &recordingTx{
-		rows: []pgx.Row{
-			staticRow{value: "tenant-id"},
-			staticRow{value: "application-id"},
-			staticRow{value: "environment-id"},
-			staticRow{value: "workspace-id"},
-			staticRow{value: "principal-id"},
-		},
-		execTags: []pgconn.CommandTag{pgconn.NewCommandTag("INSERT 0 0")},
-	}
-	runner, err := NewRunner(&recordingTransactor{tx: tx})
-	if err != nil {
-		t.Fatalf("NewRunner() error = %v", err)
-	}
-	if _, err := runner.Run(context.Background(), validInput()); err == nil || !strings.Contains(err.Error(), "更新件数") {
-		t.Fatalf("Run() error = %v", err)
-	}
-}
-
 func TestRunnerRunAcceptsUnchangedWorkspaceMembership(t *testing.T) {
 	t.Parallel()
 
@@ -269,13 +254,14 @@ func TestRunnerRunAcceptsUnchangedWorkspaceMembership(t *testing.T) {
 		rows: []pgx.Row{
 			staticRow{value: "tenant-id"},
 			staticRow{value: "application-id"},
+			staticRow{value: "application-id"},
 			staticRow{value: "environment-id"},
 			staticRow{value: "workspace-id"},
 			staticRow{value: "principal-id"},
 		},
 		execTags: []pgconn.CommandTag{
-			pgconn.NewCommandTag("INSERT 0 1"),
 			pgconn.NewCommandTag("INSERT 0 0"),
+			pgconn.NewCommandTag("INSERT 0 1"),
 		},
 	}
 	runner, err := NewRunner(&recordingTransactor{tx: tx})

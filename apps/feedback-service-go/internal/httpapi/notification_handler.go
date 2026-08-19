@@ -74,15 +74,13 @@ func (handler *APIHandler) PatchFeedbackNotificationSettings(
 		WriteError(writer, request, err)
 		return
 	}
-	result, err := handler.notifications.PatchSettings(request.Context(), scope, version, settings)
+	result, err := handler.notifications.PatchSettings(request.Context(), scope, version, settings, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "notification-settings.patch",
+		ResourceType: "notification-settings", ResourceID: scope.WorkspaceID,
+		Outcome: "succeeded", RequestID: RequestIDFromContext(request.Context()),
+	})
 	if err != nil {
 		WriteError(writer, request, mapNotificationAdministrationError(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "notification-settings.patch", "notification-settings", scope.WorkspaceID,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Version))
@@ -159,15 +157,13 @@ func (handler *APIHandler) CreateFeedbackNotificationConnector(
 		WriteError(writer, request, err)
 		return
 	}
-	result, err := handler.connectors.Create(request.Context(), scope, input)
+	result, err := handler.connectors.Create(request.Context(), scope, input, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "notification-connector.create",
+		ResourceType: "notification-connector", Outcome: "succeeded",
+		RequestID: RequestIDFromContext(request.Context()),
+	})
 	if err != nil {
 		WriteError(writer, request, mapNotificationAdministrationError(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "notification-connector.create", "notification-connector", result.ID,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Version))
@@ -207,15 +203,13 @@ func (handler *APIHandler) PatchFeedbackNotificationConnector(
 		return
 	}
 	id := connectorID.String()
-	result, err := handler.connectors.Patch(request.Context(), scope, id, version, input)
+	result, err := handler.connectors.Patch(request.Context(), scope, id, version, input, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "notification-connector.patch",
+		ResourceType: "notification-connector", ResourceID: id,
+		Outcome: "succeeded", RequestID: RequestIDFromContext(request.Context()),
+	})
 	if err != nil {
 		WriteError(writer, request, mapNotificationAdministrationError(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "notification-connector.patch", "notification-connector", id,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Version))
@@ -245,14 +239,12 @@ func (handler *APIHandler) DeleteFeedbackNotificationConnector(
 		return
 	}
 	id := connectorID.String()
-	if err := handler.connectors.Delete(request.Context(), scope, id, version); err != nil {
+	if err := handler.connectors.Delete(request.Context(), scope, id, version, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "notification-connector.delete",
+		ResourceType: "notification-connector", ResourceID: id,
+		Outcome: "succeeded", RequestID: RequestIDFromContext(request.Context()),
+	}); err != nil {
 		WriteError(writer, request, mapNotificationAdministrationError(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "notification-connector.delete", "notification-connector", id,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)
@@ -316,15 +308,13 @@ func (handler *APIHandler) RetryFeedbackNotificationDelivery(
 		return
 	}
 	id := deliveryID.String()
-	result, err := handler.notifications.Retry(request.Context(), scope, id)
+	result, err := handler.notifications.Retry(request.Context(), scope, id, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "notification.retry",
+		ResourceType: "notification-delivery", ResourceID: id,
+		Outcome: "succeeded", RequestID: RequestIDFromContext(request.Context()),
+	})
 	if err != nil {
 		WriteError(writer, request, mapNotificationAdministrationError(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "notification.retry", "notification-delivery", id,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	respondJSONOrError(writer, request, http.StatusOK, result, nil)

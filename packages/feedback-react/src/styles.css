@@ -104,7 +104,7 @@
   background: #f0fdfa;
 }
 
-.feedback-thread-list-launcher span {
+.feedback-thread-list-launcher .feedback-thread-count {
   display: grid;
   min-width: 22px;
   height: 22px;
@@ -112,6 +112,21 @@
   border-radius: 999px;
   background: #e2e8f0;
   font-size: 11px;
+}
+
+.feedback-unread-badge {
+  display: inline-grid !important;
+  min-width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  place-items: center;
+  border-radius: 999px;
+  padding-inline: 5px;
+  background: #dc2626 !important;
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .feedback-review-guide-button {
@@ -788,6 +803,11 @@
 }
 
 .feedback-message-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.feedback-reactions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.feedback-reactions button { display: inline-flex; align-items: center; gap: 3px; min-width: 30px; border: 1px solid var(--feedback-border); border-radius: 999px; padding: 3px 7px; background: #f8fafc; cursor: pointer; }
+.feedback-reactions button.is-selected { border-color: var(--feedback-accent); background: #ccfbf1; }
+.feedback-reactions button:disabled { cursor: wait; opacity: .55; }
+.feedback-reactions span { color: #475569; font-size: 10px; font-weight: 700; }
 .feedback-text-button { padding: 2px 4px; border: 0; background: transparent; color: var(--feedback-accent); font-size: 11px; }
 .feedback-message-editor,
 .feedback-message-history { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

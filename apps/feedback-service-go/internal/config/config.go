@@ -73,8 +73,9 @@ type TokenExchangeSettings struct {
 type StorageMode string
 
 const (
-	StorageModeLocal StorageMode = "local"
-	StorageModeS3    StorageMode = "s3"
+	StorageModeLocal     StorageMode = "local"
+	StorageModeS3        StorageMode = "s3"
+	StorageModeAzureBlob StorageMode = "azure_blob"
 )
 
 type StorageSettings struct {
@@ -83,6 +84,8 @@ type StorageSettings struct {
 	Bucket         string
 	Region         string
 	EndpointURL    string
+	AccountURL     string
+	Container      string
 	KeyPrefix      string
 }
 
@@ -539,50 +542,72 @@ func parseTokenExchange(lookup LookupFunc, allowInsecureHTTP bool) (*TokenExchan
 }
 
 type storageInput struct {
-	modeName      string
-	localDirName  string
-	localDefault  string
-	bucketName    string
-	regionName    string
-	endpointName  string
-	prefixName    string
-	prefixDefault string
+	modeName        string
+	localDirName    string
+	localDefault    string
+	bucketName      string
+	regionName      string
+	endpointName    string
+	prefixName      string
+	prefixDefault   string
+	accountURLName  string
+	containerName   string
+	azurePrefixName string
 }
 
 func parseEvidenceStorage(lookup LookupFunc) (StorageSettings, error) {
 	return parseStorage(lookup, storageInput{
-		modeName:      "FEEDBACK_EVIDENCE_STORAGE",
-		localDirName:  "FEEDBACK_EVIDENCE_DIR",
-		localDefault:  "/data/evidence",
-		bucketName:    "FEEDBACK_S3_BUCKET",
-		regionName:    "FEEDBACK_S3_REGION",
-		endpointName:  "FEEDBACK_S3_ENDPOINT_URL",
-		prefixName:    "FEEDBACK_S3_KEY_PREFIX",
-		prefixDefault: "evidence/",
+		modeName:        "FEEDBACK_EVIDENCE_STORAGE",
+		localDirName:    "FEEDBACK_EVIDENCE_DIR",
+		localDefault:    "/data/evidence",
+		bucketName:      "FEEDBACK_S3_BUCKET",
+		regionName:      "FEEDBACK_S3_REGION",
+		endpointName:    "FEEDBACK_S3_ENDPOINT_URL",
+		prefixName:      "FEEDBACK_S3_KEY_PREFIX",
+		prefixDefault:   "evidence/",
+		accountURLName:  "FEEDBACK_AZURE_BLOB_ACCOUNT_URL",
+		containerName:   "FEEDBACK_AZURE_BLOB_CONTAINER",
+		azurePrefixName: "FEEDBACK_AZURE_BLOB_KEY_PREFIX",
 	})
 }
 
 func parseExportStorage(lookup LookupFunc) (StorageSettings, error) {
 	return parseStorage(lookup, storageInput{
-		modeName:      "FEEDBACK_EXPORT_STORAGE",
-		localDirName:  "FEEDBACK_EXPORT_DIR",
-		localDefault:  "/data/exports",
-		bucketName:    "FEEDBACK_EXPORT_S3_BUCKET",
-		regionName:    "FEEDBACK_EXPORT_S3_REGION",
-		endpointName:  "FEEDBACK_EXPORT_S3_ENDPOINT_URL",
-		prefixName:    "FEEDBACK_EXPORT_KEY_PREFIX",
-		prefixDefault: "exports/",
+		modeName:        "FEEDBACK_EXPORT_STORAGE",
+		localDirName:    "FEEDBACK_EXPORT_DIR",
+		localDefault:    "/data/exports",
+		bucketName:      "FEEDBACK_EXPORT_S3_BUCKET",
+		regionName:      "FEEDBACK_EXPORT_S3_REGION",
+		endpointName:    "FEEDBACK_EXPORT_S3_ENDPOINT_URL",
+		prefixName:      "FEEDBACK_EXPORT_KEY_PREFIX",
+		prefixDefault:   "exports/",
+		accountURLName:  "FEEDBACK_EXPORT_AZURE_BLOB_ACCOUNT_URL",
+		containerName:   "FEEDBACK_EXPORT_AZURE_BLOB_CONTAINER",
+		azurePrefixName: "FEEDBACK_EXPORT_AZURE_BLOB_KEY_PREFIX",
 	})
 }
 
 func parseStorage(lookup LookupFunc, input storageInput) (StorageSettings, error) {
 	mode := StorageMode(optional(lookup, input.modeName, string(StorageModeLocal)))
-	if mode != StorageModeLocal && mode != StorageModeS3 {
-		return StorageSettings{}, fmt.Errorf("%s は local または s3 を指定してください", input.modeName)
+	if mode != StorageModeLocal && mode != StorageModeS3 && mode != StorageModeAzureBlob {
+		return StorageSettings{}, fmt.Errorf("%s は local、s3、azure_blobのいずれかを指定してください", input.modeName)
 	}
 	bucket := optional(lookup, input.bucketName, "")
 	if mode == StorageModeS3 && strings.TrimSpace(bucket) == "" {
 		return StorageSettings{}, fmt.Errorf("%s=s3 では %s が必須です", input.modeName, input.bucketName)
+	}
+	accountURL := optional(lookup, input.accountURLName, "")
+	container := optional(lookup, input.containerName, "")
+	if mode == StorageModeAzureBlob {
+		if strings.TrimSpace(accountURL) == "" {
+			return StorageSettings{}, fmt.Errorf("%s=azure_blob では %s が必須です", input.modeName, input.accountURLName)
+		}
+		if strings.TrimSpace(container) == "" {
+			return StorageSettings{}, fmt.Errorf("%s=azure_blob では %s が必須です", input.modeName, input.containerName)
+		}
+		if err := validateStorageEndpoint(accountURL, input.accountURLName); err != nil {
+			return StorageSettings{}, err
+		}
 	}
 	localDirectory := optional(lookup, input.localDirName, input.localDefault)
 	if strings.TrimSpace(localDirectory) == "" {
@@ -600,7 +625,11 @@ func parseStorage(lookup LookupFunc, input storageInput) (StorageSettings, error
 			return StorageSettings{}, err
 		}
 	}
-	prefix := optional(lookup, input.prefixName, input.prefixDefault)
+	prefixName := input.prefixName
+	if mode == StorageModeAzureBlob {
+		prefixName = input.azurePrefixName
+	}
+	prefix := optional(lookup, prefixName, input.prefixDefault)
 	if !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
@@ -611,6 +640,8 @@ func parseStorage(lookup LookupFunc, input storageInput) (StorageSettings, error
 		Bucket:         bucket,
 		Region:         optional(lookup, input.regionName, ""),
 		EndpointURL:    endpointURL,
+		AccountURL:     accountURL,
+		Container:      container,
 		KeyPrefix:      prefix,
 	}, nil
 }

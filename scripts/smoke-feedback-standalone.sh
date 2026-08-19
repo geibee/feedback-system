@@ -153,6 +153,7 @@ for _ in {1..120}; do
   token_response=$(curl --silent --show-error --request POST \
     --data-urlencode grant_type=password \
     --data-urlencode client_id=feedback-admin \
+    --data-urlencode scope=feedback.admin \
     --data-urlencode username=feedback-admin \
     --data-urlencode password=feedback-local-only \
     http://localhost:8180/realms/feedback/protocol/openid-connect/token || true)

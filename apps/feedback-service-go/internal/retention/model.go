@@ -43,7 +43,7 @@ type PolicyResult struct {
 type Store interface {
 	ResolveRetentionWorkspaceScope(context.Context, string, string, string) (auth.ResourceScope, error)
 	GetRetentionPolicy(context.Context, auth.ResourceScope) (Policy, int, error)
-	PatchRetentionPolicy(context.Context, auth.ResourceScope, int, Policy) (Policy, int, error)
+	PatchRetentionPolicy(context.Context, auth.ResourceScope, int, Policy, usecase.AuditEvent) (Policy, int, error)
 	RecordAudit(context.Context, usecase.AuditEvent) error
 }
 

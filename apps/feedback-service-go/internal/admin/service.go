@@ -112,7 +112,9 @@ func (service *Service) PatchMembership(
 	if err != nil {
 		return MutationResult{}, err
 	}
-	mutation, err := service.store.PatchWorkspaceMember(ctx, scope, canonicalID, expectedVersion, patch)
+	mutation, err := service.store.PatchWorkspaceMember(
+		ctx, scope, principal, workspace.RequestID, canonicalID, expectedVersion, patch,
+	)
 	if err != nil {
 		return MutationResult{}, err
 	}
@@ -145,7 +147,9 @@ func (service *Service) DeleteMembership(
 	if err := validateExpectedVersion(expectedVersion); err != nil {
 		return MutationResult{}, err
 	}
-	before, err := service.store.DeleteWorkspaceMember(ctx, scope, canonicalID, expectedVersion)
+	before, err := service.store.DeleteWorkspaceMember(
+		ctx, scope, principal, workspace.RequestID, canonicalID, expectedVersion,
+	)
 	if err != nil {
 		return MutationResult{}, err
 	}

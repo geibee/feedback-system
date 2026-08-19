@@ -11,6 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/admin"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func TestNewPoolConfig(t *testing.T) {
@@ -186,6 +190,56 @@ func TestInTransactionReturnsCommitError(t *testing.T) {
 	}
 }
 
+func TestMutationRollsBackWhenSucceededAuditInsertFails(t *testing.T) {
+	t.Parallel()
+
+	auditFailure := errors.New("audit insert failed")
+	value := &auditFailureTx{auditFailure: auditFailure}
+	db := newTestDatabase(&fakePool{beginFn: func(context.Context) (managedTx, error) {
+		return value, nil
+	}})
+	scope := auth.ResourceScope{TenantID: "tenant", ApplicationID: "application", WorkspaceID: "workspace"}
+	err := db.InTransaction(context.Background(), func(ctx context.Context, tx Tx) error {
+		if _, err := tx.Exec(ctx, "UPDATE feedback.review_sessions SET title = $1", "更新後"); err != nil {
+			return err
+		}
+		return insertAudit(ctx, tx, usecase.AuditEvent{
+			Scope: &scope, PrincipalID: "subject", Action: "session.patch",
+			ResourceType: "session", ResourceID: "session-id", Outcome: "succeeded", RequestID: "request-id",
+		})
+	})
+	if !errors.Is(err, auditFailure) {
+		t.Fatalf("InTransaction() error = %v", err)
+	}
+	if value.businessWrites != 1 || value.auditWrites != 1 || value.commits.Load() != 0 || value.rollbacks.Load() != 1 {
+		t.Fatalf("business=%d audit=%d commits=%d rollbacks=%d", value.businessWrites, value.auditWrites,
+			value.commits.Load(), value.rollbacks.Load())
+	}
+}
+
+func TestRecordMembershipSuccessIncludesMutationDiff(t *testing.T) {
+	t.Parallel()
+
+	tx := &membershipAuditTx{}
+	scope := auth.ResourceScope{TenantID: "tenant", ApplicationID: "application", WorkspaceID: "workspace"}
+	before := admin.Member{UserID: "user", Permissions: []auth.Permission{auth.PermissionAdmin}, Version: 1}
+	after := admin.Member{UserID: "user", Permissions: []auth.Permission{auth.PermissionRead}, Version: 2}
+	if err := recordMembershipSuccess(
+		context.Background(), tx, scope, auth.Principal{Subject: "actor"},
+		"membership.patch", "request-id", &before, &after,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(tx.arguments) != 11 || tx.arguments[5] != "membership.patch" || tx.arguments[7] != "user" ||
+		tx.arguments[8] != "succeeded" || tx.arguments[9] != "request-id" {
+		t.Fatalf("audit arguments = %#v", tx.arguments)
+	}
+	changes, ok := tx.arguments[10].(string)
+	if !ok || !strings.Contains(changes, `"version":1`) || !strings.Contains(changes, `"version":2`) {
+		t.Fatalf("audit changes = %#v", tx.arguments[10])
+	}
+}
+
 func TestInTransactionRejectsNestedContext(t *testing.T) {
 	t.Parallel()
 
@@ -276,6 +330,39 @@ type fakeManagedTx struct {
 	rollbackErr error
 	commits     atomic.Int32
 	rollbacks   atomic.Int32
+}
+
+type auditFailureTx struct {
+	fakeManagedTx
+	auditFailure   error
+	businessWrites int
+	auditWrites    int
+}
+
+type membershipAuditTx struct {
+	arguments []any
+}
+
+func (t *membershipAuditTx) Exec(_ context.Context, _ string, arguments ...any) (pgconn.CommandTag, error) {
+	t.arguments = append([]any(nil), arguments...)
+	return pgconn.NewCommandTag("INSERT 0 1"), nil
+}
+
+func (t *membershipAuditTx) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	panic("unexpected Query")
+}
+
+func (t *membershipAuditTx) QueryRow(context.Context, string, ...any) pgx.Row {
+	panic("unexpected QueryRow")
+}
+
+func (t *auditFailureTx) Exec(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
+	if strings.Contains(sql, "INSERT INTO feedback.audit_logs") {
+		t.auditWrites++
+		return pgconn.CommandTag{}, t.auditFailure
+	}
+	t.businessWrites++
+	return pgconn.NewCommandTag("UPDATE 1"), nil
 }
 
 func (t *fakeManagedTx) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {

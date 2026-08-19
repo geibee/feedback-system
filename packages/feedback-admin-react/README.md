@@ -2,7 +2,7 @@
 
 Feedback Service v1だけを利用する独立管理UIです。導入先の業務API、DB、route、OIDC audienceには依存しません。
 session/scope/perspective、thread/evidence/deep link、manifest、retention、membership、notification delivery、
-server-side CSV/XLSX exportを管理できます。
+server-side CSV/XLSX/証跡パッケージexportを管理できます。
 
 ```tsx
 import { FeedbackAdminConsole } from "@feedback/admin-react";
@@ -21,11 +21,17 @@ threadの証跡は専用モーダルに表示され、選択したthread番号�
 失敗状態と閉じる操作が表示され、閉じるボタン、モーダル外のbackdrop click、Escapeで閉じられます。モーダル内部の
 操作では閉じず、閉じた証跡のBlob URLは解放されます。
 
-CSV／XLSX Exportを作成すると、jobが`queued`／`running`の間は完了まで自動追跡し、`completed`になった時点で
+スレッドは既定で最近更新された順に表示し、新しい投稿順・古い投稿順へ切り替えられます。各カードでは最初のコメントを
+主情報、最新の返信を補足として分けて表示します。担当者、優先度、ラベルのトリアージと固定リアクションも同じ画面で更新できます。
+
+CSV／XLSX／証跡パッケージExportを作成すると、jobが`queued`／`running`の間は完了まで自動追跡し、`completed`になった時点で
 作成時に選択した形式のファイルを自動ダウンロードします。`failed`ではserverから返されたエラーを表示します。
 状態取得に一時的に失敗した場合も1秒から最大10秒のbackoffで自動追跡を継続し、成功時に通常間隔とエラー表示へ
 復帰します。ダウンロードに失敗したjobも画面に保持されるため、手動で状態を再確認し、完了済みファイルを再度
 ダウンロードできます。完了時の自動ダウンロードはjobごとに一度だけ行い、処理中は同じ画面からExportを重複作成
 できません。
+
+証跡パッケージはPower BIへ取り込みやすい正規化CSV、全コメント版履歴、トリアージ・状態・リアクション履歴、
+証跡画像、SHA-256 manifestをZIPへ格納します。詳細は[`docs/evidence-export.md`](../../docs/evidence-export.md)を参照してください。
 
 正式配布先が承認されるまでは `private: true` を維持し、repository内のAdmin Consoleからworkspace参照します。

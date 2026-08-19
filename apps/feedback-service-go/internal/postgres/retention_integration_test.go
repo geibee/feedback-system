@@ -93,10 +93,11 @@ AND tenant_id IN (SELECT id FROM feedback.tenants WHERE tenant_key = $1)`, tenan
 	}
 	days := 30
 	policy = retention.Policy{EvidenceRetentionDays: &days, ExportRetentionDays: 14}
-	if _, version, err = database.PatchRetentionPolicy(ctx, scope, version, policy); err != nil || version != 2 {
+	audit := usecase.AuditEvent{Scope: &scope, Action: "retention.patch", Outcome: "succeeded", RequestID: "test-request"}
+	if _, version, err = database.PatchRetentionPolicy(ctx, scope, version, policy, audit); err != nil || version != 2 {
 		t.Fatalf("patch retention version=%d err=%v", version, err)
 	}
-	if _, _, err := database.PatchRetentionPolicy(ctx, scope, 1, policy); !errors.Is(err, usecase.ErrVersionMismatch) {
+	if _, _, err := database.PatchRetentionPolicy(ctx, scope, 1, policy, audit); !errors.Is(err, usecase.ErrVersionMismatch) {
 		t.Fatalf("stale retention ETag error=%v", err)
 	}
 

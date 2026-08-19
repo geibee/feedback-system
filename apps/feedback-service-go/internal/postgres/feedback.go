@@ -142,7 +142,11 @@ FOR UPDATE`, input.Scope.ApplicationID).Scan(&currentVersionName, &currentManife
 				}
 			}
 			saved = usecase.ManifestRecord{Manifest: cloneJSON(currentManifest), Version: currentVersion}
-			return nil
+			return insertAudit(txCtx, tx, usecase.AuditEvent{
+				Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "manifest.put",
+				ResourceType: "application-manifest", ResourceID: input.Scope.ApplicationKey,
+				Outcome: "succeeded", RequestID: input.RequestID,
+			})
 		}
 
 		version := currentVersion + 1
@@ -158,7 +162,11 @@ FOR UPDATE`, input.Scope.ApplicationID).Scan(&currentVersionName, &currentManife
 			return fmt.Errorf("application manifestを登録できません: %w", err)
 		}
 		saved = usecase.ManifestRecord{Manifest: cloneJSON(input.Manifest), Version: version}
-		return nil
+		return insertAudit(txCtx, tx, usecase.AuditEvent{
+			Scope: &input.Scope, PrincipalID: input.Principal.Subject, Action: "manifest.put",
+			ResourceType: "application-manifest", ResourceID: input.Scope.ApplicationKey,
+			Outcome: "succeeded", RequestID: input.RequestID,
+		})
 	})
 	if err != nil {
 		return usecase.ManifestRecord{}, err

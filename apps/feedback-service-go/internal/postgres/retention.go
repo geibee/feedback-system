@@ -10,6 +10,7 @@ import (
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/retention"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func (d *Database) ResolveRetentionWorkspaceScope(
@@ -40,6 +41,7 @@ FROM feedback.retention_policies WHERE workspace_id = $1::uuid`, scope.Workspace
 
 func (d *Database) PatchRetentionPolicy(
 	ctx context.Context, scope auth.ResourceScope, expectedVersion int, policy retention.Policy,
+	audit usecase.AuditEvent,
 ) (retention.Policy, int, error) {
 	if err := retention.ValidatePolicy(policy); err != nil {
 		return retention.Policy{}, 0, err
@@ -62,7 +64,7 @@ WHERE workspace_id = $3::uuid AND version = $4 RETURNING version`,
 		if err != nil {
 			return fmt.Errorf("retention policyを更新できません: %w", err)
 		}
-		return nil
+		return insertAudit(txCtx, tx, audit)
 	})
 	return policy, version, err
 }

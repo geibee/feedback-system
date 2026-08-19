@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/contract"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/discussion"
@@ -20,6 +22,21 @@ import (
 )
 
 const maximumDiscussionMetadataBytes int64 = 1024 * 1024
+
+func stringValueOf[T ~string](value *T) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
+}
+
+func uuidString(value *openapi_types.UUID) *string {
+	if value == nil {
+		return nil
+	}
+	text := value.String()
+	return &text
+}
 
 func (handler *APIHandler) ListFeedbackThreads(
 	writer http.ResponseWriter,
@@ -31,7 +48,7 @@ func (handler *APIHandler) ListFeedbackThreads(
 		handler.Unimplemented.ListFeedbackThreads(writer, request, sessionID, params)
 		return
 	}
-	_, _, err := handler.authorizeDiscussionResource(
+	principal, _, err := handler.authorizeDiscussionResource(
 		request, session.ResourceKindSession, sessionID.String(), auth.PermissionRead,
 	)
 	if err != nil {
@@ -60,7 +77,31 @@ func (handler *APIHandler) ListFeedbackThreads(
 		return
 	}
 	result, err := handler.discussions.ListThreads(request.Context(), discussion.ListThreadsInput{
-		SessionID: sessionID.String(), Status: status, Limit: limit, Offset: offset,
+		SessionID: sessionID.String(), Status: status, Sort: stringValueOf(params.Sort),
+		PerspectiveCode: params.PerspectiveCode, AssigneeUserID: uuidString(params.AssigneeUserID),
+		Priority: optionalEnum(params.Priority), Label: params.Label, EvidenceAvailable: params.EvidenceAvailable,
+		Query: params.Q, ViewerUserID: principal.UserID, Limit: limit, Offset: offset,
+	})
+	respondJSONOrError(writer, request, http.StatusOK, result, mapPhase2Error(err))
+}
+
+func (handler *APIHandler) GetFeedbackUnreadReplies(
+	writer http.ResponseWriter,
+	request *http.Request,
+	params contract.GetFeedbackUnreadRepliesParams,
+) {
+	if handler.discussions == nil {
+		handler.Unimplemented.GetFeedbackUnreadReplies(writer, request, params)
+		return
+	}
+	principal, scope, err := handler.authorizeDiscussionWorkspace(request, string(params.ApplicationKey),
+		string(params.EnvironmentKey), string(params.ExternalWorkspaceKey), auth.PermissionRead)
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
+		return
+	}
+	result, err := handler.discussions.ListUnreadReplies(request.Context(), discussion.UnreadRepliesInput{
+		Scope: scope, Principal: principal,
 	})
 	respondJSONOrError(writer, request, http.StatusOK, result, mapPhase2Error(err))
 }
@@ -110,12 +151,6 @@ func (handler *APIHandler) CreateFeedbackThread(
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "thread.create", "thread", result.Value.ID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.Value.Version))
 	respondJSONOrError(writer, request, http.StatusCreated, result.Value, nil)
 }
@@ -129,14 +164,14 @@ func (handler *APIHandler) GetFeedbackThread(
 		handler.Unimplemented.GetFeedbackThread(writer, request, threadID)
 		return
 	}
-	_, _, err := handler.authorizeDiscussionResource(
+	principal, _, err := handler.authorizeDiscussionResource(
 		request, session.ResourceKindThread, threadID.String(), auth.PermissionRead,
 	)
 	if err != nil {
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	result, err := handler.discussions.GetThread(request.Context(), threadID.String())
+	result, err := handler.discussions.GetThreadForViewer(request.Context(), threadID.String(), principal.UserID)
 	if err != nil {
 		WriteError(writer, request, mapPhase2Error(err))
 		return
@@ -212,12 +247,6 @@ func (handler *APIHandler) CreateFeedbackMessage(
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "message.create", "message", result.Value.ID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.Value.Version))
 	respondJSONOrError(writer, request, http.StatusCreated, result.Value, nil)
 }
@@ -256,16 +285,10 @@ func (handler *APIHandler) PatchFeedbackMessage(
 	}
 	result, err := handler.discussions.PatchMessage(request.Context(), discussion.PatchMessageInput{
 		Scope: scope, MessageID: messageID.String(), Principal: principal,
-		ExpectedVersion: version, Request: input,
+		ExpectedVersion: version, Request: input, RequestID: RequestIDFromContext(request.Context()),
 	})
 	if err != nil {
 		WriteError(writer, request, mapPhase2Error(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "message.patch", "message", result.ID,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Version))
@@ -289,6 +312,39 @@ func (handler *APIHandler) ListFeedbackMessageVersions(
 		return
 	}
 	result, err := handler.discussions.ListMessageVersions(request.Context(), messageID.String())
+	respondJSONOrError(writer, request, http.StatusOK, result, mapPhase2Error(err))
+}
+
+func (handler *APIHandler) PutFeedbackMessageReaction(
+	writer http.ResponseWriter, request *http.Request, messageID contract.MessageID, reaction contract.FeedbackReactionKey,
+) {
+	handler.setFeedbackMessageReaction(writer, request, messageID, reaction, true)
+}
+
+func (handler *APIHandler) DeleteFeedbackMessageReaction(
+	writer http.ResponseWriter, request *http.Request, messageID contract.MessageID, reaction contract.FeedbackReactionKey,
+) {
+	handler.setFeedbackMessageReaction(writer, request, messageID, reaction, false)
+}
+
+func (handler *APIHandler) setFeedbackMessageReaction(
+	writer http.ResponseWriter, request *http.Request, messageID contract.MessageID,
+	reaction contract.FeedbackReactionKey, add bool,
+) {
+	if handler.discussions == nil {
+		WriteError(writer, request, errors.New("discussion APIが未設定です"))
+		return
+	}
+	principal, scope, err := handler.authorizeDiscussionResource(request, session.ResourceKindMessage,
+		messageID.String(), auth.PermissionComment)
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
+		return
+	}
+	result, err := handler.discussions.SetMessageReaction(request.Context(), discussion.ReactionInput{
+		Scope: scope, MessageID: messageID.String(), Principal: principal, Reaction: string(reaction), Add: add,
+		RequestID: RequestIDFromContext(request.Context()),
+	})
 	respondJSONOrError(writer, request, http.StatusOK, result, mapPhase2Error(err))
 }
 
@@ -332,14 +388,93 @@ func (handler *APIHandler) PatchFeedbackThreadStatus(
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, scope, principal.Subject, "thread.status.patch", "thread", result.ID,
-	); err != nil {
+	writer.Header().Set("ETag", formatETag(result.Version))
+	respondJSONOrError(writer, request, http.StatusOK, result, nil)
+}
+
+func (handler *APIHandler) PatchFeedbackThreadTriage(
+	writer http.ResponseWriter,
+	request *http.Request,
+	threadID contract.ThreadID,
+	params contract.PatchFeedbackThreadTriageParams,
+) {
+	if handler.discussions == nil {
+		handler.Unimplemented.PatchFeedbackThreadTriage(writer, request, threadID, params)
+		return
+	}
+	principal, scope, err := handler.authorizeDiscussionResource(request, session.ResourceKindThread,
+		threadID.String(), auth.PermissionManage)
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
+		return
+	}
+	body, err := readBoundedBody(request.Body, maximumDiscussionMetadataBytes)
+	if err != nil {
 		WriteError(writer, request, err)
+		return
+	}
+	patch, err := decodeThreadTriagePatch(body)
+	if err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	version, err := ParseRequiredETag(string(params.IfMatch))
+	if err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	result, err := handler.discussions.PatchThreadTriage(request.Context(), discussion.PatchThreadTriageInput{
+		Scope: scope, ThreadID: threadID.String(), Principal: principal, ExpectedVersion: version,
+		Patch: patch, RequestID: RequestIDFromContext(request.Context()),
+	})
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Version))
 	respondJSONOrError(writer, request, http.StatusOK, result, nil)
+}
+
+func (handler *APIHandler) PutFeedbackThreadReadState(
+	writer http.ResponseWriter, request *http.Request, threadID contract.ThreadID,
+) {
+	if handler.discussions == nil {
+		handler.Unimplemented.PutFeedbackThreadReadState(writer, request, threadID)
+		return
+	}
+	principal, scope, err := handler.authorizeDiscussionResource(request, session.ResourceKindThread,
+		threadID.String(), auth.PermissionRead)
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
+		return
+	}
+	body, err := readBoundedBody(request.Body, maximumDiscussionMetadataBytes)
+	if err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	object, err := decodeJSONObject(body)
+	if err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	if err := rejectUnknownJSONFields(object, "readThroughMessageId"); err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	messageID, err := requiredString(object, "readThroughMessageId")
+	if err != nil {
+		WriteError(writer, request, err)
+		return
+	}
+	err = handler.discussions.MarkThreadRead(request.Context(), discussion.MarkThreadReadInput{
+		Scope: scope, ThreadID: threadID.String(), ReadThroughMessageID: messageID, Principal: principal,
+	})
+	if err != nil {
+		WriteError(writer, request, mapPhase2Error(err))
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
 }
 
 func (handler *APIHandler) GetFeedbackEvidence(
@@ -412,6 +547,54 @@ func (handler *APIHandler) authorizeDiscussionResource(
 	}); err != nil {
 		return auth.Principal{}, auth.ResourceScope{}, err
 	}
+	if err := handler.auditor.RecordAudit(request.Context(), usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: string(permission),
+		ResourceType: "workspace", ResourceID: scope.WorkspaceID, Outcome: "allowed",
+		RequestID: RequestIDFromContext(request.Context()),
+	}); err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, fmt.Errorf("discussion認可監査を記録できません: %w", err)
+	}
+	return principal, scope, nil
+}
+
+func (handler *APIHandler) authorizeDiscussionWorkspace(
+	request *http.Request,
+	applicationKey, environmentKey, externalWorkspaceKey string,
+	permission auth.Permission,
+) (auth.Principal, auth.ResourceScope, error) {
+	principal, err := PrincipalFromContext(request.Context())
+	if err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	if handler.scopeResolver == nil || handler.authorizer == nil || handler.auditor == nil {
+		return auth.Principal{}, auth.ResourceScope{}, errors.New("discussion authorization dependencyが未設定です")
+	}
+	if err := ValidateApplicationKey(applicationKey); err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	environmentKey, err = ValidateKey(environmentKey, "environmentKey", 100)
+	if err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	externalWorkspaceKey, err = ValidateKey(externalWorkspaceKey, "externalWorkspaceKey", 200)
+	if err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	scope, err := handler.scopeResolver.ResolveWorkspaceScope(request.Context(), principal.UserID,
+		applicationKey, externalWorkspaceKey, environmentKey)
+	if err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	if _, err := handler.authorizer.Authorize(request.Context(), auth.AuthorizationRequest{
+		Principal: principal, Scope: scope, Required: permission, HideExistence: true,
+		RequestID: RequestIDFromContext(request.Context()),
+	}); err != nil {
+		return auth.Principal{}, auth.ResourceScope{}, err
+	}
+	WithLogFields(request.Context(), LogFields{
+		Tenant: scope.TenantKey, Application: scope.ApplicationKey,
+		Environment: scope.EnvironmentKey, Workspace: scope.ExternalWorkspaceKey,
+	})
 	if err := handler.auditor.RecordAudit(request.Context(), usecase.AuditEvent{
 		Scope: &scope, PrincipalID: principal.Subject, Action: string(permission),
 		ResourceType: "workspace", ResourceID: scope.WorkspaceID, Outcome: "allowed",
@@ -585,6 +768,41 @@ func decodeThreadStatusPatch(body []byte) (string, error) {
 		return "", invalid("request.invalid", "statusがありません")
 	}
 	return *wire.Status, nil
+}
+
+func decodeThreadTriagePatch(body []byte) (discussion.ThreadTriagePatch, error) {
+	object, err := decodeJSONObject(body)
+	if err != nil {
+		return discussion.ThreadTriagePatch{}, err
+	}
+	if err := rejectUnknownJSONFields(object, "assigneeUserId", "priority", "labels"); err != nil {
+		return discussion.ThreadTriagePatch{}, err
+	}
+	var patch discussion.ThreadTriagePatch
+	if raw, exists := object["assigneeUserId"]; exists {
+		patch.AssigneeSet = true
+		patch.AssigneeUserID, err = decodeNullablePatchString(raw, "assigneeUserId")
+		if err != nil {
+			return discussion.ThreadTriagePatch{}, err
+		}
+	}
+	if raw, exists := object["priority"]; exists {
+		patch.PrioritySet = true
+		patch.Priority, err = decodeNullablePatchString(raw, "priority")
+		if err != nil {
+			return discussion.ThreadTriagePatch{}, err
+		}
+	}
+	if raw, exists := object["labels"]; exists {
+		patch.LabelsSet = true
+		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			return discussion.ThreadTriagePatch{}, invalid("request.invalid", "labelsは配列で指定してください")
+		}
+		if err := json.Unmarshal(raw, &patch.Labels); err != nil {
+			return discussion.ThreadTriagePatch{}, invalid("request.invalid", "labelsは文字列配列で指定してください")
+		}
+	}
+	return patch, nil
 }
 
 func mapDiscussionError(err error) error {

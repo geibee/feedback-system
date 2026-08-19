@@ -48,10 +48,11 @@ func TestDecodeDocumentAndApplyAllEntriesInOneTransaction(t *testing.T) {
 		t.Fatalf("DecodeDocument() error = %v", err)
 	}
 
-	rows := make([]pgx.Row, 0, 10)
+	rows := make([]pgx.Row, 0, 12)
 	for index := 0; index < 2; index++ {
 		rows = append(rows,
 			staticRow{value: "tenant-id"},
+			staticRow{value: "application-id"},
 			staticRow{value: "application-id"},
 			staticRow{value: "environment-id"},
 			staticRow{value: "workspace-id"},
@@ -115,7 +116,7 @@ func TestValidateDocumentRejectsConflictingSharedResource(t *testing.T) {
 	}
 }
 
-func TestValidateDocumentRejectsOrderDependentApplicationMembership(t *testing.T) {
+func TestValidateDocumentAllowsDifferentPermissionsAcrossWorkspaces(t *testing.T) {
 	t.Parallel()
 
 	first := validInput()
@@ -124,7 +125,7 @@ func TestValidateDocumentRejectsOrderDependentApplicationMembership(t *testing.T
 	second.WorkspaceDisplayName = "Another workspace"
 	second.Permissions = []Permission{PermissionRead}
 	_, err := validateDocument(Document{SchemaVersion: "1", Entries: []Input{first, second}})
-	if err == nil || !strings.Contains(err.Error(), "application membership") {
+	if err != nil {
 		t.Fatalf("validateDocument() error = %v", err)
 	}
 }

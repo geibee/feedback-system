@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -158,34 +157,6 @@ func (d *Database) RecordDenial(ctx context.Context, event auth.DenialEvent) err
 		ResourceType: event.ResourceType, ResourceID: event.ResourceID,
 		Outcome: "denied", RequestID: event.RequestID,
 	})
-}
-
-func (d *Database) RecordAudit(ctx context.Context, event usecase.AuditEvent) error {
-	var tenantID, applicationID, workspaceID any
-	if event.Scope != nil {
-		tenantID = nullableUUID(event.Scope.TenantID)
-		applicationID = nullableUUID(event.Scope.ApplicationID)
-		workspaceID = nullableUUID(event.Scope.WorkspaceID)
-	}
-	var changes any
-	if len(event.Changes) != 0 {
-		if !json.Valid(event.Changes) {
-			return fmt.Errorf("audit changes JSONが不正です")
-		}
-		changes = string(event.Changes)
-	}
-	_, err := d.Exec(ctx, `INSERT INTO feedback.audit_logs (
-    id, tenant_id, application_id, workspace_id, principal_id, action,
-    resource_type, resource_id, outcome, request_id, changes
-) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
-		uuid.NewString(), tenantID, applicationID, workspaceID,
-		nullableText(event.PrincipalID), event.Action, nullableText(event.ResourceType), nullableText(event.ResourceID),
-		event.Outcome, event.RequestID, changes,
-	)
-	if err != nil {
-		return fmt.Errorf("audit logを記録できません: %w", err)
-	}
-	return nil
 }
 
 func nullableUUID(value string) any {

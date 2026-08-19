@@ -139,6 +139,9 @@ type coreDependencyStub struct{}
 func (*coreDependencyStub) ResolveResourceScope(context.Context, string, string, string) (auth.ResourceScope, error) {
 	return auth.ResourceScope{}, nil
 }
+func (*coreDependencyStub) ResolveWorkspaceScope(context.Context, string, string, string, string) (auth.ResourceScope, error) {
+	return auth.ResourceScope{}, nil
+}
 
 func (*coreDependencyStub) EnforceWriteRateLimit(context.Context, discussion.RateLimitInput) error {
 	return nil

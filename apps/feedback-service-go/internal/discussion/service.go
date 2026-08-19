@@ -15,13 +15,17 @@ import (
 
 type Store interface {
 	ListThreads(context.Context, ListThreadsInput) (ThreadPage, error)
-	GetThread(context.Context, string) (Thread, error)
+	GetThread(context.Context, string, string) (Thread, error)
 	CreateThread(context.Context, CreateThreadInput) (Mutation[Thread], error)
 	GetThreadDeepLink(context.Context, string) (string, error)
 	CreateMessage(context.Context, CreateMessageInput) (Mutation[Message], error)
 	PatchMessage(context.Context, PatchMessageInput) (Message, error)
 	ListMessageVersions(context.Context, string) ([]MessageVersion, error)
 	PatchThreadStatus(context.Context, PatchThreadStatusInput) (Thread, error)
+	PatchThreadTriage(context.Context, PatchThreadTriageInput) (Thread, error)
+	SetMessageReaction(context.Context, ReactionInput) (Message, error)
+	ListUnreadReplies(context.Context, UnreadRepliesInput) (UnreadReplySummary, error)
+	MarkThreadRead(context.Context, MarkThreadReadInput) error
 	EnforceWriteRateLimit(context.Context, RateLimitInput) ([]string, error)
 }
 
@@ -73,17 +77,151 @@ func (service *Service) ListThreads(ctx context.Context, input ListThreadsInput)
 	if input.Status != nil && *input.Status != "open" && *input.Status != "resolved" {
 		return ThreadPage{}, invalid("request.invalid", "thread statusが不正です")
 	}
+	if input.Sort == "" {
+		input.Sort = "updated_desc"
+	}
+	if input.Sort != "created_desc" && input.Sort != "created_asc" && input.Sort != "updated_desc" {
+		return ThreadPage{}, invalid("request.invalid", "thread sortが不正です")
+	}
+	if input.PerspectiveCode != nil {
+		if _, err := validateText(*input.PerspectiveCode, "perspectiveCode", 100); err != nil {
+			return ThreadPage{}, err
+		}
+	}
+	if input.AssigneeUserID != nil {
+		if err := validateUUID(*input.AssigneeUserID, "assigneeUserId"); err != nil {
+			return ThreadPage{}, err
+		}
+	}
+	if input.Priority != nil && !validPriority(*input.Priority) {
+		return ThreadPage{}, invalid("request.invalid", "priorityが不正です")
+	}
+	if input.Label != nil {
+		if _, err := validateText(*input.Label, "label", 50); err != nil {
+			return ThreadPage{}, err
+		}
+	}
+	if input.Query != nil {
+		if _, err := validateText(*input.Query, "q", 200); err != nil {
+			return ThreadPage{}, err
+		}
+	}
 	if input.Limit < 1 || input.Limit > 200 || input.Offset < 0 {
 		return ThreadPage{}, invalid("request.invalid", "paginationが不正です")
 	}
 	return service.store.ListThreads(ctx, input)
 }
 
+func (service *Service) PatchThreadTriage(ctx context.Context, input PatchThreadTriageInput) (Thread, error) {
+	if err := validateUUID(input.ThreadID, "threadId"); err != nil {
+		return Thread{}, err
+	}
+	if input.ExpectedVersion <= 0 {
+		return Thread{}, invalid("etag.invalid", "If-Matchが不正です")
+	}
+	if err := validateMutationActor(input.Scope, input.Principal.Subject); err != nil {
+		return Thread{}, err
+	}
+	if err := validateUUID(input.Principal.UserID, "principal.userId"); err != nil {
+		return Thread{}, err
+	}
+	if !input.Patch.AssigneeSet && !input.Patch.PrioritySet && !input.Patch.LabelsSet {
+		return Thread{}, invalid("request.invalid", "triage更新項目がありません")
+	}
+	if input.Patch.AssigneeUserID != nil {
+		if err := validateUUID(*input.Patch.AssigneeUserID, "assigneeUserId"); err != nil {
+			return Thread{}, err
+		}
+	}
+	if input.Patch.Priority != nil && !validPriority(*input.Patch.Priority) {
+		return Thread{}, invalid("request.invalid", "priorityが不正です")
+	}
+	if input.Patch.LabelsSet {
+		if len(input.Patch.Labels) > 10 {
+			return Thread{}, invalid("request.invalid", "labelは10件以下です")
+		}
+		seen := make(map[string]struct{}, len(input.Patch.Labels))
+		labels := make([]string, 0, len(input.Patch.Labels))
+		for _, raw := range input.Patch.Labels {
+			label, err := validateText(raw, "label", 50)
+			if err != nil {
+				return Thread{}, err
+			}
+			if _, exists := seen[label]; exists {
+				continue
+			}
+			seen[label] = struct{}{}
+			labels = append(labels, label)
+		}
+		input.Patch.Labels = labels
+	}
+	return service.store.PatchThreadTriage(ctx, input)
+}
+
+func (service *Service) SetMessageReaction(ctx context.Context, input ReactionInput) (Message, error) {
+	if err := validateUUID(input.MessageID, "messageId"); err != nil {
+		return Message{}, err
+	}
+	if err := validateMutationActor(input.Scope, input.Principal.Subject); err != nil {
+		return Message{}, err
+	}
+	if err := validateUUID(input.Principal.UserID, "principal.userId"); err != nil {
+		return Message{}, err
+	}
+	if !validReaction(input.Reaction) {
+		return Message{}, invalid("request.invalid", "reactionが不正です")
+	}
+	return service.store.SetMessageReaction(ctx, input)
+}
+
+func (service *Service) ListUnreadReplies(ctx context.Context, input UnreadRepliesInput) (UnreadReplySummary, error) {
+	if err := validateMutationActor(input.Scope, input.Principal.Subject); err != nil {
+		return UnreadReplySummary{}, err
+	}
+	if err := validateUUID(input.Principal.UserID, "principal.userId"); err != nil {
+		return UnreadReplySummary{}, err
+	}
+	return service.store.ListUnreadReplies(ctx, input)
+}
+
+func (service *Service) MarkThreadRead(ctx context.Context, input MarkThreadReadInput) error {
+	if err := validateUUID(input.ThreadID, "threadId"); err != nil {
+		return err
+	}
+	if err := validateUUID(input.ReadThroughMessageID, "readThroughMessageId"); err != nil {
+		return err
+	}
+	if err := validateMutationActor(input.Scope, input.Principal.Subject); err != nil {
+		return err
+	}
+	if err := validateUUID(input.Principal.UserID, "principal.userId"); err != nil {
+		return err
+	}
+	return service.store.MarkThreadRead(ctx, input)
+}
+
+func validPriority(value string) bool {
+	return value == "critical" || value == "high" || value == "medium" || value == "low"
+}
+
+func validReaction(value string) bool {
+	return value == "thumbs_up" || value == "check" || value == "eyes" || value == "question"
+}
+
 func (service *Service) GetThread(ctx context.Context, threadID string) (Thread, error) {
+	return service.GetThreadForViewer(ctx, threadID, "")
+}
+
+func (service *Service) GetThreadForViewer(ctx context.Context, threadID, viewerUserID string) (Thread, error) {
 	if err := validateUUID(threadID, "threadId"); err != nil {
 		return Thread{}, err
 	}
-	return service.store.GetThread(ctx, threadID)
+	if viewerUserID != "" {
+		if err := validateUUID(viewerUserID, "viewerUserId"); err != nil {
+			return Thread{}, err
+		}
+	}
+	return service.store.GetThread(ctx, threadID, viewerUserID)
 }
 
 func (service *Service) CreateThread(ctx context.Context, input CreateThreadInput) (Mutation[Thread], error) {

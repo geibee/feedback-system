@@ -50,12 +50,6 @@ func (handler *APIHandler) CreateFeedbackExport(
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, result.Scope, principal.Subject, "export.create", "export", result.Job.ID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	respondJSONOrError(writer, request, http.StatusAccepted, result.Job, nil)
 }
 

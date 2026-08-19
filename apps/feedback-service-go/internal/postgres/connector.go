@@ -16,6 +16,7 @@ import (
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/connector"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func (d *Database) ListConnectorTypes(ctx context.Context) ([]connector.ConnectorType, error) {
@@ -74,6 +75,7 @@ func (d *Database) CreateNotificationConnector(
 	ctx context.Context,
 	scope auth.ResourceScope,
 	request connector.CreateRequest,
+	audit usecase.AuditEvent,
 ) (connector.NotificationConnector, error) {
 	var result connector.NotificationConnector
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
@@ -98,7 +100,11 @@ FROM feedback.connector_installations WHERE connector_key = $1 AND enabled`, req
 			return fmt.Errorf("通知connectorを作成できません: %w", err)
 		}
 		result, err = readNotificationConnector(txCtx, tx, id)
-		return err
+		if err != nil {
+			return err
+		}
+		audit.ResourceID = result.ID
+		return insertAudit(txCtx, tx, audit)
 	})
 	return result, err
 }
@@ -109,6 +115,7 @@ func (d *Database) PatchNotificationConnector(
 	id string,
 	expectedVersion int,
 	request connector.PatchRequest,
+	audit usecase.AuditEvent,
 ) (connector.NotificationConnector, error) {
 	var result connector.NotificationConnector
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
@@ -133,7 +140,10 @@ WHERE id = $5::uuid AND workspace_id = $6::uuid AND version = $7 AND deleted_at 
 			}
 		}
 		result, err = readNotificationConnector(txCtx, tx, id)
-		return err
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, audit)
 	})
 	return result, err
 }
@@ -143,6 +153,7 @@ func (d *Database) DeleteNotificationConnector(
 	scope auth.ResourceScope,
 	id string,
 	expectedVersion int,
+	audit usecase.AuditEvent,
 ) error {
 	return d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
 		tag, err := tx.Exec(txCtx, `UPDATE feedback.notification_connectors
@@ -155,7 +166,10 @@ WHERE id = $1::uuid AND workspace_id = $2::uuid AND version = $3 AND deleted_at 
 		if tag.RowsAffected() != 1 {
 			return connectorMissingOrVersion(txCtx, tx, scope.WorkspaceID, id)
 		}
-		return failPendingConnectorDeliveries(txCtx, tx, id, "connector configuration was deleted")
+		if err := failPendingConnectorDeliveries(txCtx, tx, id, "connector configuration was deleted"); err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, audit)
 	})
 }
 

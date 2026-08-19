@@ -136,6 +136,9 @@ func provision(ctx context.Context, tx postgres.Tx, input validatedInput) (Resul
 	if err != nil {
 		return Result{}, fmt.Errorf("applicationを登録できません: %w", err)
 	}
+	if err := lockApplicationMemberships(ctx, tx, applicationID); err != nil {
+		return Result{}, err
+	}
 
 	environmentID, err := queryID(
 		ctx,
@@ -180,16 +183,6 @@ func provision(ctx context.Context, tx postgres.Tx, input validatedInput) (Resul
 		return Result{}, fmt.Errorf("principalを登録できません: %w", err)
 	}
 
-	if err := execOne(
-		ctx,
-		tx,
-		applicationMembershipUpsertSQL,
-		applicationID,
-		principalID,
-		input.permissions,
-	); err != nil {
-		return Result{}, fmt.Errorf("application membershipを登録できません: %w", err)
-	}
 	if err := execAtMostOne(
 		ctx,
 		tx,
@@ -199,6 +192,9 @@ func provision(ctx context.Context, tx postgres.Tx, input validatedInput) (Resul
 		input.permissions,
 	); err != nil {
 		return Result{}, fmt.Errorf("workspace membershipを登録できません: %w", err)
+	}
+	if err := postgres.SyncApplicationMembership(ctx, tx, applicationID, principalID); err != nil {
+		return Result{}, err
 	}
 
 	return Result{
@@ -210,23 +206,22 @@ func provision(ctx context.Context, tx postgres.Tx, input validatedInput) (Resul
 	}, nil
 }
 
+func lockApplicationMemberships(ctx context.Context, tx postgres.Tx, applicationID string) error {
+	var lockedID string
+	if err := tx.QueryRow(ctx, `SELECT id::text FROM feedback.applications
+WHERE id = $1::uuid
+FOR UPDATE`, applicationID).Scan(&lockedID); err != nil {
+		return fmt.Errorf("application membership変更lockを取得できません: %w", err)
+	}
+	return nil
+}
+
 func queryID(ctx context.Context, tx postgres.Tx, sql string, args ...any) (string, error) {
 	var id string
 	if err := tx.QueryRow(ctx, sql, args...).Scan(&id); err != nil {
 		return "", err
 	}
 	return id, nil
-}
-
-func execOne(ctx context.Context, tx postgres.Tx, sql string, args ...any) error {
-	tag, err := tx.Exec(ctx, sql, args...)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() != 1 {
-		return fmt.Errorf("更新件数が1ではありません: %d", tag.RowsAffected())
-	}
-	return nil
 }
 
 func execAtMostOne(ctx context.Context, tx postgres.Tx, sql string, args ...any) error {
@@ -281,11 +276,6 @@ VALUES ($1::uuid, $2, $3, $4, $5)
 ON CONFLICT (issuer, subject) DO UPDATE SET
     email = EXCLUDED.email, display_name = EXCLUDED.display_name, updated_at = now()
 RETURNING id::text`
-
-const applicationMembershipUpsertSQL = `INSERT INTO feedback.application_memberships (
-    application_id, user_id, permissions
-) VALUES ($1::uuid, $2::uuid, $3::text[])
-ON CONFLICT (application_id, user_id) DO UPDATE SET permissions = EXCLUDED.permissions`
 
 const workspaceMembershipUpsertSQL = `INSERT INTO feedback.workspace_memberships (
     workspace_id, user_id, permissions

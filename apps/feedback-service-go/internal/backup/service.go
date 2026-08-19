@@ -42,11 +42,11 @@ type Store interface {
 	ResolveBackupWorkspaceScope(context.Context, string, string, string) (auth.ResourceScope, error)
 	ResolveResourceScope(context.Context, string, string, string) (auth.ResourceScope, error)
 	GetBackupPolicyView(context.Context, auth.ResourceScope, time.Time) (PolicyView, int, error)
-	PatchBackupPolicy(context.Context, auth.ResourceScope, int, Policy) (Policy, int, error)
+	PatchBackupPolicy(context.Context, auth.ResourceScope, int, Policy, usecase.AuditEvent) (Policy, int, error)
 	ListBackups(context.Context, auth.ResourceScope, int, int) (Page, error)
 	GetBackup(context.Context, string) (Run, error)
 	GetStoredBackup(context.Context, string) (StoredMetadata, error)
-	RetryBackup(context.Context, auth.ResourceScope, string) (Run, error)
+	RetryBackup(context.Context, auth.ResourceScope, string, usecase.AuditEvent) (Run, error)
 	RecordAudit(context.Context, usecase.AuditEvent) error
 }
 
@@ -117,7 +117,11 @@ func (service *Service) PatchPolicy(
 	if err := ValidatePolicy(policy); err != nil {
 		return PolicyResult{}, err
 	}
-	if _, _, err := service.store.PatchBackupPolicy(ctx, scope, expectedVersion, policy); err != nil {
+	if _, _, err := service.store.PatchBackupPolicy(ctx, scope, expectedVersion, policy, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "backup-policy.patch",
+		ResourceType: "backup-policy", ResourceID: scope.WorkspaceID,
+		Outcome: "succeeded", RequestID: input.RequestID,
+	}); err != nil {
 		return PolicyResult{}, err
 	}
 	view, version, err := service.store.GetBackupPolicyView(ctx, scope, service.now())
@@ -225,7 +229,10 @@ func (service *Service) Retry(
 	if err != nil {
 		return MutationResult[Run]{}, err
 	}
-	value, err := service.store.RetryBackup(ctx, scope, id)
+	value, err := service.store.RetryBackup(ctx, scope, id, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "backup.retry",
+		ResourceType: "backup", ResourceID: id, Outcome: "succeeded", RequestID: input.RequestID,
+	})
 	if err != nil {
 		return MutationResult[Run]{}, err
 	}

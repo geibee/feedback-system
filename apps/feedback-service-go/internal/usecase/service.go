@@ -71,6 +71,7 @@ type ManifestPut struct {
 	Manifest        json.RawMessage
 	ManifestVersion string
 	ExpectedVersion *int
+	RequestID       string
 }
 
 type AuditEvent struct {
@@ -285,16 +286,10 @@ func (service *Service) PutManifest(
 	}
 	record, err := service.store.PutManifest(ctx, ManifestPut{
 		Scope: scope, Principal: principal, Manifest: manifest, ManifestVersion: manifestVersion,
-		ExpectedVersion: expectedVersion,
+		ExpectedVersion: expectedVersion, RequestID: requestID,
 	})
 	if err != nil {
 		return ManifestRecord{}, err
-	}
-	if err := service.store.RecordAudit(ctx, AuditEvent{
-		Scope: &scope, PrincipalID: principal.Subject, Action: "manifest.put", ResourceType: "application-manifest",
-		ResourceID: applicationKey, Outcome: "succeeded", RequestID: requestID,
-	}); err != nil {
-		return ManifestRecord{}, fmt.Errorf("manifest成功監査を記録できません: %w", err)
 	}
 	return record, nil
 }

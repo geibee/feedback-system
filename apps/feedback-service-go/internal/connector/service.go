@@ -16,6 +16,7 @@ import (
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 var hostPattern = regexp.MustCompile(`^[a-z0-9.-]{1,253}$`)
@@ -41,28 +42,35 @@ func (s *Service) List(ctx context.Context, scope auth.ResourceScope) ([]Notific
 	return s.store.ListNotificationConnectors(ctx, scope)
 }
 
-func (s *Service) Create(ctx context.Context, scope auth.ResourceScope, request CreateRequest) (NotificationConnector, error) {
+func (s *Service) Create(
+	ctx context.Context, scope auth.ResourceScope, request CreateRequest, audit usecase.AuditEvent,
+) (NotificationConnector, error) {
 	if err := validateCreate(request); err != nil {
 		return NotificationConnector{}, err
 	}
-	return s.store.CreateNotificationConnector(ctx, scope, request)
+	return s.store.CreateNotificationConnector(ctx, scope, request, audit)
 }
 
-func (s *Service) Patch(ctx context.Context, scope auth.ResourceScope, id string, expectedVersion int, request PatchRequest) (NotificationConnector, error) {
+func (s *Service) Patch(
+	ctx context.Context, scope auth.ResourceScope, id string, expectedVersion int,
+	request PatchRequest, audit usecase.AuditEvent,
+) (NotificationConnector, error) {
 	if _, err := uuid.Parse(id); err != nil || expectedVersion < 1 {
 		return NotificationConnector{}, domainError(ErrorBadRequest, "request.invalid", "connector IDまたはversionが不正です")
 	}
 	if err := validateNameRef(request.Name, request.DestinationRef); err != nil {
 		return NotificationConnector{}, err
 	}
-	return s.store.PatchNotificationConnector(ctx, scope, id, expectedVersion, request)
+	return s.store.PatchNotificationConnector(ctx, scope, id, expectedVersion, request, audit)
 }
 
-func (s *Service) Delete(ctx context.Context, scope auth.ResourceScope, id string, expectedVersion int) error {
+func (s *Service) Delete(
+	ctx context.Context, scope auth.ResourceScope, id string, expectedVersion int, audit usecase.AuditEvent,
+) error {
 	if _, err := uuid.Parse(id); err != nil || expectedVersion < 1 {
 		return domainError(ErrorBadRequest, "request.invalid", "connector IDまたはversionが不正です")
 	}
-	return s.store.DeleteNotificationConnector(ctx, scope, id, expectedVersion)
+	return s.store.DeleteNotificationConnector(ctx, scope, id, expectedVersion, audit)
 }
 
 func (s *Service) Register(ctx context.Context, input InstallationInput) error {

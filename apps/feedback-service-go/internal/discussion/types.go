@@ -14,14 +14,26 @@ type Participant struct {
 	ParticipantName *string `json:"participantName"`
 }
 
+type Assignee struct {
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
+}
+
+type ReactionSummary struct {
+	Reaction    string `json:"reaction"`
+	Count       int    `json:"count"`
+	ReactedByMe bool   `json:"reactedByMe"`
+}
+
 type Message struct {
-	ID        string      `json:"id"`
-	ThreadID  string      `json:"threadId"`
-	Author    Participant `json:"author"`
-	Body      string      `json:"body"`
-	CreatedAt string      `json:"createdAt"`
-	EditedAt  *string     `json:"editedAt"`
-	Version   int         `json:"version"`
+	ID        string            `json:"id"`
+	ThreadID  string            `json:"threadId"`
+	Author    Participant       `json:"author"`
+	Body      string            `json:"body"`
+	CreatedAt string            `json:"createdAt"`
+	EditedAt  *string           `json:"editedAt"`
+	Version   int               `json:"version"`
+	Reactions []ReactionSummary `json:"reactions,omitempty"`
 }
 
 type MessageVersion struct {
@@ -45,6 +57,9 @@ type Thread struct {
 	Status            string          `json:"status"`
 	Reporter          Participant     `json:"reporter"`
 	EvidenceAvailable bool            `json:"evidenceAvailable"`
+	Assignee          *Assignee       `json:"assignee,omitempty"`
+	Priority          *string         `json:"priority,omitempty"`
+	Labels            []string        `json:"labels,omitempty"`
 	Messages          []Message       `json:"messages"`
 	CreatedAt         string          `json:"createdAt"`
 	UpdatedAt         string          `json:"updatedAt"`
@@ -91,10 +106,18 @@ type MessagePatchRequest struct {
 }
 
 type ListThreadsInput struct {
-	SessionID string
-	Status    *string
-	Limit     int
-	Offset    int
+	SessionID         string
+	Status            *string
+	Sort              string
+	PerspectiveCode   *string
+	AssigneeUserID    *string
+	Priority          *string
+	Label             *string
+	EvidenceAvailable *bool
+	Query             *string
+	ViewerUserID      string
+	Limit             int
+	Offset            int
 }
 
 type CreateThreadInput struct {
@@ -126,6 +149,7 @@ type PatchMessageInput struct {
 	Principal       auth.Principal
 	ExpectedVersion int
 	Request         MessagePatchRequest
+	RequestID       string
 }
 
 type PatchThreadStatusInput struct {
@@ -135,6 +159,57 @@ type PatchThreadStatusInput struct {
 	ExpectedVersion int
 	Status          string
 	RequestID       string
+}
+
+type ThreadTriagePatch struct {
+	AssigneeSet    bool
+	AssigneeUserID *string
+	PrioritySet    bool
+	Priority       *string
+	LabelsSet      bool
+	Labels         []string
+}
+
+type PatchThreadTriageInput struct {
+	Scope           auth.ResourceScope
+	ThreadID        string
+	Principal       auth.Principal
+	ExpectedVersion int
+	Patch           ThreadTriagePatch
+	RequestID       string
+}
+
+type ReactionInput struct {
+	Scope     auth.ResourceScope
+	MessageID string
+	Principal auth.Principal
+	Reaction  string
+	Add       bool
+	RequestID string
+}
+
+type UnreadReplyThread struct {
+	ThreadID        string `json:"threadId"`
+	Count           int    `json:"count"`
+	LatestMessageID string `json:"latestMessageId"`
+	LatestAt        string `json:"latestAt"`
+}
+
+type UnreadReplySummary struct {
+	TotalCount int                 `json:"totalCount"`
+	Threads    []UnreadReplyThread `json:"threads"`
+}
+
+type UnreadRepliesInput struct {
+	Scope     auth.ResourceScope
+	Principal auth.Principal
+}
+
+type MarkThreadReadInput struct {
+	Scope                auth.ResourceScope
+	ThreadID             string
+	ReadThroughMessageID string
+	Principal            auth.Principal
 }
 
 type RateLimitInput struct {

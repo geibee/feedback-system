@@ -50,6 +50,17 @@ const thread = {
   version: 1
 };
 
+const message = {
+  id: "30000000-0000-4000-8000-000000000001",
+  threadId: thread.id,
+  author: { principalId: "user-2", displayName: "返信者", participantName: null },
+  body: "確認しました",
+  reactions: [],
+  createdAt: "2026-08-09T01:00:00Z",
+  editedAt: null,
+  version: 1
+};
+
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.stubGlobal("crypto", { randomUUID: () => "00000000-0000-4000-8000-000000000001" });
@@ -180,6 +191,49 @@ describe("FeedbackOverlay", () => {
     expect(screen.queryByRole("button", { name: "フィードバック" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /#1/ }));
     expect(await screen.findByRole("heading", { name: /#1/ })).toBeTruthy();
+  });
+
+  it("未読返信をbadge表示し、threadを開いて既読化してmessageへreactionできる", async () => {
+    const calls: Array<{ path: string; method?: string }> = [];
+    const threadWithReply = { ...thread, messages: [message], updatedAt: message.createdAt };
+    const transport = createTransport(async (path, options) => {
+      calls.push({ path, method: options?.method });
+      if (path.startsWith("/me/unread-replies?")) {
+        return {
+          value: {
+            totalCount: 2,
+            threads: [{ threadId: thread.id, count: 2, latestMessageId: message.id, latestAt: message.createdAt }]
+          },
+          etag: null
+        };
+      }
+      if (path.endsWith("/threads")) return { value: { items: [threadWithReply] }, etag: null };
+      if (path === `/threads/${thread.id}`) return { value: threadWithReply, etag: '"1"' };
+      if (path === `/threads/${thread.id}/read-state` && options?.method === "PUT") {
+        return { value: undefined, etag: null };
+      }
+      if (path === `/messages/${message.id}/reactions/thumbs_up` && options?.method === "PUT") {
+        return { value: { ...message, reactions: [{ reaction: "thumbs_up", count: 1, reactedByMe: true }] }, etag: null };
+      }
+      throw new Error(`unexpected: ${path}`);
+    });
+    render(
+      <FeedbackProvider adapter={createAdapter()} transport={transport}>
+        <FeedbackOverlay />
+      </FeedbackProvider>
+    );
+
+    expect(await screen.findByLabelText("未読の返信 2件")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /他の人の投稿を見る/ }));
+    expect(await screen.findByText("未読 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /#1 使いやすさ/ }));
+    await waitFor(() => expect(calls).toContainEqual({
+      path: `/threads/${thread.id}/read-state`, method: "PUT"
+    }));
+    fireEvent.click(await screen.findByRole("button", { name: "👍 賛成" }));
+    await waitFor(() => expect(calls).toContainEqual({
+      path: `/messages/${message.id}/reactions/thumbs_up`, method: "PUT"
+    }));
   });
 
   it("地図targetのpinをProviderで表示し、選択pinの反対側へDrawerを移す", async () => {

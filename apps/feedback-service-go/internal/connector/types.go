@@ -7,6 +7,7 @@ import (
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 const ProtocolVersion = "1"
@@ -196,9 +197,9 @@ type ValidatedInstallation struct {
 type Store interface {
 	ListConnectorTypes(context.Context) ([]ConnectorType, error)
 	ListNotificationConnectors(context.Context, auth.ResourceScope) ([]NotificationConnector, error)
-	CreateNotificationConnector(context.Context, auth.ResourceScope, CreateRequest) (NotificationConnector, error)
-	PatchNotificationConnector(context.Context, auth.ResourceScope, string, int, PatchRequest) (NotificationConnector, error)
-	DeleteNotificationConnector(context.Context, auth.ResourceScope, string, int) error
+	CreateNotificationConnector(context.Context, auth.ResourceScope, CreateRequest, usecase.AuditEvent) (NotificationConnector, error)
+	PatchNotificationConnector(context.Context, auth.ResourceScope, string, int, PatchRequest, usecase.AuditEvent) (NotificationConnector, error)
+	DeleteNotificationConnector(context.Context, auth.ResourceScope, string, int, usecase.AuditEvent) error
 	RegisterConnectorInstallation(context.Context, ValidatedInstallation, *cryptoutil.Cipher) error
 }
 

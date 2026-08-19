@@ -172,12 +172,16 @@ func (store *adminStoreFake) CreateWorkspaceMember(context.Context, auth.Resourc
 	return store.mutation, nil
 }
 
-func (store *adminStoreFake) PatchWorkspaceMember(context.Context, auth.ResourceScope, string, int, MembershipPatch) (StoreMutation, error) {
+func (store *adminStoreFake) PatchWorkspaceMember(
+	context.Context, auth.ResourceScope, auth.Principal, string, string, int, MembershipPatch,
+) (StoreMutation, error) {
 	store.events.add("patch")
 	return store.mutation, nil
 }
 
-func (store *adminStoreFake) DeleteWorkspaceMember(context.Context, auth.ResourceScope, string, int) (Member, error) {
+func (store *adminStoreFake) DeleteWorkspaceMember(
+	context.Context, auth.ResourceScope, auth.Principal, string, string, int,
+) (Member, error) {
 	store.events.add("delete")
 	return store.deleted, nil
 }

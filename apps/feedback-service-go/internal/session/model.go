@@ -93,6 +93,7 @@ type CreateCommand struct {
 	Request        CreateRequest
 	IdempotencyKey string
 	RequestHash    string
+	RequestID      string
 }
 
 // OptionalString はmerge-patchの未指定と明示nullを区別する。

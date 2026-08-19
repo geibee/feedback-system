@@ -85,12 +85,6 @@ func (handler *APIHandler) CreateFeedbackSession(
 		WriteError(writer, request, mapPhase2Error(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, result.Scope, principal.Subject, "session.create", "session", result.Session.ID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.Session.Version))
 	respondJSONOrError(writer, request, http.StatusCreated, result.Session, nil)
 }
@@ -152,12 +146,6 @@ func (handler *APIHandler) PatchFeedbackSession(
 	)
 	if err != nil {
 		WriteError(writer, request, mapPhase2Error(err))
-		return
-	}
-	if err := handler.recordMutation(
-		request, result.Scope, principal.Subject, "session.patch", "session", result.Session.ID,
-	); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.Header().Set("ETag", formatETag(result.Session.Version))

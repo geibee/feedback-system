@@ -101,6 +101,30 @@ func (e FeedbackConnectorTypeProtocolVersion) Valid() bool {
 	}
 }
 
+// Defines values for FeedbackReactionKey.
+const (
+	Check    FeedbackReactionKey = "check"
+	Eyes     FeedbackReactionKey = "eyes"
+	Question FeedbackReactionKey = "question"
+	ThumbsUp FeedbackReactionKey = "thumbs_up"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackReactionKey enum.
+func (e FeedbackReactionKey) Valid() bool {
+	switch e {
+	case Check:
+		return true
+	case Eyes:
+		return true
+	case Question:
+		return true
+	case ThumbsUp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FeedbackSessionStatus.
 const (
 	FeedbackSessionStatusClosed FeedbackSessionStatus = "closed"
@@ -116,6 +140,51 @@ func (e FeedbackSessionStatus) Valid() bool {
 	case FeedbackSessionStatusDraft:
 		return true
 	case FeedbackSessionStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedbackThreadPriority.
+const (
+	Critical FeedbackThreadPriority = "critical"
+	High     FeedbackThreadPriority = "high"
+	Low      FeedbackThreadPriority = "low"
+	Medium   FeedbackThreadPriority = "medium"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackThreadPriority enum.
+func (e FeedbackThreadPriority) Valid() bool {
+	switch e {
+	case Critical:
+		return true
+	case High:
+		return true
+	case Low:
+		return true
+	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedbackThreadSort.
+const (
+	CreatedAsc  FeedbackThreadSort = "created_asc"
+	CreatedDesc FeedbackThreadSort = "created_desc"
+	UpdatedDesc FeedbackThreadSort = "updated_desc"
+)
+
+// Valid indicates whether the value is a known member of the FeedbackThreadSort enum.
+func (e FeedbackThreadSort) Valid() bool {
+	switch e {
+	case CreatedAsc:
+		return true
+	case CreatedDesc:
+		return true
+	case UpdatedDesc:
 		return true
 	default:
 		return false
@@ -159,6 +228,12 @@ type FeedbackApplicationManifestV1 struct {
 		Template string `json:"template"`
 	} `json:"routes"`
 	SchemaVersion interface{} `json:"schemaVersion"`
+}
+
+// FeedbackAssignee defines model for FeedbackAssignee.
+type FeedbackAssignee struct {
+	DisplayName string             `json:"displayName"`
+	UserID      openapi_types.UUID `json:"userId"`
 }
 
 // FeedbackBackupPolicy defines model for FeedbackBackupPolicy.
@@ -336,6 +411,7 @@ type FeedbackMessageV1 struct {
 	CreatedAt time.Time                    `json:"createdAt"`
 	EditedAt  nullable.Nullable[time.Time] `json:"editedAt,omitempty"`
 	ID        openapi_types.UUID           `json:"id"`
+	Reactions *[]FeedbackReactionSummary   `json:"reactions,omitempty"`
 	ThreadID  openapi_types.UUID           `json:"threadId"`
 	Version   int                          `json:"version"`
 }
@@ -454,6 +530,16 @@ type FeedbackProblem struct {
 	Status    int     `json:"status"`
 	Title     string  `json:"title"`
 	Type      string  `json:"type"`
+}
+
+// FeedbackReactionKey defines model for FeedbackReactionKey.
+type FeedbackReactionKey string
+
+// FeedbackReactionSummary defines model for FeedbackReactionSummary.
+type FeedbackReactionSummary struct {
+	Count       int                 `json:"count"`
+	ReactedByMe bool                `json:"reactedByMe"`
+	Reaction    FeedbackReactionKey `json:"reaction"`
 }
 
 // FeedbackRetentionPolicy defines model for FeedbackRetentionPolicy.
@@ -614,24 +700,59 @@ type FeedbackThreadPage struct {
 	TotalCount *int                      `json:"totalCount,omitempty"`
 }
 
+// FeedbackThreadPriority defines model for FeedbackThreadPriority.
+type FeedbackThreadPriority string
+
+// FeedbackThreadReadStateRequest defines model for FeedbackThreadReadStateRequest.
+type FeedbackThreadReadStateRequest struct {
+	ReadThroughMessageID openapi_types.UUID `json:"readThroughMessageId"`
+}
+
+// FeedbackThreadSort defines model for FeedbackThreadSort.
+type FeedbackThreadSort string
+
 // FeedbackThreadStatus defines model for FeedbackThreadStatus.
 type FeedbackThreadStatus string
 
+// FeedbackThreadTriagePatchRequest defines model for FeedbackThreadTriagePatchRequest.
+type FeedbackThreadTriagePatchRequest struct {
+	AssigneeUserID nullable.Nullable[openapi_types.UUID]     `json:"assigneeUserId,omitempty"`
+	Labels         *[]string                                 `json:"labels,omitempty"`
+	Priority       nullable.Nullable[FeedbackThreadPriority] `json:"priority,omitempty"`
+}
+
 // FeedbackThreadV1 defines model for FeedbackThreadV1.
 type FeedbackThreadV1 struct {
-	CreatedAt         time.Time            `json:"createdAt"`
-	DisplayNumber     int                  `json:"displayNumber"`
-	EvidenceAvailable *bool                `json:"evidenceAvailable,omitempty"`
-	ID                openapi_types.UUID   `json:"id"`
-	Location          FeedbackLocationV1   `json:"location"`
-	Messages          []FeedbackMessageV1  `json:"messages"`
-	PerspectiveCode   string               `json:"perspectiveCode"`
-	Reporter          FeedbackParticipant  `json:"reporter"`
-	SessionID         openapi_types.UUID   `json:"sessionId"`
-	Status            FeedbackThreadStatus `json:"status"`
-	Target            FeedbackTargetV1     `json:"target"`
-	UpdatedAt         time.Time            `json:"updatedAt"`
-	Version           int                  `json:"version"`
+	Assignee          nullable.Nullable[FeedbackAssignee]       `json:"assignee,omitempty"`
+	CreatedAt         time.Time                                 `json:"createdAt"`
+	DisplayNumber     int                                       `json:"displayNumber"`
+	EvidenceAvailable *bool                                     `json:"evidenceAvailable,omitempty"`
+	ID                openapi_types.UUID                        `json:"id"`
+	Labels            *[]string                                 `json:"labels,omitempty"`
+	Location          FeedbackLocationV1                        `json:"location"`
+	Messages          []FeedbackMessageV1                       `json:"messages"`
+	PerspectiveCode   string                                    `json:"perspectiveCode"`
+	Priority          nullable.Nullable[FeedbackThreadPriority] `json:"priority,omitempty"`
+	Reporter          FeedbackParticipant                       `json:"reporter"`
+	SessionID         openapi_types.UUID                        `json:"sessionId"`
+	Status            FeedbackThreadStatus                      `json:"status"`
+	Target            FeedbackTargetV1                          `json:"target"`
+	UpdatedAt         time.Time                                 `json:"updatedAt"`
+	Version           int                                       `json:"version"`
+}
+
+// FeedbackUnreadReplySummary defines model for FeedbackUnreadReplySummary.
+type FeedbackUnreadReplySummary struct {
+	Threads    []FeedbackUnreadReplyThread `json:"threads"`
+	TotalCount int                         `json:"totalCount"`
+}
+
+// FeedbackUnreadReplyThread defines model for FeedbackUnreadReplyThread.
+type FeedbackUnreadReplyThread struct {
+	Count           int                `json:"count"`
+	LatestAt        time.Time          `json:"latestAt"`
+	LatestMessageID openapi_types.UUID `json:"latestMessageId"`
+	ThreadID        openapi_types.UUID `json:"threadId"`
 }
 
 // FeedbackWorkspaceMember defines model for FeedbackWorkspaceMember.
@@ -772,6 +893,13 @@ type CreateFeedbackExportParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// GetFeedbackUnreadRepliesParams defines parameters for GetFeedbackUnreadReplies.
+type GetFeedbackUnreadRepliesParams struct {
+	ApplicationKey       ApplicationKeyQuery       `form:"applicationKey" json:"applicationKey"`
+	EnvironmentKey       EnvironmentKeyQuery       `form:"environmentKey" json:"environmentKey"`
+	ExternalWorkspaceKey ExternalWorkspaceKeyQuery `form:"externalWorkspaceKey" json:"externalWorkspaceKey"`
+}
+
 // ListFeedbackWorkspaceMembershipsParams defines parameters for ListFeedbackWorkspaceMemberships.
 type ListFeedbackWorkspaceMembershipsParams struct {
 	ApplicationKey       ApplicationKeyQuery       `form:"applicationKey" json:"applicationKey"`
@@ -910,9 +1038,16 @@ type PatchFeedbackSessionParams struct {
 
 // ListFeedbackThreadsParams defines parameters for ListFeedbackThreads.
 type ListFeedbackThreadsParams struct {
-	Status *FeedbackThreadStatus `form:"status,omitempty" json:"status,omitempty"`
-	Cursor *Cursor               `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Limit  *Limit                `form:"limit,omitempty" json:"limit,omitempty"`
+	Status            *FeedbackThreadStatus   `form:"status,omitempty" json:"status,omitempty"`
+	Sort              *FeedbackThreadSort     `form:"sort,omitempty" json:"sort,omitempty"`
+	PerspectiveCode   *string                 `form:"perspectiveCode,omitempty" json:"perspectiveCode,omitempty"`
+	AssigneeUserID    *openapi_types.UUID     `form:"assigneeUserId,omitempty" json:"assigneeUserId,omitempty"`
+	Priority          *FeedbackThreadPriority `form:"priority,omitempty" json:"priority,omitempty"`
+	Label             *string                 `form:"label,omitempty" json:"label,omitempty"`
+	EvidenceAvailable *bool                   `form:"evidenceAvailable,omitempty" json:"evidenceAvailable,omitempty"`
+	Q                 *string                 `form:"q,omitempty" json:"q,omitempty"`
+	Cursor            *Cursor                 `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit             *Limit                  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // CreateFeedbackThreadParams defines parameters for CreateFeedbackThread.
@@ -937,6 +1072,11 @@ type PatchFeedbackThreadStatusApplicationMergePatchPlusJSONBody struct {
 
 // PatchFeedbackThreadStatusParams defines parameters for PatchFeedbackThreadStatus.
 type PatchFeedbackThreadStatusParams struct {
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// PatchFeedbackThreadTriageParams defines parameters for PatchFeedbackThreadTriage.
+type PatchFeedbackThreadTriageParams struct {
 	IfMatch IfMatch `json:"If-Match"`
 }
 
@@ -984,8 +1124,14 @@ type CreateFeedbackThreadJSONRequestBody = FeedbackThreadCreateRequest
 // CreateFeedbackMessageJSONRequestBody defines body for CreateFeedbackMessage for application/json ContentType.
 type CreateFeedbackMessageJSONRequestBody = FeedbackMessageCreateRequest
 
+// PutFeedbackThreadReadStateJSONRequestBody defines body for PutFeedbackThreadReadState for application/json ContentType.
+type PutFeedbackThreadReadStateJSONRequestBody = FeedbackThreadReadStateRequest
+
 // PatchFeedbackThreadStatusApplicationMergePatchPlusJSONRequestBody defines body for PatchFeedbackThreadStatus for application/merge-patch+json ContentType.
 type PatchFeedbackThreadStatusApplicationMergePatchPlusJSONRequestBody PatchFeedbackThreadStatusApplicationMergePatchPlusJSONBody
+
+// PatchFeedbackThreadTriageApplicationMergePatchPlusJSONRequestBody defines body for PatchFeedbackThreadTriage for application/merge-patch+json ContentType.
+type PatchFeedbackThreadTriageApplicationMergePatchPlusJSONRequestBody = FeedbackThreadTriagePatchRequest
 
 // AsFeedbackParticipantPolicy0 returns the union data inside the FeedbackParticipantPolicy as a FeedbackParticipantPolicy0
 func (t FeedbackParticipantPolicy) AsFeedbackParticipantPolicy0() (FeedbackParticipantPolicy0, error) {
@@ -1210,6 +1356,9 @@ type ServerInterface interface {
 	// (GET /me)
 	GetFeedbackMe(w http.ResponseWriter, r *http.Request)
 
+	// (GET /me/unread-replies)
+	GetFeedbackUnreadReplies(w http.ResponseWriter, r *http.Request, params GetFeedbackUnreadRepliesParams)
+
 	// (GET /memberships)
 	ListFeedbackWorkspaceMemberships(w http.ResponseWriter, r *http.Request, params ListFeedbackWorkspaceMembershipsParams)
 
@@ -1224,6 +1373,12 @@ type ServerInterface interface {
 
 	// (PATCH /messages/{messageId})
 	PatchFeedbackMessage(w http.ResponseWriter, r *http.Request, messageID MessageID, params PatchFeedbackMessageParams)
+
+	// (DELETE /messages/{messageId}/reactions/{reaction})
+	DeleteFeedbackMessageReaction(w http.ResponseWriter, r *http.Request, messageID MessageID, reaction FeedbackReactionKey)
+
+	// (PUT /messages/{messageId}/reactions/{reaction})
+	PutFeedbackMessageReaction(w http.ResponseWriter, r *http.Request, messageID MessageID, reaction FeedbackReactionKey)
 
 	// (GET /messages/{messageId}/versions)
 	ListFeedbackMessageVersions(w http.ResponseWriter, r *http.Request, messageID MessageID)
@@ -1295,8 +1450,14 @@ type ServerInterface interface {
 	// (POST /threads/{threadId}/messages)
 	CreateFeedbackMessage(w http.ResponseWriter, r *http.Request, threadID ThreadID, params CreateFeedbackMessageParams)
 
+	// (PUT /threads/{threadId}/read-state)
+	PutFeedbackThreadReadState(w http.ResponseWriter, r *http.Request, threadID ThreadID)
+
 	// (PATCH /threads/{threadId}/status)
 	PatchFeedbackThreadStatus(w http.ResponseWriter, r *http.Request, threadID ThreadID, params PatchFeedbackThreadStatusParams)
+
+	// (PATCH /threads/{threadId}/triage)
+	PatchFeedbackThreadTriage(w http.ResponseWriter, r *http.Request, threadID ThreadID, params PatchFeedbackThreadTriageParams)
 }
 
 // Unimplemented is the contract-freeze handler. Every OpenAPI operation is
@@ -1373,6 +1534,11 @@ func (Unimplemented) GetFeedbackMe(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /me/unread-replies)
+func (Unimplemented) GetFeedbackUnreadReplies(w http.ResponseWriter, _ *http.Request, _ GetFeedbackUnreadRepliesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /memberships)
 func (Unimplemented) ListFeedbackWorkspaceMemberships(w http.ResponseWriter, _ *http.Request, _ ListFeedbackWorkspaceMembershipsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1395,6 +1561,16 @@ func (Unimplemented) PatchFeedbackWorkspaceMembership(w http.ResponseWriter, _ *
 
 // (PATCH /messages/{messageId})
 func (Unimplemented) PatchFeedbackMessage(w http.ResponseWriter, _ *http.Request, messageID MessageID, _ PatchFeedbackMessageParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /messages/{messageId}/reactions/{reaction})
+func (Unimplemented) DeleteFeedbackMessageReaction(w http.ResponseWriter, _ *http.Request, messageID MessageID, reaction FeedbackReactionKey) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /messages/{messageId}/reactions/{reaction})
+func (Unimplemented) PutFeedbackMessageReaction(w http.ResponseWriter, _ *http.Request, messageID MessageID, reaction FeedbackReactionKey) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1512,8 +1688,18 @@ func (Unimplemented) CreateFeedbackMessage(w http.ResponseWriter, _ *http.Reques
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (PUT /threads/{threadId}/read-state)
+func (Unimplemented) PutFeedbackThreadReadState(w http.ResponseWriter, _ *http.Request, threadID ThreadID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (PATCH /threads/{threadId}/status)
 func (Unimplemented) PatchFeedbackThreadStatus(w http.ResponseWriter, _ *http.Request, threadID ThreadID, _ PatchFeedbackThreadStatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PATCH /threads/{threadId}/triage)
+func (Unimplemented) PatchFeedbackThreadTriage(w http.ResponseWriter, _ *http.Request, threadID ThreadID, _ PatchFeedbackThreadTriageParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2069,6 +2255,65 @@ func (siw *ServerInterfaceWrapper) GetFeedbackMe(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetFeedbackUnreadReplies operation middleware
+func (siw *ServerInterfaceWrapper) GetFeedbackUnreadReplies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFeedbackUnreadRepliesParams
+
+	// ------------- Required query parameter "applicationKey" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "applicationKey", r.URL.Query(), &params.ApplicationKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "applicationKey"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationKey", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "environmentKey" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environmentKey", r.URL.Query(), &params.EnvironmentKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environmentKey"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environmentKey", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "externalWorkspaceKey" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "externalWorkspaceKey", r.URL.Query(), &params.ExternalWorkspaceKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "externalWorkspaceKey"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "externalWorkspaceKey", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFeedbackUnreadReplies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListFeedbackWorkspaceMemberships operation middleware
 func (siw *ServerInterfaceWrapper) ListFeedbackWorkspaceMemberships(w http.ResponseWriter, r *http.Request) {
 
@@ -2391,6 +2636,76 @@ func (siw *ServerInterfaceWrapper) PatchFeedbackMessage(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchFeedbackMessage(w, r, messageID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFeedbackMessageReaction operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFeedbackMessageReaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "messageId" -------------
+	var messageID MessageID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "messageId", r.PathValue("messageId"), &messageID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "messageId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "reaction" -------------
+	var reaction FeedbackReactionKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reaction", r.PathValue("reaction"), &reaction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reaction", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFeedbackMessageReaction(w, r, messageID, reaction)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutFeedbackMessageReaction operation middleware
+func (siw *ServerInterfaceWrapper) PutFeedbackMessageReaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "messageId" -------------
+	var messageID MessageID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "messageId", r.PathValue("messageId"), &messageID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "messageId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "reaction" -------------
+	var reaction FeedbackReactionKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reaction", r.PathValue("reaction"), &reaction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reaction", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutFeedbackMessageReaction(w, r, messageID, reaction)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3443,6 +3758,97 @@ func (siw *ServerInterfaceWrapper) ListFeedbackThreads(w http.ResponseWriter, r 
 		return
 	}
 
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "perspectiveCode" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "perspectiveCode", r.URL.Query(), &params.PerspectiveCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "perspectiveCode"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "perspectiveCode", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "assigneeUserId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "assigneeUserId", r.URL.Query(), &params.AssigneeUserID, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "assigneeUserId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "assigneeUserId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "priority" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "priority", r.URL.Query(), &params.Priority, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "priority"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "priority", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "label" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "label", r.URL.Query(), &params.Label, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "label"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "label", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "evidenceAvailable" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "evidenceAvailable", r.URL.Query(), &params.EvidenceAvailable, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "evidenceAvailable"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "evidenceAvailable", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "cursor" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -3690,6 +4096,32 @@ func (siw *ServerInterfaceWrapper) CreateFeedbackMessage(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// PutFeedbackThreadReadState operation middleware
+func (siw *ServerInterfaceWrapper) PutFeedbackThreadReadState(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "threadId" -------------
+	var threadID ThreadID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "threadId", r.PathValue("threadId"), &threadID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "threadId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutFeedbackThreadReadState(w, r, threadID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PatchFeedbackThreadStatus operation middleware
 func (siw *ServerInterfaceWrapper) PatchFeedbackThreadStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -3735,6 +4167,60 @@ func (siw *ServerInterfaceWrapper) PatchFeedbackThreadStatus(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchFeedbackThreadStatus(w, r, threadID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchFeedbackThreadTriage operation middleware
+func (siw *ServerInterfaceWrapper) PatchFeedbackThreadTriage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "threadId" -------------
+	var threadID ThreadID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "threadId", r.PathValue("threadId"), &threadID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "threadId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PatchFeedbackThreadTriageParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchFeedbackThreadTriage(w, r, threadID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3866,6 +4352,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/capabilities", wrapper.GetFeedbackCapabilities)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetFeedbackMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/unread-replies", wrapper.GetFeedbackUnreadReplies)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/applications/{applicationKey}/manifest", wrapper.GetFeedbackApplicationManifest)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/applications/{applicationKey}/manifest", wrapper.PutFeedbackApplicationManifest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/review-context", wrapper.GetFeedbackReviewContext)
@@ -3880,7 +4367,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{threadId}/messages", wrapper.CreateFeedbackMessage)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/messages/{messageId}", wrapper.PatchFeedbackMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/messages/{messageId}/versions", wrapper.ListFeedbackMessageVersions)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{messageId}/reactions/{reaction}", wrapper.DeleteFeedbackMessageReaction)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{messageId}/reactions/{reaction}", wrapper.PutFeedbackMessageReaction)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/threads/{threadId}/status", wrapper.PatchFeedbackThreadStatus)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/threads/{threadId}/triage", wrapper.PatchFeedbackThreadTriage)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{threadId}/read-state", wrapper.PutFeedbackThreadReadState)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{threadId}/evidence", wrapper.GetFeedbackEvidence)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/exports", wrapper.CreateFeedbackExport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/exports/{exportId}", wrapper.GetFeedbackExport)
@@ -5003,6 +5494,60 @@ func (response GetFeedbackMe401ApplicationProblemPlusJSONResponse) VisitGetFeedb
 	return err
 }
 
+type GetFeedbackUnreadRepliesRequestObject struct {
+	Params GetFeedbackUnreadRepliesParams
+}
+
+type GetFeedbackUnreadRepliesResponseObject interface {
+	VisitGetFeedbackUnreadRepliesResponse(w http.ResponseWriter) error
+}
+
+type GetFeedbackUnreadReplies200JSONResponse FeedbackUnreadReplySummary
+
+func (response GetFeedbackUnreadReplies200JSONResponse) VisitGetFeedbackUnreadRepliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFeedbackUnreadReplies401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFeedbackUnreadReplies401ApplicationProblemPlusJSONResponse) VisitGetFeedbackUnreadRepliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFeedbackUnreadReplies403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFeedbackUnreadReplies403ApplicationProblemPlusJSONResponse) VisitGetFeedbackUnreadRepliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFeedbackWorkspaceMembershipsRequestObject struct {
 	Params ListFeedbackWorkspaceMembershipsParams
 }
@@ -5381,6 +5926,22 @@ func (response PatchFeedbackWorkspaceMembership404ApplicationProblemPlusJSONResp
 	return err
 }
 
+type PatchFeedbackWorkspaceMembership409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackWorkspaceMembership409ApplicationProblemPlusJSONResponse) VisitPatchFeedbackWorkspaceMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PatchFeedbackWorkspaceMembership412ApplicationProblemPlusJSONResponse struct {
 	PreconditionFailedApplicationProblemPlusJSONResponse
 }
@@ -5507,6 +6068,148 @@ func (response PatchFeedbackMessage412ApplicationProblemPlusJSONResponse) VisitP
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeedbackMessageReactionRequestObject struct {
+	MessageID MessageID           `json:"messageId"`
+	Reaction  FeedbackReactionKey `json:"reaction"`
+}
+
+type DeleteFeedbackMessageReactionResponseObject interface {
+	VisitDeleteFeedbackMessageReactionResponse(w http.ResponseWriter) error
+}
+
+type DeleteFeedbackMessageReaction200JSONResponse FeedbackMessageV1
+
+func (response DeleteFeedbackMessageReaction200JSONResponse) VisitDeleteFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeedbackMessageReaction401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFeedbackMessageReaction401ApplicationProblemPlusJSONResponse) VisitDeleteFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeedbackMessageReaction403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFeedbackMessageReaction403ApplicationProblemPlusJSONResponse) VisitDeleteFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeedbackMessageReaction404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFeedbackMessageReaction404ApplicationProblemPlusJSONResponse) VisitDeleteFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackMessageReactionRequestObject struct {
+	MessageID MessageID           `json:"messageId"`
+	Reaction  FeedbackReactionKey `json:"reaction"`
+}
+
+type PutFeedbackMessageReactionResponseObject interface {
+	VisitPutFeedbackMessageReactionResponse(w http.ResponseWriter) error
+}
+
+type PutFeedbackMessageReaction200JSONResponse FeedbackMessageV1
+
+func (response PutFeedbackMessageReaction200JSONResponse) VisitPutFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackMessageReaction401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackMessageReaction401ApplicationProblemPlusJSONResponse) VisitPutFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackMessageReaction403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackMessageReaction403ApplicationProblemPlusJSONResponse) VisitPutFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackMessageReaction404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackMessageReaction404ApplicationProblemPlusJSONResponse) VisitPutFeedbackMessageReactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7527,6 +8230,87 @@ func (response CreateFeedbackMessage429ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type PutFeedbackThreadReadStateRequestObject struct {
+	ThreadID ThreadID `json:"threadId"`
+	Body     *PutFeedbackThreadReadStateJSONRequestBody
+}
+
+type PutFeedbackThreadReadStateResponseObject interface {
+	VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error
+}
+
+type PutFeedbackThreadReadState204Response struct {
+}
+
+func (response PutFeedbackThreadReadState204Response) VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PutFeedbackThreadReadState400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackThreadReadState400ApplicationProblemPlusJSONResponse) VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackThreadReadState401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackThreadReadState401ApplicationProblemPlusJSONResponse) VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackThreadReadState403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackThreadReadState403ApplicationProblemPlusJSONResponse) VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFeedbackThreadReadState404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutFeedbackThreadReadState404ApplicationProblemPlusJSONResponse) VisitPutFeedbackThreadReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PatchFeedbackThreadStatusRequestObject struct {
 	ThreadID ThreadID `json:"threadId"`
 	Params   PatchFeedbackThreadStatusParams
@@ -7641,6 +8425,136 @@ func (response PatchFeedbackThreadStatus412ApplicationProblemPlusJSONResponse) V
 	return err
 }
 
+type PatchFeedbackThreadTriageRequestObject struct {
+	ThreadID ThreadID `json:"threadId"`
+	Params   PatchFeedbackThreadTriageParams
+	Body     *PatchFeedbackThreadTriageApplicationMergePatchPlusJSONRequestBody
+}
+
+type PatchFeedbackThreadTriageResponseObject interface {
+	VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error
+}
+
+type PatchFeedbackThreadTriage200ResponseHeaders struct {
+	ETag *string
+}
+
+type PatchFeedbackThreadTriage200JSONResponse struct {
+	Body    FeedbackThreadV1
+	Headers PatchFeedbackThreadTriage200ResponseHeaders
+}
+
+func (response PatchFeedbackThreadTriage200JSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage400ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage401ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage403ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage404ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage409ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFeedbackThreadTriage412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFeedbackThreadTriage412ApplicationProblemPlusJSONResponse) VisitPatchFeedbackThreadTriageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -7686,6 +8600,9 @@ type StrictServerInterface interface {
 	// (GET /me)
 	GetFeedbackMe(ctx context.Context, request GetFeedbackMeRequestObject) (GetFeedbackMeResponseObject, error)
 
+	// (GET /me/unread-replies)
+	GetFeedbackUnreadReplies(ctx context.Context, request GetFeedbackUnreadRepliesRequestObject) (GetFeedbackUnreadRepliesResponseObject, error)
+
 	// (GET /memberships)
 	ListFeedbackWorkspaceMemberships(ctx context.Context, request ListFeedbackWorkspaceMembershipsRequestObject) (ListFeedbackWorkspaceMembershipsResponseObject, error)
 
@@ -7700,6 +8617,12 @@ type StrictServerInterface interface {
 
 	// (PATCH /messages/{messageId})
 	PatchFeedbackMessage(ctx context.Context, request PatchFeedbackMessageRequestObject) (PatchFeedbackMessageResponseObject, error)
+
+	// (DELETE /messages/{messageId}/reactions/{reaction})
+	DeleteFeedbackMessageReaction(ctx context.Context, request DeleteFeedbackMessageReactionRequestObject) (DeleteFeedbackMessageReactionResponseObject, error)
+
+	// (PUT /messages/{messageId}/reactions/{reaction})
+	PutFeedbackMessageReaction(ctx context.Context, request PutFeedbackMessageReactionRequestObject) (PutFeedbackMessageReactionResponseObject, error)
 
 	// (GET /messages/{messageId}/versions)
 	ListFeedbackMessageVersions(ctx context.Context, request ListFeedbackMessageVersionsRequestObject) (ListFeedbackMessageVersionsResponseObject, error)
@@ -7771,8 +8694,14 @@ type StrictServerInterface interface {
 	// (POST /threads/{threadId}/messages)
 	CreateFeedbackMessage(ctx context.Context, request CreateFeedbackMessageRequestObject) (CreateFeedbackMessageResponseObject, error)
 
+	// (PUT /threads/{threadId}/read-state)
+	PutFeedbackThreadReadState(ctx context.Context, request PutFeedbackThreadReadStateRequestObject) (PutFeedbackThreadReadStateResponseObject, error)
+
 	// (PATCH /threads/{threadId}/status)
 	PatchFeedbackThreadStatus(ctx context.Context, request PatchFeedbackThreadStatusRequestObject) (PatchFeedbackThreadStatusResponseObject, error)
+
+	// (PATCH /threads/{threadId}/triage)
+	PatchFeedbackThreadTriage(ctx context.Context, request PatchFeedbackThreadTriageRequestObject) (PatchFeedbackThreadTriageResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -8197,6 +9126,32 @@ func (sh *strictHandler) GetFeedbackMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetFeedbackUnreadReplies operation middleware
+func (sh *strictHandler) GetFeedbackUnreadReplies(w http.ResponseWriter, r *http.Request, params GetFeedbackUnreadRepliesParams) {
+	var request GetFeedbackUnreadRepliesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFeedbackUnreadReplies(ctx, request.(GetFeedbackUnreadRepliesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFeedbackUnreadReplies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFeedbackUnreadRepliesResponseObject); ok {
+		if err := validResponse.VisitGetFeedbackUnreadRepliesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListFeedbackWorkspaceMemberships operation middleware
 func (sh *strictHandler) ListFeedbackWorkspaceMemberships(w http.ResponseWriter, r *http.Request, params ListFeedbackWorkspaceMembershipsParams) {
 	var request ListFeedbackWorkspaceMembershipsRequestObject
@@ -8344,6 +9299,60 @@ func (sh *strictHandler) PatchFeedbackMessage(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PatchFeedbackMessageResponseObject); ok {
 		if err := validResponse.VisitPatchFeedbackMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFeedbackMessageReaction operation middleware
+func (sh *strictHandler) DeleteFeedbackMessageReaction(w http.ResponseWriter, r *http.Request, messageID MessageID, reaction FeedbackReactionKey) {
+	var request DeleteFeedbackMessageReactionRequestObject
+
+	request.MessageID = messageID
+	request.Reaction = reaction
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFeedbackMessageReaction(ctx, request.(DeleteFeedbackMessageReactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFeedbackMessageReaction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFeedbackMessageReactionResponseObject); ok {
+		if err := validResponse.VisitDeleteFeedbackMessageReactionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutFeedbackMessageReaction operation middleware
+func (sh *strictHandler) PutFeedbackMessageReaction(w http.ResponseWriter, r *http.Request, messageID MessageID, reaction FeedbackReactionKey) {
+	var request PutFeedbackMessageReactionRequestObject
+
+	request.MessageID = messageID
+	request.Reaction = reaction
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutFeedbackMessageReaction(ctx, request.(PutFeedbackMessageReactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutFeedbackMessageReaction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutFeedbackMessageReactionResponseObject); ok {
+		if err := validResponse.VisitPutFeedbackMessageReactionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8987,6 +9996,39 @@ func (sh *strictHandler) CreateFeedbackMessage(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// PutFeedbackThreadReadState operation middleware
+func (sh *strictHandler) PutFeedbackThreadReadState(w http.ResponseWriter, r *http.Request, threadID ThreadID) {
+	var request PutFeedbackThreadReadStateRequestObject
+
+	request.ThreadID = threadID
+
+	var body PutFeedbackThreadReadStateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutFeedbackThreadReadState(ctx, request.(PutFeedbackThreadReadStateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutFeedbackThreadReadState")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutFeedbackThreadReadStateResponseObject); ok {
+		if err := validResponse.VisitPutFeedbackThreadReadStateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // PatchFeedbackThreadStatus operation middleware
 func (sh *strictHandler) PatchFeedbackThreadStatus(w http.ResponseWriter, r *http.Request, threadID ThreadID, params PatchFeedbackThreadStatusParams) {
 	var request PatchFeedbackThreadStatusRequestObject
@@ -9021,131 +10063,180 @@ func (sh *strictHandler) PatchFeedbackThreadStatus(w http.ResponseWriter, r *htt
 	}
 }
 
+// PatchFeedbackThreadTriage operation middleware
+func (sh *strictHandler) PatchFeedbackThreadTriage(w http.ResponseWriter, r *http.Request, threadID ThreadID, params PatchFeedbackThreadTriageParams) {
+	var request PatchFeedbackThreadTriageRequestObject
+
+	request.ThreadID = threadID
+	request.Params = params
+
+	var body PatchFeedbackThreadTriageApplicationMergePatchPlusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchFeedbackThreadTriage(ctx, request.(PatchFeedbackThreadTriageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchFeedbackThreadTriage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchFeedbackThreadTriageResponseObject); ok {
+		if err := validResponse.VisitPatchFeedbackThreadTriageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

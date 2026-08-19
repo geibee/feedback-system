@@ -8,6 +8,7 @@ Feedback Service v1 のみを利用する独立管理 SPA。導入先の業務AP
 VITE_FEEDBACK_API_BASE=http://localhost:8090/feedback/v1 \
 VITE_FEEDBACK_ADMIN_OIDC_AUTHORITY=http://localhost:8180/realms/feedback \
 VITE_FEEDBACK_ADMIN_OIDC_CLIENT_ID=feedback-admin \
+VITE_FEEDBACK_ADMIN_OIDC_SCOPE="openid profile email feedback.admin" \
 VITE_FEEDBACK_ADMIN_APPLICATION_KEY=inventory \
 VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY=local \
 VITE_FEEDBACK_ADMIN_WORKSPACE_KEY=east \
@@ -22,6 +23,8 @@ podman compose --env-file deploy/.env.example -f deploy/compose.yaml up --build
 ```
 
 管理画面は `http://localhost:5174` に起動する。`VITE_*` はブラウザへ配布されるため、secret を設定しない。
+Admin Consoleは既定で `feedback.admin` OAuth scopeを要求する。IdPはこのscopeをaccess tokenの
+`feedback_permissions: ["feedback.admin"]` claimへmappingする。DBのworkspace membershipにadminがなければadmin操作は許可されない。
 導入先のconsumerは `applicationKey`、`environmentKey`、`workspaceKey` query parameter を付けて
 対象 workspace を開ける。OIDC redirect 中はこの3値だけを sessionStorage に一時保存し、tokenやconsumerの
 任意 query は Admin Console へ転送しない。

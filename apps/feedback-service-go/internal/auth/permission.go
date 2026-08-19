@@ -75,6 +75,10 @@ func IntersectPermissions(databasePermissions, tokenPermissions []Permission) []
 }
 
 func (token TokenScope) Matches(scope ResourceScope, applicationOnly bool) bool {
+	// Direct OIDCはpermissionだけをscopeとし、resource座標はDB membershipで制限する。
+	if !token.HasResourceRestriction() {
+		return true
+	}
 	if token.TenantKey != scope.TenantKey || token.ApplicationKey != scope.ApplicationKey {
 		return false
 	}
@@ -85,7 +89,13 @@ func (token TokenScope) Matches(scope ResourceScope, applicationOnly bool) bool 
 		(scope.EnvironmentKey == "" || token.EnvironmentKey == scope.EnvironmentKey)
 }
 
-// RestrictMemberships は/meのmembershipをexchange token scopeとpermissionで狭める。
+// HasResourceRestriction はtoken exchangeが指定するresource座標の有無を返す。
+func (token TokenScope) HasResourceRestriction() bool {
+	return token.TenantKey != "" || token.ApplicationKey != "" ||
+		token.EnvironmentKey != "" || token.ExternalWorkspaceKey != ""
+}
+
+// RestrictMemberships は/meのmembershipをtoken permissionと、指定時はexchange resource scopeで狭める。
 func RestrictMemberships(principal Principal, memberships []Membership) []Membership {
 	if principal.TokenScope == nil {
 		return cloneMemberships(memberships)
@@ -93,7 +103,8 @@ func RestrictMemberships(principal Principal, memberships []Membership) []Member
 	token := principal.TokenScope
 	result := make([]Membership, 0, len(memberships))
 	for _, membership := range memberships {
-		if membership.ApplicationKey != token.ApplicationKey || membership.ExternalWorkspaceKey != token.ExternalWorkspaceKey {
+		if token.HasResourceRestriction() &&
+			(membership.ApplicationKey != token.ApplicationKey || membership.ExternalWorkspaceKey != token.ExternalWorkspaceKey) {
 			continue
 		}
 		permissions := IntersectPermissions(membership.Permissions, token.Permissions)

@@ -69,6 +69,39 @@ describe("FeedbackAdminConsole", () => {
     expect(deepLink.searchParams.get("feedbackThread")).toBe(thread.id);
   });
 
+  it("最初のコメントを主表示し、投稿順の切替とreaction更新を行う", async () => {
+    const firstMessage = {
+      id: "30000000-0000-4000-8000-000000000001", threadId: thread.id,
+      author: { principalId: "user-1", displayName: "投稿者" }, body: "最初の要望",
+      reactions: [], createdAt: "2026-08-09T00:00:00Z", version: 1
+    };
+    const latestMessage = {
+      ...firstMessage, id: "30000000-0000-4000-8000-000000000002", body: "最新の回答",
+      author: { principalId: "user-2", displayName: "回答者" }, createdAt: "2026-08-09T01:00:00Z"
+    };
+    const request = vi.fn(async (path: string, options?: { method?: string }) => {
+      if (path.startsWith(`/sessions/${session.id}/threads`)) {
+        return { value: { items: [{ ...thread, messages: [firstMessage, latestMessage] }] }, etag: null };
+      }
+      if (path === `/messages/${firstMessage.id}/reactions/thumbs_up` && options?.method === "PUT") {
+        return { value: { ...firstMessage, reactions: [{ reaction: "thumbs_up", count: 1, reactedByMe: true }] }, etag: null };
+      }
+      return createRequest()(path, options);
+    });
+    render(<FeedbackAdminConsole {...scope} transport={createTransport(request)} />);
+
+    expect(await screen.findByText("最初の要望")).toBeTruthy();
+    expect(screen.getByText("最新の回答")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "並べ替え" }), { target: { value: "created_asc" } });
+    await waitFor(() => expect(request.mock.calls.some(([path]) =>
+      path === `/sessions/${session.id}/threads?sort=created_asc`
+    )).toBe(true));
+    fireEvent.click(screen.getAllByRole("button", { name: "👍" })[0]);
+    await waitFor(() => expect(request.mock.calls.some(([path, options]) =>
+      path === `/messages/${firstMessage.id}/reactions/thumbs_up` && options?.method === "PUT"
+    )).toBe(true));
+  });
+
   it("新規レビューをJSON入力なしで設定できる", async () => {
     const baseRequest = createRequest();
     const request = vi.fn(async (path: string, options?: unknown) => {

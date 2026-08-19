@@ -6,6 +6,15 @@ Feedback Serviceは、Feedback audienceを持つBearer JWTの直接OIDC検証と
 完全検証する。direct検証失敗後にexchange検証へfallbackするfirst-success方式は採用しない。
 
 直接OIDCは `FEEDBACK_OIDC_ISSUER` と `FEEDBACK_OIDC_AUDIENCE` を設定した場合だけ有効になる。
+直接OIDCのaccess tokenは、検証対象のissuer、audience、時刻、設定済みsubject claimに加え、
+`feedback_permissions`を1件以上の文字列配列で必須とする。語彙は `feedback.read`、`feedback.comment`、
+`feedback.manage`、`feedback.admin`だけである。claimがない、空、文字列配列でない、未知の値を含むtokenは
+401で拒否する。直接OIDCのpermissionはresource座標を制限せず、各resourceのDB membershipと常に交差する。
+
+OAuth scope名とaccess token claimは別物である。IdPにFeedback用OAuth scopeを登録し、例えばAdmin Consoleが要求する
+`feedback.admin`を `feedback_permissions: ["feedback.admin"]` へmappingする。scopeを要求しただけでclaimが発行されない
+IdP設定では認証できない。Admin Consoleの要求値はtoken上限であり、DB membershipにない権限は許可しない。
+
 異なる認証基盤ではホストbackendが自身のHttpOnly sessionを検証し、mTLSでreference brokerの
 `POST /v1/exchanges` を呼ぶ。Service側は `FEEDBACK_TOKEN_EXCHANGE_*` だけでも起動できる。
 ブラウザ由来のuser/role headerをactorとして信用しない。
@@ -18,4 +27,5 @@ exchange-only配備では、brokerの停止またはJWKS取得失敗時に直接
 exchange issuerのtokenは拒否する。認証境界をどちらも設定しない構成、片方の必須変数だけを欠く部分設定、両境界で
 同一issuerを使う構成は起動時にfail-closedで拒否する。
 
-契約は `contracts/feedback/token-exchange.openapi.yaml` と `schemas/token-exchange-jwt.schema.json` を正本とする。
+直接OIDCのBearer JWT契約は `contracts/feedback/openapi.yaml` の `bearerAuth`、token exchange契約は
+`contracts/feedback/token-exchange.openapi.yaml` と `schemas/token-exchange-jwt.schema.json` を正本とする。

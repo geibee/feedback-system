@@ -17,6 +17,7 @@ import (
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/discussion"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/notification"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func (d *Database) GetNotificationSettings(
@@ -43,6 +44,7 @@ func (d *Database) PatchNotificationSettings(
 	scope auth.ResourceScope,
 	expectedVersion int,
 	update notification.SettingsUpdate,
+	audit usecase.AuditEvent,
 ) (notification.StoredSettings, error) {
 	var result notification.StoredSettings
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
@@ -81,7 +83,7 @@ WHERE workspace_id = $6::uuid AND version = $7 RETURNING version`,
 			EndpointNonce: append([]byte(nil), update.EndpointNonce...), IncludeBody: update.IncludeBody,
 			IncludeEvidence: update.IncludeEvidence, Version: version,
 		}
-		return nil
+		return insertAudit(txCtx, tx, audit)
 	})
 	return result, err
 }
@@ -232,6 +234,7 @@ func (d *Database) RetryNotificationDelivery(
 	ctx context.Context,
 	scope auth.ResourceScope,
 	id string,
+	audit usecase.AuditEvent,
 ) (notification.Delivery, error) {
 	var result notification.Delivery
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
@@ -249,7 +252,10 @@ WHERE id = $1::uuid AND status = 'failed' AND connector_id IN (
 		}
 		if tag.RowsAffected() == 1 {
 			result, err = readConnectorDelivery(ctx, tx, scope.WorkspaceID, id)
-			return err
+			if err != nil {
+				return err
+			}
+			return insertAudit(txCtx, tx, audit)
 		}
 
 		tag, err = tx.Exec(txCtx, `UPDATE feedback.notification_outbox SET
@@ -293,7 +299,10 @@ RETURNING id::text`, id, scope.WorkspaceID).Scan(&queueID)
 			return fmt.Errorf("connector delivery queueを再作成できません: %w", err)
 		}
 		result, err = readConnectorDelivery(txCtx, tx, scope.WorkspaceID, queueID)
-		return err
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, audit)
 	})
 	return result, err
 }

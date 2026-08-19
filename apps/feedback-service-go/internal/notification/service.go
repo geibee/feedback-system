@@ -10,6 +10,7 @@ import (
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 type Service struct {
@@ -38,6 +39,7 @@ func (s *Service) PatchSettings(
 	scope auth.ResourceScope,
 	expectedVersion int,
 	settings Settings,
+	audit usecase.AuditEvent,
 ) (SettingsView, error) {
 	if expectedVersion < 1 {
 		return SettingsView{}, domainError(ErrorBadRequest, "request.invalid", "versionが不正です")
@@ -56,7 +58,7 @@ func (s *Service) PatchSettings(
 	stored, err := s.store.PatchNotificationSettings(ctx, scope, expectedVersion, SettingsUpdate{
 		WebhookEnabled: settings.WebhookEnabled, EndpointCiphertext: ciphertext, EndpointNonce: nonce,
 		IncludeBody: settings.IncludeBody, IncludeEvidence: settings.IncludeEvidence,
-	})
+	}, audit)
 	if err != nil {
 		return SettingsView{}, err
 	}
@@ -80,11 +82,13 @@ func (s *Service) ListDeliveries(ctx context.Context, input ListInput) ([]Delive
 	return s.store.ListNotificationDeliveries(ctx, input)
 }
 
-func (s *Service) Retry(ctx context.Context, scope auth.ResourceScope, id string) (Delivery, error) {
+func (s *Service) Retry(
+	ctx context.Context, scope auth.ResourceScope, id string, audit usecase.AuditEvent,
+) (Delivery, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return Delivery{}, domainError(ErrorBadRequest, "request.invalid", "delivery IDが不正です")
 	}
-	return s.store.RetryNotificationDelivery(ctx, scope, id)
+	return s.store.RetryNotificationDelivery(ctx, scope, id, audit)
 }
 
 func (s *Service) decodeSettings(stored StoredSettings) (SettingsView, error) {

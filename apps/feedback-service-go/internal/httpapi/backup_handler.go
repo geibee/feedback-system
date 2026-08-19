@@ -79,12 +79,6 @@ func (handler *APIHandler) PatchFeedbackBackupPolicy(
 		WriteError(writer, request, mapBackupError(err))
 		return
 	}
-	if err := handler.recordMutation(
-		request, result.Scope, principal.Subject, "backup-policy.patch", "backup-policy", result.Scope.WorkspaceID,
-	); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.Version))
 	respondJSONOrError(writer, request, http.StatusOK, result.View, nil)
 }
@@ -201,10 +195,6 @@ func (handler *APIHandler) RetryFeedbackBackup(
 	}, id)
 	if err != nil {
 		WriteError(writer, request, mapBackupError(err))
-		return
-	}
-	if err := handler.recordMutation(request, result.Scope, principal.Subject, "backup.retry", "backup", id); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	respondJSONOrError(writer, request, http.StatusOK, result.Value, nil)

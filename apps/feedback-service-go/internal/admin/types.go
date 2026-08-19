@@ -57,8 +57,8 @@ type Store interface {
 	ResolveAdminWorkspaceScope(context.Context, string, string, string) (auth.ResourceScope, error)
 	ListWorkspaceMembers(context.Context, auth.ResourceScope) ([]Member, error)
 	CreateWorkspaceMember(context.Context, auth.ResourceScope, auth.Principal, CreateCommand) (StoreMutation, error)
-	PatchWorkspaceMember(context.Context, auth.ResourceScope, string, int, MembershipPatch) (StoreMutation, error)
-	DeleteWorkspaceMember(context.Context, auth.ResourceScope, string, int) (Member, error)
+	PatchWorkspaceMember(context.Context, auth.ResourceScope, auth.Principal, string, string, int, MembershipPatch) (StoreMutation, error)
+	DeleteWorkspaceMember(context.Context, auth.ResourceScope, auth.Principal, string, string, int) (Member, error)
 	RecordAudit(context.Context, usecase.AuditEvent) error
 }
 

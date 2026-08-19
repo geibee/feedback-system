@@ -17,6 +17,7 @@ import (
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/notification"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/postgres"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func TestNotificationConnectorLeaseAndRetryWithPostgreSQL(t *testing.T) {
@@ -114,7 +115,7 @@ VALUES ($1::uuid,$2::uuid,$3::uuid,'feedback.message.created.v1',$4::jsonb)`, ou
 	scope := auth.ResourceScope{TenantID: tenantID, WorkspaceID: workspaceID}
 	createdConnector, err := connectorService.Create(ctx, scope, connector.CreateRequest{
 		ConnectorType: installationKey, Name: "W3 Webhook", DestinationRef: "review-a", Enabled: true,
-	})
+	}, usecase.AuditEvent{Scope: &scope, Action: "connector.create", Outcome: "succeeded", RequestID: "test-request"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +184,9 @@ SET claimed_at = now() - interval '3 minutes' WHERE id = $1::uuid`, first.ID)
 	if err != nil || len(deliveries) != 1 || deliveries[0].AttemptCount != 3 || len(deliveries[0].Attempts) != 2 {
 		t.Fatalf("deliveries=%+v err=%v", deliveries, err)
 	}
-	retried, err := notificationService.Retry(ctx, scope, first.ID)
+	retried, err := notificationService.Retry(ctx, scope, first.ID, usecase.AuditEvent{
+		Scope: &scope, Action: "notification.retry", Outcome: "succeeded", RequestID: "test-request",
+	})
 	if err != nil || retried.Status != "pending" || retried.RetryCycle != 1 || retried.AttemptCount != 0 {
 		t.Fatalf("retry=%+v err=%v", retried, err)
 	}

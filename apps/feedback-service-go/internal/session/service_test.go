@@ -225,7 +225,9 @@ func (store *fakeStore) CreateSession(
 	return store.created, nil
 }
 
-func (store *fakeStore) PatchSession(context.Context, string, Patch) (Session, error) {
+func (store *fakeStore) PatchSession(
+	context.Context, auth.ResourceScope, auth.Principal, string, string, Patch,
+) (Session, error) {
 	return store.patched, nil
 }
 

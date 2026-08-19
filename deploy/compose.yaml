@@ -263,7 +263,7 @@ services:
       FEEDBACK_MANIFEST_TOKEN_URL: http://oidc:8080/realms/feedback/protocol/openid-connect/token
       FEEDBACK_MANIFEST_CLIENT_ID: feedback-manifest-sync
       FEEDBACK_MANIFEST_CLIENT_SECRET: ${FEEDBACK_MANIFEST_CLIENT_SECRET:?deploy/.envを作成してください}
-      FEEDBACK_MANIFEST_SCOPE: openid
+      FEEDBACK_MANIFEST_SCOPE: feedback.admin
     volumes:
       - ../apps/feedback-conformance-consumer/feedback-manifest.json:/config/application-manifest.json:ro,z
     depends_on:
@@ -364,7 +364,7 @@ services:
         VITE_FEEDBACK_ADMIN_OIDC_AUTHORITY: http://localhost:8180/realms/feedback
         VITE_FEEDBACK_ADMIN_OIDC_CLIENT_ID: feedback-admin
         VITE_FEEDBACK_ADMIN_OIDC_REDIRECT_URI: http://localhost:5174/
-        VITE_FEEDBACK_ADMIN_OIDC_SCOPE: ${VITE_FEEDBACK_ADMIN_OIDC_SCOPE:-openid profile email}
+        VITE_FEEDBACK_ADMIN_OIDC_SCOPE: ${VITE_FEEDBACK_ADMIN_OIDC_SCOPE:-openid profile email feedback.admin}
         FEEDBACK_ADMIN_APPLICATION: inventory
         FEEDBACK_ADMIN_ENVIRONMENT: local
         FEEDBACK_ADMIN_WORKSPACE: east

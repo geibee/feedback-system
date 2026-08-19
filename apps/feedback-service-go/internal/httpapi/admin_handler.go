@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/admin"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/contract"
-	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 const maximumAdminRequestBytes = 4 * 1024 * 1024
@@ -84,10 +82,6 @@ func (handler *APIHandler) CreateFeedbackWorkspaceMembership(
 		WriteError(writer, request, errors.New("membership create responseがありません"))
 		return
 	}
-	if err := handler.recordAdminMutation(request, principal, "membership.create", result); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.After.Version))
 	respondJSONOrError(writer, request, http.StatusCreated, result.After, nil)
 }
@@ -135,10 +129,6 @@ func (handler *APIHandler) PatchFeedbackWorkspaceMembership(
 		WriteError(writer, request, errors.New("membership patch responseがありません"))
 		return
 	}
-	if err := handler.recordAdminMutation(request, principal, "membership.patch", result); err != nil {
-		WriteError(writer, request, err)
-		return
-	}
 	writer.Header().Set("ETag", formatETag(result.After.Version))
 	respondJSONOrError(writer, request, http.StatusOK, result.After, nil)
 }
@@ -163,16 +153,12 @@ func (handler *APIHandler) DeleteFeedbackWorkspaceMembership(
 		ExternalWorkspaceKey: string(params.ExternalWorkspaceKey),
 		RequestID:            RequestIDFromContext(request.Context()),
 	}
-	result, err := handler.administration.DeleteMembership(
+	_, err = handler.administration.DeleteMembership(
 		request.Context(), principal, workspace, userID.String(),
 		func() (int, error) { return ParseRequiredETag(string(params.IfMatch)) },
 	)
 	if err != nil {
 		WriteError(writer, request, mapAdminError(err))
-		return
-	}
-	if err := handler.recordAdminMutation(request, principal, "membership.delete", result); err != nil {
-		WriteError(writer, request, err)
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)
@@ -218,38 +204,6 @@ func decodeMembershipPatch(body []byte) (admin.MembershipPatch, error) {
 		return admin.MembershipPatch{}, invalid("request.invalid", "request bodyが不正です: %v", err)
 	}
 	return admin.MembershipPatch{Permissions: wire.Permissions}, nil
-}
-
-func (handler *APIHandler) recordAdminMutation(
-	request *http.Request,
-	principal auth.Principal,
-	action string,
-	result admin.MutationResult,
-) error {
-	if handler.auditor == nil {
-		return errors.New("mutation auditorが未設定です")
-	}
-	changes, err := json.Marshal(struct {
-		Before *admin.Member `json:"before"`
-		After  *admin.Member `json:"after"`
-	}{Before: result.Before, After: result.After})
-	if err != nil {
-		return fmt.Errorf("membership監査差分を生成できません: %w", err)
-	}
-	resourceID := ""
-	if result.After != nil {
-		resourceID = result.After.UserID
-	} else if result.Before != nil {
-		resourceID = result.Before.UserID
-	}
-	if err := handler.auditor.RecordAudit(request.Context(), usecase.AuditEvent{
-		Scope: &result.Scope, PrincipalID: principal.Subject, Action: action,
-		ResourceType: "membership", ResourceID: resourceID, Outcome: "succeeded",
-		RequestID: RequestIDFromContext(request.Context()), Changes: changes,
-	}); err != nil {
-		return fmt.Errorf("成功監査を記録できません: %w", err)
-	}
-	return nil
 }
 
 func mapAdminError(err error) error {

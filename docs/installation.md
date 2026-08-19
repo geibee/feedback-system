@@ -20,8 +20,9 @@ feedback-bootstrap --input /run/config/feedback-installation.json
 `entries`はworkspace membership単位である。同じtenant、application、environment、workspaceを複数entryへ記述してよい。
 全entryを検証してから1つのDB transactionで冪等upsertするため、途中失敗で一部だけ反映されない。manifestにないresourceや
 membershipは削除しない。削除は意図しない権限喪失を防ぐためAdmin APIで明示的に行う。
-同じapplication内の同一主体はapplication membershipも共有するため、複数workspaceへ記述する場合も同じ`permissions`を
-指定する。不一致はentry順による権限変化を避けるため反映前に拒否する。
+workspace membershipを権限の正本とし、application membershipは同じapplication内で主体に付与された全workspaceの
+`permissions`の和集合としてtransaction内で再計算する。複数workspaceでは用途に応じて異なる`permissions`を指定できる。
+Admin APIによるworkspace membershipの作成・更新・削除でも同じ集約規則を適用する。
 
 初回アクセス前の主体も`issuer`と`subject`で作成できるので、「一度アクセスして拒否された後でmembershipを追加する」手順は
 不要である。secretはmanifestへ記述せず、DB credentialは従来どおり環境変数またはsecret mountで渡す。

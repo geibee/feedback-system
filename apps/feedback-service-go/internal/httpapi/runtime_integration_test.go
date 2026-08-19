@@ -139,11 +139,16 @@ func TestRuntimeHTTPFoundationAgainstPostgreSQL(t *testing.T) {
 	server := httptest.NewServer(httpapi.RequestIDMiddleware(nil)(httpapi.AuthenticationMiddleware(authenticator)(mux)))
 	defer server.Close()
 
-	validToken := keys.sign(t, issuer, "feedback-service", subject, map[string]any{"name": displayName})
+	validToken := keys.sign(t, issuer, "feedback-service", subject, map[string]any{
+		"name":                 displayName,
+		"feedback_permissions": []string{"feedback.admin"},
+	})
 	assertHTTPStatus(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/capabilities", "", nil, http.StatusOK, "")
 	assertHTTPStatus(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/me", "", nil, http.StatusUnauthorized, "http-"+runID+"-missing")
 	wrongAudience := keys.sign(t, issuer, "another-service", subject, nil)
 	assertHTTPStatus(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/me", wrongAudience, nil, http.StatusUnauthorized, "http-"+runID+"-audience")
+	missingPermissions := keys.sign(t, issuer, "feedback-service", subject, nil)
+	assertHTTPStatus(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/me", missingPermissions, nil, http.StatusUnauthorized, "http-"+runID+"-permission-claim")
 
 	me := assertHTTPStatus(t, server.Client(), http.MethodGet, server.URL+"/feedback/v1/me", validToken, nil, http.StatusOK, "http-"+runID+"-me")
 	var meValue usecase.Me

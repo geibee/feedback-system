@@ -52,7 +52,9 @@ func runExportWorker() error {
 	if err != nil {
 		return err
 	}
-	exportWorker, err := exportdomain.NewWorker(database, exportStorage, settings.Export.Storage.KeyPrefix)
+	exportWorker, err := exportdomain.NewWorker(
+		database, exportStorage, settings.Export.Storage.KeyPrefix, evidenceStorage,
+	)
 	if err != nil {
 		return err
 	}

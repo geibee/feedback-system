@@ -70,7 +70,11 @@ func (service *Service) PatchPolicy(
 	if err := ValidatePolicy(policy); err != nil {
 		return PolicyResult{}, err
 	}
-	policy, version, err := service.store.PatchRetentionPolicy(ctx, scope, expectedVersion, policy)
+	policy, version, err := service.store.PatchRetentionPolicy(ctx, scope, expectedVersion, policy, usecase.AuditEvent{
+		Scope: &scope, PrincipalID: principal.Subject, Action: "retention.patch",
+		ResourceType: "retention-policy", ResourceID: scope.WorkspaceID,
+		Outcome: "succeeded", RequestID: input.RequestID,
+	})
 	return PolicyResult{Policy: policy, Version: version, Scope: scope}, err
 }
 

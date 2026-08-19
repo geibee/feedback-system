@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	FormatCSV  = "csv"
-	FormatXLSX = "xlsx"
+	FormatCSV             = "csv"
+	FormatXLSX            = "xlsx"
+	FormatEvidencePackage = "evidence-package"
 )
 
 var (
@@ -41,6 +42,7 @@ type CreateCommand struct {
 	Request        Request
 	IdempotencyKey string
 	RequestHash    string
+	RequestID      string
 }
 
 type Job struct {
@@ -86,8 +88,32 @@ type Claimed struct {
 }
 
 type Prepared struct {
-	Rows          []Row
-	RetentionDays int
+	Rows            []Row
+	RetentionDays   int
+	EvidencePackage *EvidencePackage
+}
+
+type CSVEntry struct {
+	Path   string
+	Header []string
+	Rows   [][]*string
+}
+
+type EvidenceEntry struct {
+	ArchivePath    string
+	ObjectKey      string
+	ExpectedSHA256 string
+}
+
+type EvidencePackage struct {
+	ExportID             string
+	TenantKey            string
+	ApplicationKey       string
+	EnvironmentKey       string
+	ExternalWorkspaceKey string
+	SessionID            *string
+	CSVEntries           []CSVEntry
+	EvidenceEntries      []EvidenceEntry
 }
 
 type StoredMetadata struct {

@@ -66,6 +66,8 @@ func NewStore(ctx context.Context, settings serviceconfig.StorageSettings) (Stor
 		return NewLocal(settings.LocalDirectory)
 	case serviceconfig.StorageModeS3:
 		return NewS3(ctx, settings)
+	case serviceconfig.StorageModeAzureBlob:
+		return NewAzureBlob(settings)
 	default:
 		return nil, fmt.Errorf("未対応のobject storage modeです: %s", settings.Mode)
 	}

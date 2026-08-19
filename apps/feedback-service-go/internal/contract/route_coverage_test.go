@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const frozenOperationCount = 42
+const frozenOperationCount = 47
 
 var pathParameterPattern = regexp.MustCompile(`\{[^}/]+\}`)
 

@@ -82,6 +82,7 @@ func (service *Service) Create(
 		return MutationResult{}, err
 	}
 	command.Request = request
+	command.RequestID = requestID
 	job, err := service.store.CreateExport(ctx, scope, principal, command)
 	if err != nil {
 		return MutationResult{}, err
@@ -131,11 +132,15 @@ func (service *Service) Download(
 		}
 	}
 	contentType := "text/csv; charset=utf-8"
+	extension := metadata.Format
 	if metadata.Format == FormatXLSX {
 		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	} else if metadata.Format == FormatEvidencePackage {
+		contentType = "application/zip"
+		extension = "zip"
 	}
 	return Stored{
-		FileName:    "feedback-" + canonicalID + "." + metadata.Format,
+		FileName:    "feedback-" + canonicalID + "." + extension,
 		ContentType: contentType, Size: object.Size, Body: object.Body,
 	}, scope, nil
 }

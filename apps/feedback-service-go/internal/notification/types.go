@@ -7,6 +7,7 @@ import (
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/connector"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 type Settings struct {
@@ -71,9 +72,9 @@ type ListInput struct {
 
 type AdminStore interface {
 	GetNotificationSettings(context.Context, auth.ResourceScope) (StoredSettings, error)
-	PatchNotificationSettings(context.Context, auth.ResourceScope, int, SettingsUpdate) (StoredSettings, error)
+	PatchNotificationSettings(context.Context, auth.ResourceScope, int, SettingsUpdate, usecase.AuditEvent) (StoredSettings, error)
 	ListNotificationDeliveries(context.Context, ListInput) ([]Delivery, error)
-	RetryNotificationDelivery(context.Context, auth.ResourceScope, string) (Delivery, error)
+	RetryNotificationDelivery(context.Context, auth.ResourceScope, string, usecase.AuditEvent) (Delivery, error)
 }
 
 type WorkerStore interface {

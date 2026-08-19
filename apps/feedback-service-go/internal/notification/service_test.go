@@ -11,6 +11,7 @@ import (
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/auth"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/connector"
 	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/cryptoutil"
+	"github.com/geibee/feedback-system/apps/feedback-service-go/internal/usecase"
 )
 
 func TestServiceSettingsEncryptionAndRotation(t *testing.T) {
@@ -42,7 +43,7 @@ func TestServiceSettingsEncryptionAndRotation(t *testing.T) {
 	endpoint := "https://new.example/hook"
 	view, err = service.PatchSettings(context.Background(), auth.ResourceScope{WorkspaceID: "workspace"}, 3, Settings{
 		WebhookEnabled: true, WebhookEndpoint: &endpoint, IncludeBody: true,
-	})
+	}, usecase.AuditEvent{})
 	if err != nil || bytes.Contains(store.update.EndpointCiphertext, []byte(endpoint)) {
 		t.Fatalf("view=%+v update=%+v err=%v", view, store.update, err)
 	}
@@ -64,7 +65,7 @@ func TestServiceValidation(t *testing.T) {
 		{WebhookEndpoint: stringPointer("http://127.0.0.1/hook")},
 		{WebhookEndpoint: stringPointer("https://user@example.test/hook#fragment")},
 	} {
-		if _, err := service.PatchSettings(context.Background(), auth.ResourceScope{}, 1, settings); err == nil {
+		if _, err := service.PatchSettings(context.Background(), auth.ResourceScope{}, 1, settings, usecase.AuditEvent{}); err == nil {
 			t.Fatalf("invalid settings accepted: %+v", settings)
 		}
 	}
@@ -140,7 +141,9 @@ func (s *adminFake) GetNotificationSettings(context.Context, auth.ResourceScope)
 	return s.stored, nil
 }
 
-func (s *adminFake) PatchNotificationSettings(_ context.Context, _ auth.ResourceScope, _ int, update SettingsUpdate) (StoredSettings, error) {
+func (s *adminFake) PatchNotificationSettings(
+	_ context.Context, _ auth.ResourceScope, _ int, update SettingsUpdate, _ usecase.AuditEvent,
+) (StoredSettings, error) {
 	s.update = update
 	s.stored = StoredSettings{
 		WebhookEnabled: update.WebhookEnabled, EndpointCiphertext: update.EndpointCiphertext,
@@ -154,7 +157,9 @@ func (s *adminFake) ListNotificationDeliveries(context.Context, ListInput) ([]De
 	return []Delivery{}, nil
 }
 
-func (s *adminFake) RetryNotificationDelivery(context.Context, auth.ResourceScope, string) (Delivery, error) {
+func (s *adminFake) RetryNotificationDelivery(
+	context.Context, auth.ResourceScope, string, usecase.AuditEvent,
+) (Delivery, error) {
 	return Delivery{}, nil
 }
 

@@ -27,9 +27,20 @@
 .feedback-admin-session-list button.selected { border-color: #2563eb; background: #eff6ff; }
 .feedback-admin-session-list span { color: #526175; font-size: .8rem; }
 .feedback-admin-card-wide { min-width: 0; }
-.feedback-admin-thread-filters { display: grid; grid-template-columns: repeat(3, minmax(8rem, 1fr)) minmax(12rem, 2fr); gap: .65rem; padding-block: .5rem 1rem; }
+.feedback-admin-thread-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; padding-block: .5rem 1rem; }
 .feedback-admin-thread-filters label { margin: 0; }
 .feedback-admin-thread { border-top: 1px solid #e2e8f0; padding-block: .75rem; }
+.feedback-admin-thread-message { margin-block: .65rem; border-radius: .55rem; padding: .8rem .9rem; background: #f8fafc; }
+.feedback-admin-thread-message.is-initial { border-left: .3rem solid #2563eb; background: #eff6ff; }
+.feedback-admin-thread-message.is-latest { border-left: .3rem solid #94a3b8; }
+.feedback-admin-thread-message p { margin-block: .35rem; white-space: pre-wrap; }
+.feedback-admin-thread-message small { color: #64748b; }
+.feedback-admin-reactions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem; }
+.feedback-admin-reactions button { min-width: 2.6rem; padding: .35rem .55rem; }
+.feedback-admin-reactions button.selected { border-color: #2563eb; background: #dbeafe; color: #1d4ed8; }
+.feedback-admin-triage { display: grid; grid-template-columns: repeat(3, minmax(9rem, 1fr)) auto; gap: .65rem; align-items: end; margin-block: .8rem; border: 1px solid #e2e8f0; border-radius: .55rem; padding: .75rem; }
+.feedback-admin-triage label { margin: 0; }
+.feedback-admin-triage > button { margin-bottom: 0; }
 .feedback-admin-notice { margin: 0; border: 1px solid #86efac; border-radius: .4rem; padding: .65rem .8rem; background: #f0fdf4; color: #166534; }
 .feedback-admin-session-summary { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
 .feedback-admin-session-summary h2, .feedback-admin-session-summary p { margin-block: .25rem; }
@@ -115,5 +126,5 @@
 .feedback-admin code { display: block; overflow-wrap: anywhere; margin-block: .35rem; }
 .feedback-admin table { width: 100%; border-collapse: collapse; }
 .feedback-admin th, .feedback-admin td { border: 1px solid var(--feedback-admin-border, #cbd5e1); padding: .35rem; text-align: start; }
-@media (max-width: 980px) { .feedback-admin-session-form { grid-template-columns: 1fr 1fr; } .feedback-admin-perspective-row { grid-template-columns: minmax(12rem, 1fr) minmax(9rem, .7fr); } .feedback-admin-perspective-row > label:last-child { grid-column: 1 / -1; } }
-@media (max-width: 760px) { .feedback-admin-review-layout { grid-template-columns: 1fr; } .feedback-admin-session-sidebar { position: static; } .feedback-admin-thread-filters { grid-template-columns: 1fr 1fr; } .feedback-admin-inline-form, .feedback-admin-session-form, .feedback-admin-perspective-row { grid-template-columns: 1fr; } .feedback-admin-session-form .wide, .feedback-admin-perspective-row > label:last-child { grid-column: auto; } .feedback-admin-summary { grid-template-columns: 1fr 1fr; } .feedback-admin-card-heading { display: grid; } .feedback-admin-manifest-routes li { grid-template-columns: 1fr; gap: .35rem; } .feedback-admin-manifest-routes li code { text-align: start; } .feedback-admin-dialog-backdrop { padding: .35rem; } .feedback-admin-dialog { width: calc(100vw - .7rem); max-height: calc(100vh - .7rem); border-radius: .65rem; } .feedback-admin-dialog > header, .feedback-admin-session-form { padding-inline: 1rem; } .feedback-admin-session-form footer { margin-inline: -1rem; padding-inline: 1rem; } .feedback-admin-selection-actions { align-items: stretch; flex-wrap: wrap; } .feedback-admin-selection-actions span { flex-basis: 100%; } }
+@media (max-width: 980px) { .feedback-admin-session-form { grid-template-columns: 1fr 1fr; } .feedback-admin-perspective-row { grid-template-columns: minmax(12rem, 1fr) minmax(9rem, .7fr); } .feedback-admin-perspective-row > label:last-child { grid-column: 1 / -1; } .feedback-admin-triage { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .feedback-admin-review-layout { grid-template-columns: 1fr; } .feedback-admin-session-sidebar { position: static; } .feedback-admin-thread-filters, .feedback-admin-triage { grid-template-columns: 1fr; } .feedback-admin-inline-form, .feedback-admin-session-form, .feedback-admin-perspective-row { grid-template-columns: 1fr; } .feedback-admin-session-form .wide, .feedback-admin-perspective-row > label:last-child { grid-column: auto; } .feedback-admin-summary { grid-template-columns: 1fr 1fr; } .feedback-admin-card-heading { display: grid; } .feedback-admin-manifest-routes li { grid-template-columns: 1fr; gap: .35rem; } .feedback-admin-manifest-routes li code { text-align: start; } .feedback-admin-dialog-backdrop { padding: .35rem; } .feedback-admin-dialog { width: calc(100vw - .7rem); max-height: calc(100vh - .7rem); border-radius: .65rem; } .feedback-admin-dialog > header, .feedback-admin-session-form { padding-inline: 1rem; } .feedback-admin-session-form footer { margin-inline: -1rem; padding-inline: 1rem; } .feedback-admin-selection-actions { align-items: stretch; flex-wrap: wrap; } .feedback-admin-selection-actions span { flex-basis: 100%; } }

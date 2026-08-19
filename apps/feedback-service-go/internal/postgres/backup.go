@@ -96,6 +96,7 @@ ORDER BY completed_at DESC LIMIT 1`, scope.WorkspaceID).Scan(&lastAt, &changeCur
 
 func (d *Database) PatchBackupPolicy(
 	ctx context.Context, scope auth.ResourceScope, expectedVersion int, value backupdomain.Policy,
+	audit usecase.AuditEvent,
 ) (backupdomain.Policy, int, error) {
 	if err := backupdomain.ValidatePolicy(value); err != nil {
 		return backupdomain.Policy{}, 0, err
@@ -116,7 +117,10 @@ WHERE workspace_id = $7::uuid AND version = $8 RETURNING version`,
 		if errors.Is(err, pgx.ErrNoRows) {
 			return versionMismatchError()
 		}
-		return err
+		if err != nil {
+			return fmt.Errorf("backup policyを更新できません: %w", err)
+		}
+		return insertAudit(txCtx, tx, audit)
 	})
 	return value, version, err
 }
@@ -710,7 +714,7 @@ WHERE id = $1::uuid AND status = 'completed' AND object_key IS NOT NULL
 }
 
 func (d *Database) RetryBackup(
-	ctx context.Context, scope auth.ResourceScope, id string,
+	ctx context.Context, scope auth.ResourceScope, id string, audit usecase.AuditEvent,
 ) (backupdomain.Run, error) {
 	var result backupdomain.Run
 	err := d.InTransaction(ctx, func(txCtx context.Context, tx Tx) error {
@@ -736,7 +740,10 @@ WHERE id = $1::uuid AND workspace_id = $2::uuid AND status = 'failed'`, id, scop
 		}
 		result, err = scanBackupRun(tx.QueryRow(txCtx, `SELECT `+backupRunColumns+`
 FROM feedback.backup_runs WHERE id = $1::uuid`, id))
-		return err
+		if err != nil {
+			return err
+		}
+		return insertAudit(txCtx, tx, audit)
 	})
 	return result, err
 }

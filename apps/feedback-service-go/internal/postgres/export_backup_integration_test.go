@@ -152,7 +152,8 @@ VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'feedback.thread.created.v1', 't
 	enabled.Enabled = true
 	retention := 30
 	enabled.RetentionDays = &retention
-	if _, version, err = database.PatchBackupPolicy(ctx, resolved, version, enabled); err != nil || version != 2 {
+	audit := usecase.AuditEvent{Scope: &resolved, Action: "backup-policy.patch", Outcome: "succeeded", RequestID: "test-request"}
+	if _, version, err = database.PatchBackupPolicy(ctx, resolved, version, enabled, audit); err != nil || version != 2 {
 		t.Fatalf("patch policy version=%d err=%v", version, err)
 	}
 

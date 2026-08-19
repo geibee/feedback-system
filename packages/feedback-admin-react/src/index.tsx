@@ -36,9 +36,11 @@ type EvidencePreview = {
   error: string | null;
 };
 
+type ExportFormat = "csv" | "xlsx" | "evidence-package";
+
 type ActiveExport = {
   job: ExportJob;
-  format: "csv" | "xlsx";
+  format: ExportFormat;
   pollingError: string | null;
   pollingFailureCount: number;
   downloadError: string | null;
@@ -164,9 +166,14 @@ function SessionAdministration({
   const [selectedId, setSelectedId] = useState("");
   const [sessionSearch, setSessionSearch] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [threadSort, setThreadSort] = useState<"updated_desc" | "created_desc" | "created_asc">("updated_desc");
   const [threadStatus, setThreadStatus] = useState<"" | "open" | "resolved">("");
   const [threadPerspective, setThreadPerspective] = useState("");
   const [threadEvidence, setThreadEvidence] = useState<"" | "with" | "without">("");
+  const [threadAssignee, setThreadAssignee] = useState("");
+  const [threadPriority, setThreadPriority] = useState("");
+  const [threadLabel, setThreadLabel] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
   const [title, setTitle] = useState("");
   const [manifestVersion, setManifestVersion] = useState("1");
@@ -200,11 +207,11 @@ function SessionAdministration({
   }, [releaseEvidenceUrl]);
   const refresh = useCallback(async () => {
     try {
-      const page = await transport.request<Schemas["FeedbackSessionPage"]>(`/sessions?${scopeQuery}`);
-      setSessions(page.value.items);
-      setSelectedId((current) => page.value.items.some((item) => item.id === current)
+		const items = await requestAllPages<Session>(transport, `/sessions?${scopeQuery}`);
+		setSessions(items);
+		setSelectedId((current) => items.some((item) => item.id === current)
         ? current
-        : page.value.items.find((item) => item.status === "open")?.id ?? page.value.items[0]?.id ?? "");
+			: items.find((item) => item.status === "open")?.id ?? items[0]?.id ?? "");
       onError(null);
     } catch (caught) { onError(messageOf(caught)); }
     finally { setLoading(false); }
@@ -222,15 +229,20 @@ function SessionAdministration({
       (caught) => onError(messageOf(caught))
     );
   }, [applicationKey, onError, transport]);
-  useEffect(() => {
+	useEffect(() => {
+		void transport.request<Member[]>(`/memberships?${scopeQuery}`).then(
+			(resource) => setMembers(resource.value),
+			(caught) => onError(messageOf(caught))
+		);
+	}, [onError, scopeQuery, transport]);
+	const refreshThreads = useCallback(async () => {
     if (!selectedId) { setThreads([]); return; }
-    let active = true;
-    void transport.request<Schemas["FeedbackThreadPage"]>(`/sessions/${selectedId}/threads`).then(
-      (page) => { if (active) setThreads(page.value.items); },
-      (caught) => { if (active) onError(messageOf(caught)); }
-    );
-    return () => { active = false; };
-  }, [onError, selectedId, transport]);
+		try {
+			const sortQuery = threadSort === "updated_desc" ? "" : `?sort=${threadSort}`;
+			setThreads(await requestAllPages<Thread>(transport, `/sessions/${selectedId}/threads${sortQuery}`));
+		} catch (caught) { onError(messageOf(caught)); }
+	}, [onError, selectedId, threadSort, transport]);
+	useEffect(() => { void refreshThreads(); }, [refreshThreads]);
   useEffect(() => { closeEvidence(); }, [closeEvidence, selectedId]);
   useEffect(() => {
     if (!evidence) return;
@@ -251,6 +263,9 @@ function SessionAdministration({
     if (threadPerspective && thread.perspectiveCode !== threadPerspective) return false;
     if (threadEvidence === "with" && !thread.evidenceAvailable) return false;
     if (threadEvidence === "without" && thread.evidenceAvailable) return false;
+    if (threadAssignee && thread.assignee?.userId !== threadAssignee) return false;
+    if (threadPriority && thread.priority !== threadPriority) return false;
+    if (threadLabel && !thread.labels?.some((label) => label.toLowerCase().includes(threadLabel.toLowerCase()))) return false;
     if (threadSearch && !thread.messages.some((message) => message.body.toLowerCase().includes(threadSearch.toLowerCase()))) return false;
     return true;
   });
@@ -381,8 +396,7 @@ function SessionAdministration({
         ifMatch: versionEtag(thread.version),
         body: { status: thread.status === "open" ? "resolved" : "open" }
       });
-      setSelectedId("");
-      queueMicrotask(() => setSelectedId(thread.sessionId));
+      await refreshThreads();
       setNotice(thread.status === "open" ? "フィードバックを対応済みにしました" : "フィードバックを再オープンしました");
     } catch (caught) { onError(messageOf(caught)); }
   };
@@ -441,16 +455,31 @@ function SessionAdministration({
       <div className="feedback-admin-card feedback-admin-card-wide">
         <h2>スレッドと証跡</h2>
         <dl className="feedback-admin-summary feedback-admin-thread-summary"><div><dt>未解決</dt><dd>{threads.filter((thread) => thread.status === "open").length}件</dd></div><div><dt>解決済み</dt><dd>{threads.filter((thread) => thread.status === "resolved").length}件</dd></div><div><dt>証跡あり</dt><dd>{threads.filter((thread) => thread.evidenceAvailable).length}件</dd></div></dl>
-        <form className="feedback-admin-thread-filters" onSubmit={(event) => event.preventDefault()}><label>状態<select value={threadStatus} onChange={(event) => setThreadStatus(event.target.value as typeof threadStatus)}><option value="">すべて</option><option value="open">未解決</option><option value="resolved">解決済み</option></select></label><label>観点<select value={threadPerspective} onChange={(event) => setThreadPerspective(event.target.value)}><option value="">すべて</option>{selected?.perspectives.map((perspective) => <option key={perspective.code} value={perspective.code}>{perspective.label ?? perspective.code}</option>)}</select></label><label>証跡<select value={threadEvidence} onChange={(event) => setThreadEvidence(event.target.value as typeof threadEvidence)}><option value="">すべて</option><option value="with">証跡あり</option><option value="without">証跡なし</option></select></label><label>コメント本文<input type="search" placeholder="コメントを検索" value={threadSearch} onChange={(event) => setThreadSearch(event.target.value)} /></label></form>
-        {visibleThreads.map((thread) => <article className="feedback-admin-thread" key={thread.id}>
+        <form className="feedback-admin-thread-filters" onSubmit={(event) => event.preventDefault()}>
+          <label>並べ替え<select value={threadSort} onChange={(event) => setThreadSort(event.target.value as typeof threadSort)}><option value="updated_desc">最近更新された順</option><option value="created_desc">新しい投稿順</option><option value="created_asc">古い投稿順</option></select></label>
+          <label>状態<select value={threadStatus} onChange={(event) => setThreadStatus(event.target.value as typeof threadStatus)}><option value="">すべて</option><option value="open">未解決</option><option value="resolved">解決済み</option></select></label>
+          <label>観点<select value={threadPerspective} onChange={(event) => setThreadPerspective(event.target.value)}><option value="">すべて</option>{selected?.perspectives.map((perspective) => <option key={perspective.code} value={perspective.code}>{perspective.label ?? perspective.code}</option>)}</select></label>
+          <label>担当者<select value={threadAssignee} onChange={(event) => setThreadAssignee(event.target.value)}><option value="">すべて</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.subject}</option>)}</select></label>
+          <label>優先度<select value={threadPriority} onChange={(event) => setThreadPriority(event.target.value)}><option value="">すべて</option><option value="critical">緊急</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
+          <label>ラベル<input type="search" placeholder="ラベルを検索" value={threadLabel} onChange={(event) => setThreadLabel(event.target.value)} /></label>
+          <label>証跡<select value={threadEvidence} onChange={(event) => setThreadEvidence(event.target.value as typeof threadEvidence)}><option value="">すべて</option><option value="with">証跡あり</option><option value="without">証跡なし</option></select></label>
+          <label>コメント本文<input type="search" placeholder="コメントを検索" value={threadSearch} onChange={(event) => setThreadSearch(event.target.value)} /></label>
+        </form>
+        {visibleThreads.map((thread) => {
+          const firstMessage = thread.messages[0];
+          const latestMessage = thread.messages[thread.messages.length - 1];
+          return <article className="feedback-admin-thread" key={thread.id}>
           <h3>#{thread.displayNumber} {perspectiveDisplayLabel(thread.perspectiveCode, selected?.perspectives)}</h3>
-          <p>{thread.messages[thread.messages.length - 1]?.body}</p>
+          {firstMessage ? <div className="feedback-admin-thread-message is-initial"><strong>最初のコメント</strong><p>{firstMessage.body}</p><small>{participantLabel(firstMessage.author)} / {new Date(firstMessage.createdAt).toLocaleString("ja-JP")}</small><AdminReactionButtons transport={transport} message={firstMessage} onChange={refreshThreads} onError={onError} /></div> : null}
+          {latestMessage && latestMessage.id !== firstMessage?.id ? <div className="feedback-admin-thread-message is-latest"><strong>最新の返信</strong><p>{latestMessage.body}</p><small>{participantLabel(latestMessage.author)} / {new Date(latestMessage.createdAt).toLocaleString("ja-JP")}</small><AdminReactionButtons transport={transport} message={latestMessage} onChange={refreshThreads} onError={onError} /></div> : null}
+          <ThreadTriageControls transport={transport} thread={thread} members={members} onSaved={refreshThreads} onError={onError} />
           <div className="feedback-admin-actions">
             <button type="button" onClick={() => void openThread(thread.id)}>対象アプリでスレッドを開く</button>
             <button type="button" onClick={() => void toggleThread(thread)}>{thread.status === "open" ? "対応済みにする" : "再オープン"}</button>
             {thread.evidenceAvailable ? <button type="button" onClick={() => void showEvidence(thread)}>証跡</button> : null}
           </div>
-        </article>)}
+        </article>;
+        })}
         {visibleThreads.length === 0 ? <p className="feedback-admin-help">条件に一致するフィードバックはありません。</p> : null}
       </div>
       </div>
@@ -479,6 +508,97 @@ function SessionAdministration({
       </form></section></div> : null}
     </div>
   );
+}
+
+const reactionDefinitions = [
+  ["thumbs_up", "👍"],
+  ["check", "✅"],
+  ["eyes", "👀"],
+  ["question", "❓"]
+] as const;
+
+function AdminReactionButtons({ transport, message, onChange, onError }: {
+  transport: FeedbackTransport;
+  message: Schemas["FeedbackMessageV1"];
+  onChange(): Promise<void>;
+  onError(error: string | null): void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  return <div className="feedback-admin-reactions" aria-label="コメントへのリアクション">{reactionDefinitions.map(([key, emoji]) => {
+    const summary = message.reactions?.find((item) => item.reaction === key);
+    return <button key={key} type="button" className={summary?.reactedByMe ? "selected" : ""} disabled={busy === key}
+      aria-pressed={summary?.reactedByMe ?? false} onClick={() => {
+        setBusy(key);
+        void transport.request(`/messages/${message.id}/reactions/${key}`, {
+          method: summary?.reactedByMe ? "DELETE" : "PUT"
+        }).then(() => {
+          onError(null);
+          return onChange();
+        }).catch((caught) => onError(messageOf(caught))).finally(() => setBusy(null));
+      }}>{emoji}{summary ? ` ${summary.count}` : ""}</button>;
+  })}</div>;
+}
+
+function ThreadTriageControls({ transport, thread, members, onSaved, onError }: {
+  transport: FeedbackTransport;
+  thread: Thread;
+  members: Member[];
+  onSaved(): Promise<void>;
+  onError(error: string | null): void;
+}) {
+  const [assignee, setAssignee] = useState(thread.assignee?.userId ?? "");
+  const [priority, setPriority] = useState(thread.priority ?? "");
+  const [labels, setLabels] = useState((thread.labels ?? []).join(", "));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setAssignee(thread.assignee?.userId ?? "");
+    setPriority(thread.priority ?? "");
+    setLabels((thread.labels ?? []).join(", "));
+  }, [thread.assignee?.userId, thread.labels, thread.priority]);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await transport.request(`/threads/${thread.id}/triage`, {
+        method: "PATCH",
+        ifMatch: versionEtag(thread.version),
+        body: {
+          assigneeUserId: assignee || null,
+          priority: priority || null,
+          labels: labels.split(",").map((value) => value.trim()).filter(Boolean)
+        }
+      });
+      onError(null);
+      await onSaved();
+    } catch (caught) { onError(messageOf(caught)); }
+    finally { setSaving(false); }
+  };
+  return <div className="feedback-admin-triage">
+    <label>担当者<select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">未設定</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.subject}</option>)}</select></label>
+    <label>優先度<select value={priority ?? ""} onChange={(event) => setPriority(event.target.value as typeof priority)}><option value="">未設定</option><option value="critical">緊急</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
+    <label>ラベル<input value={labels} placeholder="例: UI, 要確認" onChange={(event) => setLabels(event.target.value)} /></label>
+    <button type="button" disabled={saving} onClick={() => void save()}>{saving ? "保存中…" : "トリアージを保存"}</button>
+  </div>;
+}
+
+function participantLabel(participant: Schemas["FeedbackParticipant"]): string {
+  return participant.participantName ?? participant.displayName ?? participant.principalId;
+}
+
+async function requestAllPages<T>(transport: FeedbackTransport, path: string): Promise<T[]> {
+  const items: T[] = [];
+  const cursors = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const separator = path.includes("?") ? "&" : "?";
+    const resource: { value: { items: T[]; nextCursor?: string | null } } = await transport.request<{ items: T[]; nextCursor?: string | null }>(
+      cursor ? `${path}${separator}cursor=${encodeURIComponent(cursor)}` : path
+    );
+    items.push(...resource.value.items);
+    cursor = resource.value.nextCursor ?? null;
+    if (cursor && cursors.has(cursor)) throw new Error("一覧のcursorが循環しています");
+    if (cursor) cursors.add(cursor);
+  } while (cursor);
+  return items;
 }
 
 function PerspectiveEditor({ values, onChange }: {
@@ -573,7 +693,7 @@ function RetentionAndExport({
 }) {
   const [policy, setPolicy] = useState<Schemas["FeedbackRetentionPolicy"] | null>(null);
   const [etag, setEtag] = useState<string | null>(null);
-  const [format, setFormat] = useState<"csv" | "xlsx">("csv");
+  const [format, setFormat] = useState<ExportFormat>("csv");
   const [activeExport, setActiveExport] = useState<ActiveExport | null>(null);
   const [creatingExport, setCreatingExport] = useState(false);
   const creatingExportRef = useRef(false);
@@ -664,7 +784,7 @@ function RetentionAndExport({
       await load();
     } catch (caught) { onError(messageOf(caught)); }
   };
-  const downloadExport = useCallback(async (target: ExportJob, requestedFormat: "csv" | "xlsx", generation: number) => {
+  const downloadExport = useCallback(async (target: ExportJob, requestedFormat: ExportFormat, generation: number) => {
     if (downloadsInFlight.current.has(target.id)) return;
     downloadsInFlight.current.add(target.id);
     let url: string | null = null;
@@ -674,7 +794,7 @@ function RetentionAndExport({
       url = URL.createObjectURL(new Blob([binary.bytes.slice().buffer as ArrayBuffer], { type: binary.contentType }));
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `feedback-${target.id}.${requestedFormat}`;
+      anchor.download = `feedback-${target.id}.${requestedFormat === "evidence-package" ? "zip" : requestedFormat}`;
       anchor.hidden = true;
       document.body.append(anchor);
       try { anchor.click(); }
@@ -756,7 +876,7 @@ function RetentionAndExport({
       <button type="button" onClick={() => void save()}>保存</button>
     </> : null}</div>
     <div className="feedback-admin-card"><h2>データをエクスポート</h2><p className="feedback-admin-help">レビュー記録をファイルとして出力します。</p>
-      <label>ファイル形式<select value={format} disabled={creatingExport || activeExport?.job.status === "queued" || activeExport?.job.status === "running"} onChange={(event) => setFormat(event.target.value as "csv" | "xlsx")}><option value="csv">CSV（表計算ソフト向け）</option><option value="xlsx">Excel（XLSX）</option></select></label>
+      <label>ファイル形式<select value={format} disabled={creatingExport || activeExport?.job.status === "queued" || activeExport?.job.status === "running"} onChange={(event) => setFormat(event.target.value as ExportFormat)}><option value="csv">CSV（表計算ソフト向け）</option><option value="xlsx">Excel（XLSX）</option><option value="evidence-package">証跡パッケージ（Power BI向けZIP）</option></select></label>
       <div className="feedback-admin-actions"><button type="button" disabled={creatingExport || activeExport?.job.status === "queued" || activeExport?.job.status === "running"} onClick={() => void createExport()}>{creatingExport ? "作成を依頼中..." : "エクスポートを作成"}</button>
         {activeExport ? <button type="button" disabled={activeExport.downloadState === "downloading"} onClick={() => void refreshJob()}>状態を再確認</button> : null}
         {activeExport?.job.status === "completed" ? <button type="button" disabled={activeExport.downloadState === "downloading"} onClick={download}>{activeExport.downloadState === "downloading" ? "ダウンロード中..." : "ファイルを再ダウンロード"}</button> : null}</div>

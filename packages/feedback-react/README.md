@@ -82,6 +82,9 @@ Thread Drawerは選択中pinの反対側へ配置し、pinと地図上の対象�
 地図を完全に覆わないコンパクトな下部sheetへ切り替えます。
 Thread Drawerで別のthreadへ切り替えると以前の証跡previewを破棄します。切替前に開始した証跡取得が遅れて完了しても、
 現在開いているthreadのpreviewは上書きされません。Drawerを閉じた時とOverlayを破棄した時は証跡のBlob URLを解放します。
+参加中スレッドへ別の利用者から返信があると一覧ボタンと対象スレッドに未読badgeを表示します。未読数は表示中に30秒ごと、
+window focus時、非表示tabの再表示時に更新し、スレッドを開くと最新メッセージまで既読にします。コメントには
+👍、✅、👀、❓の固定リアクションを付けられます。
 
 MapLibreの地図を証跡へ含める場合は`@feedback/maplibre`の`createMapLibreEvidenceProvider`で既定DOM captureを
 包み、`adapter.captureEvidence`へ指定してください。MapLibreを使わないconsumerには追加依存は入りません。

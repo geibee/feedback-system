@@ -16,16 +16,18 @@ const (
 )
 
 type recordingDiscussionStore struct {
+	listThreadsInput   ListThreadsInput
 	createThreadInput  CreateThreadInput
 	createThreadResult Mutation[Thread]
 	createThreadErr    error
 	rateExceeded       []string
 }
 
-func (store *recordingDiscussionStore) ListThreads(context.Context, ListThreadsInput) (ThreadPage, error) {
+func (store *recordingDiscussionStore) ListThreads(_ context.Context, input ListThreadsInput) (ThreadPage, error) {
+	store.listThreadsInput = input
 	return ThreadPage{}, nil
 }
-func (store *recordingDiscussionStore) GetThread(context.Context, string) (Thread, error) {
+func (store *recordingDiscussionStore) GetThread(context.Context, string, string) (Thread, error) {
 	return Thread{}, nil
 }
 func (store *recordingDiscussionStore) CreateThread(_ context.Context, input CreateThreadInput) (Mutation[Thread], error) {
@@ -46,6 +48,18 @@ func (store *recordingDiscussionStore) ListMessageVersions(context.Context, stri
 }
 func (store *recordingDiscussionStore) PatchThreadStatus(context.Context, PatchThreadStatusInput) (Thread, error) {
 	return Thread{}, nil
+}
+func (store *recordingDiscussionStore) PatchThreadTriage(context.Context, PatchThreadTriageInput) (Thread, error) {
+	return Thread{}, nil
+}
+func (store *recordingDiscussionStore) SetMessageReaction(context.Context, ReactionInput) (Message, error) {
+	return Message{}, nil
+}
+func (store *recordingDiscussionStore) ListUnreadReplies(context.Context, UnreadRepliesInput) (UnreadReplySummary, error) {
+	return UnreadReplySummary{}, nil
+}
+func (store *recordingDiscussionStore) MarkThreadRead(context.Context, MarkThreadReadInput) error {
+	return nil
 }
 func (store *recordingDiscussionStore) EnforceWriteRateLimit(context.Context, RateLimitInput) ([]string, error) {
 	return append([]string(nil), store.rateExceeded...), nil
@@ -227,6 +241,23 @@ func TestListThreadsAcceptsLimit200(t *testing.T) {
 	}
 	if _, err := service.ListThreads(context.Background(), ListThreadsInput{SessionID: testSessionID, Limit: 201}); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("limit=201が拒否されませんでした: %v", err)
+	}
+}
+
+func TestListThreadsDefaultsToRecentlyUpdatedOrder(t *testing.T) {
+	t.Parallel()
+	store := &recordingDiscussionStore{}
+	service, err := NewService(store, nil, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ListThreads(context.Background(), ListThreadsInput{
+		SessionID: testSessionID, Limit: 50,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if store.listThreadsInput.Sort != "updated_desc" {
+		t.Fatalf("既定の並べ替え = %q", store.listThreadsInput.Sort)
 	}
 }
 

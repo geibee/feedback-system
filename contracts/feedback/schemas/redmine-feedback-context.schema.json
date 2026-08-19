@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-feedback-context.v1.json",
+  "title": "RedmineFeedbackContextV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "threadId",
+    "intentId",
+    "requestHash",
+    "applicationKey",
+    "environmentKey",
+    "externalWorkspaceKey",
+    "pageKey",
+    "hostResourceKey",
+    "release",
+    "locale",
+    "perspectiveCode",
+    "location",
+    "target",
+    "author",
+    "capturedAt",
+    "primaryEvidence"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "kind": { "const": "feedback-context" },
+    "threadId": { "type": "string", "format": "uuid" },
+    "intentId": { "type": "string", "format": "uuid" },
+    "requestHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "applicationKey": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "environmentKey": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "externalWorkspaceKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "pageKey": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "hostResourceKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "release": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "locale": { "type": "string", "minLength": 2, "maxLength": 35 },
+    "perspectiveCode": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "location": { "$ref": "https://feedback.example/schemas/location.v1.json" },
+    "target": {
+      "oneOf": [
+        { "$ref": "https://feedback.example/schemas/target.v1.json" },
+        { "type": "null" }
+      ]
+    },
+    "author": { "$ref": "#/$defs/author" },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "primaryEvidence": {
+      "oneOf": [
+        { "$ref": "#/$defs/evidence" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "subjectId", "displayName", "redmineUserId"],
+      "properties": {
+        "source": { "enum": ["host-session", "redmine-api-key"] },
+        "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "displayName": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 200 },
+            { "type": "null" }
+          ]
+        },
+        "redmineUserId": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source": { "const": "redmine-api-key" } },
+            "required": ["source"]
+          },
+          "then": {
+            "properties": {
+              "redmineUserId": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "contentType",
+        "byteSize",
+        "sha256",
+        "viewportWidth",
+        "viewportHeight",
+        "pixelRatio",
+        "capturedAt"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "pattern": "^feedback-[0-9a-fA-F-]{36}\\.(?:png|webp)$",
+          "maxLength": 80
+        },
+        "contentType": { "enum": ["image/png", "image/webp"] },
+        "byteSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "viewportWidth": { "type": "integer", "minimum": 1, "maximum": 32768 },
+        "viewportHeight": { "type": "integer", "minimum": 1, "maximum": 32768 },
+        "pixelRatio": { "type": "number", "exclusiveMinimum": 0, "maximum": 16 },
+        "capturedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

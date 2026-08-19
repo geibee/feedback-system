@@ -36,3 +36,30 @@ manifestの検証方法は[`evidence-export.md`](evidence-export.md)を正本と
 
 registry公開前は `npm pack` のtarballをcleanなReact 18/19 + Vite consumerへinstallして検証する。
 公開時は同じpackage versionとService image tagをnpm互換registry/OCI registryへ配置する。
+
+## Redmine gateway・browser contract v1
+
+Redmine正本経路は従来の`/feedback/v1`へendpointを追加せず、独立した
+`contracts/feedback/redmine-gateway.openapi.yaml`と`redmine-*.schema.json`を公開契約とする。
+gateway base pathは`/internal/feedback-redmine/v1`であり、業務アプリケーションと同一originに置く。
+`@feedback/redmine-core`、React UI、plugin、gateway、Chrome / Edge拡張は同じversionを使用する。
+
+version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thread.latestReply`、
+`Attachment.primaryEvidence`をnull許容の必須fieldとする。エラーcodeは固定集合で、Redmineの401は
+`redmine.invalid_api_key`へ写像する。成功response、extension message、端末内follow/pending/draft messageも
+JSON Schemaで閉じており、追加fieldは契約変更としてOpenAPI、生成TypeScript型、互換性文書を同時更新する。
+extension unlock成功responseの任意`customFieldValidation`は、project内に検証対象issueがない場合を
+`not-yet-proven`としてoptions UIへ表示するための後方互換fieldである。
+端末内follow stateの任意`seenJournalIds`は、非単調なjournal IDを既知ID集合で判定するための後方互換fieldである。
+旧stateにこのfieldがない場合は`lastSeenJournalId`による従来判定を維持し、次回既読更新時に集合を保存する。
+extension専用`diagnostic.download.v1`は追加operationであり、既存messageを変更しない。返す最大100件のentryは
+request ID、operation、profile ID、HTTP status、duration、error codeだけに閉じ、browser再起動後へ永続化しない。
+Redmine client state v1のpending intentはRedmineへ保存する`requestHash`と区別して`clientDraftHash`を使用し、
+`prepared|uncertain`を必須にする。intent/draft operationは必須`principalScopeHash`で共有端末の利用者間を分離し、7日超のintentを削除する。
+
+初回createは201、同一`threadId`・`intentId`・request hashの冪等回収は200を返す。同じthread IDでhashが異なる場合、
+または同じcustom field値が複数issueに存在する場合は409相当でfail-closedする。返信・編集・状態変更はRedmine UIだけで行い、
+Feedback UIのversion 1ではread-onlyである。
+
+検証対象と対応下限はRedmine 5.1.12、6.0.10、6.1.3、7.0.0である。各Docker Official Imageの
+exact tagとmulti-platform manifest digestを固定し、`scripts/check-feedback-redmine-conformance.sh`で4版すべてを検証する。

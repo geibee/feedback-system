@@ -1,0 +1,19 @@
+{
+  "name": "@feedback/redmine-browser-e2e",
+  "version": "1.0.0-alpha.1",
+  "description": "Feedback Redmine plugin・拡張機能browser smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test src/plugin-smoke.test.mjs",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test:chrome": "node src/plugin-browser-smoke.mjs && node src/extension-smoke.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.2.5",
+    "@types/node": "26.1.0",
+    "playwright": "1.62.1",
+    "typescript": "^5.6.3"
+  }
+}

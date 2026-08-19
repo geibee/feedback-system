@@ -1,0 +1,16 @@
+# Feedback Redmine gateway reference
+
+`@feedback/redmine-gateway`をNode.js HTTP serverへ接続する最小例です。業務アプリ固有のsession/authorization実装は
+`FeedbackRedmineGatewayHost`として注入します。CLI起動時は署名・期限・profile/resource・CSRFを検証するtest/demo adapterを使い、
+固定principalや認証bypassをproduction機能として提供しません。
+
+`FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`へread-only server profile JSONのabsolute pathを指定します。`clientProfileRef`は
+同じdirectoryからのrelative pathまたはabsolute pathです。`FEEDBACK_REDMINE_GATEWAY_API_KEY`へRedmine integration user key、
+`FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET`へtest/demo session署名鍵を設定します。いずれのsecretも既定値はなく、未設定時は
+起動前にfail-fastします。
+
+CLI起動では署名付き`feedback_redmine_demo_session` cookieを検証するtest/demo adapterを使います。固定principal、未署名cookie、
+認証bypassはありません。このadapterをproduction認証とみなさず、顧客固有session/authorization/CSRF adapterへ差し替えてください。
+
+このreference appはDB、ORM、queue、cache、upload directoryを使用しません。実環境ではhandlerを業務アプリの既存認証
+middleware後段へ直接組み込む構成を推奨します。

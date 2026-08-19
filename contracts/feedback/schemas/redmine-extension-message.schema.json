@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-extension-message.v1.json",
+  "title": "RedmineExtensionMessageV1",
+  "oneOf": [
+    { "$ref": "https://feedback.example/schemas/redmine-operation.v1.json" },
+    { "$ref": "https://feedback.example/schemas/redmine-client-state-message.v1.json" },
+    { "$ref": "#/$defs/unlockRequest" },
+    { "$ref": "#/$defs/lockRequest" },
+    { "$ref": "#/$defs/profileSuccess" },
+    { "$ref": "#/$defs/profileError" },
+    { "$ref": "#/$defs/diagnosticRequest" },
+    { "$ref": "#/$defs/diagnosticSuccess" },
+    { "$ref": "#/$defs/diagnosticError" },
+    { "$ref": "#/$defs/evidenceStreamStart" },
+    { "$ref": "#/$defs/evidenceStreamChunk" },
+    { "$ref": "#/$defs/evidenceStreamComplete" },
+    { "$ref": "#/$defs/evidenceStreamResult" },
+    { "$ref": "#/$defs/attachmentStreamStart" },
+    { "$ref": "#/$defs/attachmentStreamChunk" },
+    { "$ref": "#/$defs/attachmentStreamComplete" }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "profileId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$" },
+    "unlockRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "profile.unlock.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileId", "apiKey"],
+          "properties": {
+            "profileId": { "$ref": "#/$defs/profileId" },
+            "apiKey": { "type": "string", "minLength": 1, "maxLength": 255 }
+          }
+        }
+      }
+    },
+    "lockRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "profile.lock.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileId"],
+          "properties": {
+            "profileId": { "$ref": "#/$defs/profileId" }
+          }
+        }
+      }
+    },
+    "profileSuccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "ok", "result"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "enum": ["profile.unlock.v1", "profile.lock.v1"] },
+        "ok": { "const": true },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileId", "locked"],
+          "properties": {
+            "profileId": { "$ref": "#/$defs/profileId" },
+            "locked": { "type": "boolean" },
+            "customFieldValidation": { "enum": ["verified", "not-yet-proven"] }
+          }
+        }
+      }
+    },
+    "profileError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "ok", "error"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "enum": ["profile.unlock.v1", "profile.lock.v1"] },
+        "ok": { "const": false },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable", "upstreamStatus", "requestId"],
+          "properties": {
+            "code": { "enum": ["redmine.unauthenticated", "redmine.invalid_api_key", "redmine.permission_denied", "redmine.not_found", "redmine.contract_invalid", "redmine.unavailable"] },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "retryable": { "type": "boolean" },
+            "upstreamStatus": {
+              "oneOf": [{ "type": "integer", "minimum": 100, "maximum": 599 }, { "type": "null" }]
+            },
+            "requestId": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      }
+    },
+    "diagnosticRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "diagnostic.download.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileId"],
+          "properties": { "profileId": { "$ref": "#/$defs/profileId" } }
+        }
+      }
+    },
+    "diagnosticDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "generatedAt", "entries"],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "entries": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requestId", "operation", "profileId", "httpStatus", "durationMilliseconds", "errorCode"],
+            "properties": {
+              "requestId": { "$ref": "#/$defs/uuid" },
+              "operation": { "type": "string", "pattern": "^(?:redmine|profile)\\.[a-z0-9.-]+\\.v1$" },
+              "profileId": { "$ref": "#/$defs/profileId" },
+              "httpStatus": { "oneOf": [{ "type": "integer", "minimum": 100, "maximum": 599 }, { "type": "null" }] },
+              "durationMilliseconds": { "type": "number", "minimum": 0 },
+              "errorCode": {
+                "oneOf": [
+                  { "enum": ["redmine.unauthenticated", "redmine.invalid_api_key", "redmine.permission_denied", "redmine.not_found", "redmine.duplicate_thread_id", "redmine.thread_mismatch", "redmine.content_type_rejected", "redmine.payload_too_large", "redmine.validation_failed", "redmine.rate_limited", "redmine.unavailable", "redmine.contract_invalid", "feedback.locator_too_large"] },
+                  { "type": "null" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnosticSuccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "ok", "result"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "diagnostic.download.v1" },
+        "ok": { "const": true },
+        "result": { "$ref": "#/$defs/diagnosticDocument" }
+      }
+    },
+    "diagnosticError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "ok", "error"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "diagnostic.download.v1" },
+        "ok": { "const": false },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable", "upstreamStatus", "requestId"],
+          "properties": {
+            "code": { "enum": ["redmine.permission_denied", "redmine.not_found", "redmine.contract_invalid", "redmine.unavailable"] },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "retryable": { "type": "boolean" },
+            "upstreamStatus": { "oneOf": [{ "type": "integer", "minimum": 100, "maximum": 599 }, { "type": "null" }] },
+            "requestId": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      }
+    },
+    "evidenceStreamStart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "evidence.stream.start.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profileId", "metadata"],
+          "properties": {
+            "profileId": { "$ref": "#/$defs/profileId" },
+            "metadata": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["filename", "contentType", "byteSize", "sha256", "viewportWidth", "viewportHeight", "pixelRatio", "capturedAt"],
+              "properties": {
+                "filename": { "type": "string", "minLength": 1, "maxLength": 80 },
+                "contentType": { "enum": ["image/png", "image/webp"] },
+                "byteSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "viewportWidth": { "type": "integer", "minimum": 1, "maximum": 32768 },
+                "viewportHeight": { "type": "integer", "minimum": 1, "maximum": 32768 },
+                "pixelRatio": { "type": "number", "exclusiveMinimum": 0, "maximum": 16 },
+                "capturedAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidenceStreamChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "evidence.stream.chunk.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["index", "data"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0, "maximum": 53 },
+            "data": { "type": "string", "maxLength": 262144, "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" }
+          }
+        }
+      }
+    },
+    "evidenceStreamComplete": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "evidence.stream.complete.v1" },
+        "payload": { "type": "object", "additionalProperties": false, "maxProperties": 0 }
+      }
+    },
+    "evidenceStreamResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "ok"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "evidence.stream.result.v1" },
+        "ok": { "type": "boolean" }
+      }
+    },
+    "attachmentStreamStart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "redmine.attachment.stream.start.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["filename", "contentType", "byteSize", "sha256", "rawChunkSize", "totalChunks"],
+          "properties": {
+            "filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "contentType": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "byteSize": { "type": "integer", "minimum": 0, "maximum": 52428800 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "rawChunkSize": { "const": 196608 },
+            "totalChunks": { "type": "integer", "minimum": 0, "maximum": 267 }
+          }
+        }
+      }
+    },
+    "attachmentStreamChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "redmine.attachment.stream.chunk.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["index", "data"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0, "maximum": 266 },
+            "data": {
+              "type": "string",
+              "maxLength": 262144,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            }
+          }
+        }
+      }
+    },
+    "attachmentStreamComplete": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "type", "payload"],
+      "properties": {
+        "contractVersion": { "const": "1" },
+        "requestId": { "$ref": "#/$defs/uuid" },
+        "type": { "const": "redmine.attachment.stream.complete.v1" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 0
+        }
+      }
+    }
+  }
+}

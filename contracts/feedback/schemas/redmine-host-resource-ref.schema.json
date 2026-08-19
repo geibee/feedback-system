@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-host-resource-ref.v1.json",
+  "title": "FeedbackHostResourceRefV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "key"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "kind": { "enum": ["record", "page"] },
+    "key": { "type": "string", "minLength": 1, "maxLength": 500 }
+  }
+}

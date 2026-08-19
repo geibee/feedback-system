@@ -7,6 +7,7 @@
   "files": [
     "dist",
     "openapi.yaml",
+    "redmine-gateway.openapi.yaml",
     "token-exchange.openapi.yaml",
     "schemas",
     "README.md",
@@ -21,6 +22,7 @@
       "import": "./dist/index.js"
     },
     "./openapi.yaml": "./openapi.yaml",
+    "./redmine-gateway.openapi.yaml": "./redmine-gateway.openapi.yaml",
     "./token-exchange.openapi.yaml": "./token-exchange.openapi.yaml",
     "./schemas/*": "./schemas/*"
   },
@@ -28,7 +30,9 @@
     "access": "restricted"
   },
   "scripts": {
-    "generate": "openapi-typescript openapi.yaml -o src/generated.ts",
+    "generate": "npm run generate:legacy && npm run generate:redmine",
+    "generate:legacy": "openapi-typescript openapi.yaml -o src/generated.ts",
+    "generate:redmine": "openapi-typescript redmine-gateway.openapi.yaml -o src/redmine-gateway.generated.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"

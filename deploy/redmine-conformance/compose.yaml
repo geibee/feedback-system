@@ -1,0 +1,24 @@
+services:
+  redmine:
+    image: ${FEEDBACK_REDMINE_IMAGE:?FEEDBACK_REDMINE_IMAGEは必須です}
+    labels:
+      io.feedback.conformance.run-id: ${FEEDBACK_REDMINE_CONFORMANCE_RUN_ID:?FEEDBACK_REDMINE_CONFORMANCE_RUN_IDは必須です}
+    environment:
+      SECRET_KEY_BASE: ${FEEDBACK_REDMINE_CONFORMANCE_SECRET:?FEEDBACK_REDMINE_CONFORMANCE_SECRETは必須です}
+    ports:
+      - "127.0.0.1::3000"
+    tmpfs:
+      - /tmp
+    networks:
+      - conformance
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 90
+      start_period: 10s
+
+networks:
+  conformance:
+    labels:
+      io.feedback.conformance.run-id: ${FEEDBACK_REDMINE_CONFORMANCE_RUN_ID:?FEEDBACK_REDMINE_CONFORMANCE_RUN_IDは必須です}

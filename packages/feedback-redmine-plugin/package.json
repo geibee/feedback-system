@@ -1,0 +1,39 @@
+{
+  "name": "@feedback/redmine-plugin",
+  "version": "1.0.0-alpha.1",
+  "description": "業務アプリへ埋め込むDBレスRedmine Feedback JavaScript plugin",
+  "private": true,
+  "type": "module",
+  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./self-hosted": "./dist/feedback-redmine-plugin-with-react.es.js"
+  },
+  "publishConfig": { "access": "restricted" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && vite build"
+  },
+  "dependencies": {
+    "@feedback/redmine-core": "1.0.0-alpha.1",
+    "@feedback/redmine-react": "1.0.0-alpha.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "10.4.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "jsdom": "29.1.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "4.1.9"
+  }
+}

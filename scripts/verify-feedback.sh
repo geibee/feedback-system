@@ -47,11 +47,15 @@ for application in @feedback/admin-console @feedback/token-broker-reference @fee
   npm --workspace "$application" run build
 done
 
+bash scripts/check-feedback-redmine-packages.sh
+
 bash scripts/check-feedback-contracts.sh
 if [[ "${FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS:-0}" != "1" ]]; then
   bash scripts/check-feedback-packages.sh
 fi
 bash scripts/check-feedback-conformance.sh
+bash scripts/check-feedback-redmine-security.sh
+bash scripts/check-feedback-redmine-conformance.sh
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet

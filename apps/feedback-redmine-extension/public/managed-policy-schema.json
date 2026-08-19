@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "profiles": {
+      "title": "Feedback Redmine profiles",
+      "description": "redmine-extension-profile.v1準拠JSON document。API keyは指定しない。",
+      "type": "string"
+    }
+  }
+}

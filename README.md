@@ -22,6 +22,21 @@ Admin Consoleを提供します。
 Feedback Serviceに障害が発生した場合はFeedback UIだけを縮退させ、
 ホストアプリ全体の表示や操作は継続できます。
 
+## Redmineを正本にする構成
+
+Feedback専用DBやobject storageを新設せず、Redmine issue・journal・attachment・custom fieldを唯一の業務データ正本にする
+別構成も提供します。既存sessionを使う埋め込みJavaScriptプラグインと、個人Redmine API keyをbrowser sessionだけに保持する
+Manifest V3 Chrome / Edge拡張を同じUI・契約で利用できます。
+
+埋め込み版では業務アプリケーションと同一originのstateless gatewayが認証・resource authorization・CSRFを検証し、
+server-side integration keyでRedmineへ接続します。gatewayはDB、queue、cache、attachment storageを持ちません。
+拡張機能版は業務画面を変更できない場合向けで、許可済みHTTPS originだけにprogrammatic content scriptを登録します。
+
+導入は[`docs/redmine-integration.md`](docs/redmine-integration.md)、gatewayは
+[`docs/redmine-gateway.md`](docs/redmine-gateway.md)、拡張機能は
+[`docs/redmine-extension.md`](docs/redmine-extension.md)を参照してください。これは従来のFeedback Service runtimeを
+Redmineへ暗黙移行する機能ではありません。
+
 ## 構成
 
 ```text

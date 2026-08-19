@@ -223,6 +223,34 @@ FEEDBACK_EXTRACTION_SKIP_STANDALONE_SMOKE
 `FEEDBACK_VERIFY_SKIP_NPM_CI`と`FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS`は局所切り分け用で、release/CIの合格証跡では
 使用しない。
 
+## Redmine正本client・検証
+
+Feedback Redmine gateway referenceは次を使用する。
+
+```text
+FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
+FEEDBACK_REDMINE_GATEWAY_API_KEY
+FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET
+```
+
+`FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`はread-only server profile JSONへのabsolute pathで必須である。
+`FEEDBACK_REDMINE_GATEWAY_API_KEY`はFeedback専用integration userのRedmine API key、
+`FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET`はreference appのdemo session署名鍵であり、いずれも必須かつ既定値を持たない。
+本番ではreferenceのdemo session adapterを使わず、業務アプリケーションの既存session・resource authorization・CSRF実装を
+`FeedbackRedmineGatewayHost`へ注入する。API keyと署名鍵はsecret managerからprocessへ注入し、profile fileへ記載しない。
+
+次はRedmine Docker適合性試験だけが使用し、本番runtimeへ設定しない。
+
+```text
+FEEDBACK_REDMINE_IMAGE
+FEEDBACK_REDMINE_CONFORMANCE_SECRET
+FEEDBACK_REDMINE_CONFORMANCE_RUN_ID
+```
+
+`FEEDBACK_REDMINE_IMAGE`は検証対象のdigest固定Docker Official Image、`FEEDBACK_REDMINE_CONFORMANCE_SECRET`は試験中に
+生成する一時API key、`FEEDBACK_REDMINE_CONFORMANCE_RUN_ID`はproject/user名を分離する一時識別子である。
+通常は`tests/redmine-conformance/run-local-matrix.sh`が暗号学的乱数で生成するため、固定値をrepositoryやCI定義へ保存しない。
+
 ## Service storage
 
 次のstorageとnotification secretは `FEEDBACK_DEPLOYMENT_PROFILE=full` のAPI runtimeだけで必須となる。

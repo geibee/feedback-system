@@ -17,16 +17,24 @@ go_legacy_journal=apps/feedback-service-go/migrations/legacyjournal/V1__feedback
 }
 
 tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
+redmine_tmp=$(mktemp)
+trap 'rm -f "$tmp" "$redmine_tmp"' EXIT
 npx --no-install openapi-typescript "$OPENAPI" -o "$tmp" >/dev/null
 if ! diff -u "$GENERATED" "$tmp"; then
   echo "[feedback-contract] FAIL: @feedback/contracts の生成型が専用OpenAPIと同期していません" >&2
   echo "  npm --workspace @feedback/contracts run generate を実行してください" >&2
   exit 1
 fi
+npx --no-install openapi-typescript contracts/feedback/redmine-gateway.openapi.yaml -o "$redmine_tmp" >/dev/null
+if ! diff -u contracts/feedback/src/redmine-gateway.generated.ts "$redmine_tmp"; then
+  echo "[feedback-contract] FAIL: Redmine gateway生成型がOpenAPIと同期していません" >&2
+  echo "  npm --workspace @feedback/contracts run generate:redmine を実行してください" >&2
+  exit 1
+fi
 
 npx --no-install spectral lint --ruleset .spectral.yaml "$OPENAPI"
 npx --no-install spectral lint --ruleset .spectral.yaml contracts/feedback/token-exchange.openapi.yaml
+npx --no-install spectral lint --ruleset .spectral.yaml contracts/feedback/redmine-gateway.openapi.yaml
 
 if grep -qE '^  /api/' "$OPENAPI"; then
   echo "[feedback-contract] FAIL: 専用契約にWeb GISの /api pathが混入しています" >&2
@@ -42,10 +50,16 @@ for schema in contracts/feedback/schemas/*.json; do
     || { echo "[feedback-contract] FAIL: $schema に \$schema / \$id がありません" >&2; exit 1; }
 done
 
-if rg -n '@web-gis|apps/api/openapi|projectId' \
+if rg -n '@web-gis|apps/api/openapi' \
   contracts/feedback/src packages/feedback-core/src packages/feedback-react/src packages/feedback-maplibre/src \
   packages/feedback-admin-react/src apps/feedback-admin/src apps/feedback-conformance-consumer/src; then
   echo "[feedback-contract] FAIL: 独立packageにWeb GIS固有契約が混入しています" >&2
+  exit 1
+fi
+if rg -n 'projectId' \
+  contracts/feedback/src/generated.ts packages/feedback-core/src packages/feedback-react/src packages/feedback-maplibre/src \
+  packages/feedback-admin-react/src apps/feedback-admin/src apps/feedback-conformance-consumer/src; then
+  echo "[feedback-contract] FAIL: legacy独立packageにWeb GIS projectIdが混入しています" >&2
   exit 1
 fi
 if rg -n '@web-gis|apps/api/openapi|projectId|app\.projects|app\.users|gis_data|org\.postgis|(^|[^A-Za-z0-9_])ST_[A-Za-z]+' \
@@ -73,7 +87,7 @@ node -e '
 ' || { echo "[feedback-contract] FAIL: @feedback/core のpackage dependency境界が不正です" >&2; exit 1; }
 
 undocumented_feedback_variables=$(comm -23 \
-  <(rg -o -P --no-filename '(?<![A-Z0-9_])FEEDBACK_[A-Z][A-Z0-9_]+' \
+  <(rg --no-messages -o -P --no-filename '(?<![A-Z0-9_])FEEDBACK_[A-Z][A-Z0-9_]+' \
     apps/feedback-* packages/feedback-* contracts/feedback deploy .github/workflows scripts \
     --glob '!**/node_modules/**' --glob '!**/build/**' --glob '!**/dist/**' \
     | rg -v '^(FEEDBACK_AUTH_NAME|FEEDBACK_EXCHANGE_AUTH_NAME)$' | LC_ALL=C sort -u) \

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-client-profile.v1.json",
+  "title": "RedmineClientProfileV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "displayName",
+    "applicationKey",
+    "environmentKey",
+    "externalWorkspaceKey",
+    "perspectives",
+    "capture",
+    "attachments"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "id": { "$ref": "#/$defs/profileId" },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "applicationKey": { "$ref": "#/$defs/key" },
+    "environmentKey": { "$ref": "#/$defs/key" },
+    "externalWorkspaceKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "perspectives": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/perspective" }
+    },
+    "capture": { "$ref": "#/$defs/capture" },
+    "attachments": { "$ref": "#/$defs/attachments" },
+    "showRedmineLink": { "type": "boolean" }
+  },
+  "$defs": {
+    "profileId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "key": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "perspective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "label"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maximumUploadBytes", "contentTypes"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "maximumUploadBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 10485760
+        },
+        "contentTypes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["image/png", "image/webp"] }
+        }
+      }
+    },
+    "attachments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumInlinePreviewBytes", "maximumDownloadBytes"],
+      "properties": {
+        "maximumInlinePreviewBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 10485760
+        },
+        "maximumDownloadBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 52428800
+        }
+      }
+    }
+  }
+}

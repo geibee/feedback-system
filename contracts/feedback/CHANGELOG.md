@@ -2,6 +2,16 @@
 
 ## 2026-08-19
 
+- Redmineを業務データ正本とするgateway OpenAPI、共通operation、client/extension profile、host resource、context attachment契約を追加。
+- Redmine専用生成TypeScript型をlegacy Feedback Service生成型から分離して追加。
+- Redmine profile/current user/thread/list/attachment response、client state message、evidence/attachment Port messageを
+  unknown property拒否のstrict schemaとして追加。
+- extension unlock成功responseへ非破壊接続確認の`customFieldValidation`を任意fieldとして追加。
+- 端末内follow stateへ非単調なRedmine journal IDの未読判定に使う任意`seenJournalIds`を追加。
+- extension optionsからmemory診断を明示downloadする`diagnostic.download.v1` messageを追加。
+- pending intentを`clientDraftHash`・`prepared|uncertain`へ固定し、intent/draft messageをprincipal scopeへ束縛。
+- thread/listの`latestReply`とattachmentの`primaryEvidence`をnull許容の必須fieldとして固定し、401 error codeへ
+  `redmine.invalid_api_key`を追加。
 - スレッド一覧へ更新順・作成順、観点、担当者、優先度、ラベル、証跡、本文検索のfilterを後方互換で追加。
 - スレッドへ担当者・優先度・ラベル、メッセージへ固定リアクションを追加。
 - 参加スレッドへの未読返信件数と既読更新APIを追加。

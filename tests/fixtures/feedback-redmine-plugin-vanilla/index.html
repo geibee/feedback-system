@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'"
+    />
+    <meta name="csrf-token" content="browser-smoke-csrf" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/hostile-host.css" />
+    <title>Feedback Redmine vanilla fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Vanilla業務アプリ</h1>
+      <div id="feedback-root"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

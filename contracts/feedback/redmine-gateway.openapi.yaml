@@ -1,0 +1,720 @@
+openapi: 3.1.0
+info:
+  title: Feedback Redmine Gateway API
+  version: 1.0.0
+  description: |
+    業務アプリケーションの既存セッションで利用する、同一origin限定のstateless Redmine gateway契約。
+    実装は固定operationだけを公開し、Redmine API key、任意URL、任意headerをbrowserへ公開しない。
+servers:
+  - url: /internal/feedback-redmine/v1
+    description: 業務アプリケーションと同一originの相対path
+tags:
+  - name: Redmine feedback
+paths:
+  /profiles/{profileId}:
+    get:
+      operationId: getRedmineProfile
+      x-feedback-operation: redmine.profile.get.v1
+      tags: [Redmine feedback]
+      summary: 公開profileとcapabilityを取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+      responses:
+        '200':
+          description: 公開profile
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/me:
+    get:
+      operationId: getRedmineCurrentUser
+      x-feedback-operation: redmine.current-user.get.v1
+      tags: [Redmine feedback]
+      summary: 認証済みprincipalを取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+      responses:
+        '200':
+          description: current principal
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUserResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/threads:
+    get:
+      operationId: listRedmineThreads
+      x-feedback-operation: redmine.thread.list.v1
+      tags: [Redmine feedback]
+      summary: 認可済みresourceのthreadを一覧する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+        - $ref: '#/components/parameters/PageKey'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PerspectiveFilter'
+        - $ref: '#/components/parameters/AssigneeFilter'
+        - $ref: '#/components/parameters/PriorityFilter'
+        - $ref: '#/components/parameters/QueryFilter'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: thread一覧
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadListResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createRedmineThread
+      x-feedback-operation: redmine.thread.create.v1
+      tags: [Redmine feedback]
+      summary: Redmine issueとして初回投稿を作成する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request]
+              properties:
+                request:
+                  $ref: '#/components/schemas/CreateThreadRequest'
+                evidence:
+                  type: string
+                  format: binary
+            encoding:
+              request:
+                contentType: application/json; charset=utf-8
+              evidence:
+                contentType: image/png, image/webp
+      responses:
+        '201':
+          description: 作成したthread
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '200':
+          description: 冪等回収した既存thread
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '406': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/threads/{threadId}:
+    get:
+      operationId: getRedmineThread
+      x-feedback-operation: redmine.thread.get.v1
+      tags: [Redmine feedback]
+      summary: 全journalとattachmentを含むthreadを取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: thread詳細
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/threads/{threadId}/attachments/{attachmentId}:
+    get:
+      operationId: getRedmineAttachment
+      x-feedback-operation: redmine.attachment.get.v1
+      tags: [Redmine feedback]
+      summary: thread所属確認済みattachmentを取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: 検証済みattachment bytes
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+            Content-Disposition:
+              description: sanitize済みfilenameから生成したattachment disposition
+              schema: { type: string }
+            X-Feedback-Content-SHA256:
+              description: lowercase SHA-256 hex
+              schema: { type: string, pattern: '^[a-f0-9]{64}$' }
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '406': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+components:
+  headers:
+    NoStore:
+      schema: { type: string, const: no-store }
+    NoSniff:
+      schema: { type: string, const: nosniff }
+  parameters:
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,99}$' }
+    ThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      schema: { type: string, format: uri, maxLength: 253 }
+    SecFetchSite:
+      name: Sec-Fetch-Site
+      in: header
+      required: true
+      schema: { type: string, const: same-origin }
+    CsrfToken:
+      name: X-Feedback-CSRF
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 1024 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    ResourceKind:
+      name: resourceKind
+      in: query
+      required: true
+      schema: { type: string, enum: [record, page] }
+    ResourceKey:
+      name: resourceKey
+      in: query
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 500 }
+    PageKey:
+      name: pageKey
+      in: query
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 100 }
+    Sort:
+      name: sort
+      in: query
+      required: true
+      schema: { type: string, enum: [created_desc, created_asc, updated_desc] }
+    StatusFilter:
+      name: status
+      in: query
+      schema: { type: string, pattern: '^(?:open|closed|[1-9][0-9]*)$' }
+    PerspectiveFilter:
+      name: perspectiveCode
+      in: query
+      schema: { type: string, minLength: 1, maxLength: 100 }
+    AssigneeFilter:
+      name: assigneeId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    PriorityFilter:
+      name: priorityId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    QueryFilter:
+      name: q
+      in: query
+      schema: { type: string, maxLength: 200 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string, minLength: 1, maxLength: 2048 }
+  responses:
+    Problem:
+      description: sanitize済みproblem
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemEnvelope' }
+  schemas:
+    HostResourceRef:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, key]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, enum: [record, page] }
+        key: { type: string, minLength: 1, maxLength: 500 }
+    Perspective:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,99}$' }
+        label: { type: string, minLength: 1, maxLength: 200 }
+    CaptureProfile:
+      type: object
+      additionalProperties: false
+      required: [enabled, maximumUploadBytes, contentTypes]
+      properties:
+        enabled: { type: boolean }
+        maximumUploadBytes: { type: integer, minimum: 1048576, maximum: 10485760 }
+        contentTypes:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items: { type: string, enum: [image/png, image/webp] }
+    AttachmentProfile:
+      type: object
+      additionalProperties: false
+      required: [maximumInlinePreviewBytes, maximumDownloadBytes]
+      properties:
+        maximumInlinePreviewBytes: { type: integer, minimum: 1048576, maximum: 10485760 }
+        maximumDownloadBytes: { type: integer, minimum: 1048576, maximum: 52428800 }
+    ClientProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - id
+        - displayName
+        - applicationKey
+        - environmentKey
+        - externalWorkspaceKey
+        - perspectives
+        - capture
+        - attachments
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        id: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,99}$' }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        applicationKey: { type: string, minLength: 1, maxLength: 100 }
+        environmentKey: { type: string, minLength: 1, maxLength: 100 }
+        externalWorkspaceKey: { type: string, minLength: 1, maxLength: 200 }
+        perspectives:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Perspective' }
+        capture: { $ref: '#/components/schemas/CaptureProfile' }
+        attachments: { $ref: '#/components/schemas/AttachmentProfile' }
+        showRedmineLink: { type: boolean }
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [canRead, canCreate, repliesReadOnly, stateReadOnly]
+      properties:
+        canRead: { type: boolean }
+        canCreate: { type: boolean }
+        repliesReadOnly: { type: boolean, const: true }
+        stateReadOnly: { type: boolean, const: true }
+    ProfileResult:
+      type: object
+      additionalProperties: false
+      required: [profile, capabilities]
+      properties:
+        profile: { $ref: '#/components/schemas/ClientProfile' }
+        capabilities: { $ref: '#/components/schemas/Capabilities' }
+    Principal:
+      type: object
+      additionalProperties: false
+      required: [subjectId, displayName, redmineUserId, source]
+      properties:
+        subjectId: { type: string, minLength: 1, maxLength: 200 }
+        displayName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        redmineUserId: { type: [integer, 'null'], minimum: 1 }
+        source: { type: string, enum: [host-session, redmine-api-key] }
+    CurrentUserResult:
+      type: object
+      additionalProperties: false
+      required: [principal]
+      properties:
+        principal: { $ref: '#/components/schemas/Principal' }
+    NamedValue:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+    Locator:
+      type: object
+      additionalProperties: false
+      required: [v, location, target]
+      properties:
+        v: { type: string, const: '1' }
+        location: { $ref: '#/components/schemas/Location' }
+        target:
+          oneOf:
+            - { $ref: '#/components/schemas/Target' }
+            - { type: 'null' }
+    Location:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, pageKey, routeTemplate, pathParameters]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        pageKey: { type: string, minLength: 1, maxLength: 100 }
+        routeTemplate: { type: string, minLength: 1, maxLength: 500 }
+        pathParameters:
+          type: object
+          additionalProperties: { type: string, maxLength: 500 }
+        queryParameters:
+          type: object
+          additionalProperties: { type: string, maxLength: 1000 }
+    Target:
+      oneOf:
+        - $ref: '#/components/schemas/UiElementTarget'
+        - $ref: '#/components/schemas/ScreenPositionTarget'
+        - $ref: '#/components/schemas/MapFeatureTarget'
+        - $ref: '#/components/schemas/MapPositionTarget'
+    UiElementTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, elementKey, relativeX, relativeY]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: ui-element }
+        elementKey: { type: string, minLength: 1, maxLength: 200 }
+        relativeX: { type: number, minimum: 0, maximum: 1 }
+        relativeY: { type: number, minimum: 0, maximum: 1 }
+    ScreenPositionTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, relativeX, relativeY]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: screen-position }
+        relativeX: { type: number, minimum: 0, maximum: 1 }
+        relativeY: { type: number, minimum: 0, maximum: 1 }
+    MapFeatureTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, provider, sourceKey, featureKey, longitude, latitude]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: map-feature }
+        provider: { type: string, const: maplibre }
+        sourceKey: { type: string, minLength: 1, maxLength: 200 }
+        sourceLayer: { type: string, minLength: 1, maxLength: 200 }
+        featureKey: { type: string, minLength: 1, maxLength: 200 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+    MapPositionTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, longitude, latitude]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: map-position }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+    Attachment:
+      type: object
+      additionalProperties: false
+      required: [id, filename, byteSize, contentType, author, createdAt, inlinePreview, primaryEvidence]
+      properties:
+        id: { type: integer, minimum: 1 }
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        byteSize: { type: integer, minimum: 0 }
+        contentType: { type: [string, 'null'], maxLength: 255 }
+        author: { $ref: '#/components/schemas/NamedValue' }
+        createdAt: { type: string, format: date-time }
+        inlinePreview: { type: boolean }
+        primaryEvidence: { type: boolean }
+    Reply:
+      type: object
+      additionalProperties: false
+      required: [kind, journalId, body, author, createdAt, updatedAt]
+      properties:
+        kind: { type: string, const: reply }
+        journalId: { type: integer, minimum: 1 }
+        body: { type: string }
+        author: { $ref: '#/components/schemas/NamedValue' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: [string, 'null'], format: date-time }
+    Activity:
+      type: object
+      additionalProperties: false
+      required: [kind, journalId, field, oldValue, newValue, author, createdAt]
+      properties:
+        kind: { type: string, const: activity }
+        journalId: { type: integer, minimum: 1 }
+        field: { type: string, enum: [status, assignee, priority, tracker, subject, description, attachment] }
+        oldValue: { type: [string, 'null'], maxLength: 65535 }
+        newValue: { type: [string, 'null'], maxLength: 65535 }
+        author: { $ref: '#/components/schemas/NamedValue' }
+        createdAt: { type: string, format: date-time }
+    DiagnosticActivity:
+      type: object
+      additionalProperties: false
+      required: [kind, journalId, message]
+      properties:
+        kind: { type: string, const: diagnostic }
+        journalId: { type: [integer, 'null'], minimum: 1 }
+        message: { type: string, minLength: 1, maxLength: 200 }
+    ThreadSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - threadId
+        - issueId
+        - subject
+        - initialComment
+        - latestReply
+        - status
+        - priority
+        - assignee
+        - author
+        - perspectiveCode
+        - locator
+        - hasAttachments
+        - createdAt
+        - updatedAt
+      properties:
+        threadId: { type: string, format: uuid }
+        issueId: { type: integer, minimum: 1 }
+        subject: { type: string, maxLength: 255 }
+        initialComment: { type: string, maxLength: 65535 }
+        latestReply: { type: [string, 'null'], maxLength: 65535 }
+        status: { $ref: '#/components/schemas/NamedValue' }
+        priority:
+          oneOf: [{ $ref: '#/components/schemas/NamedValue' }, { type: 'null' }]
+        assignee:
+          oneOf: [{ $ref: '#/components/schemas/NamedValue' }, { type: 'null' }]
+        author: { $ref: '#/components/schemas/NamedValue' }
+        perspectiveCode: { type: [string, 'null'], maxLength: 100 }
+        locator:
+          oneOf: [{ $ref: '#/components/schemas/Locator' }, { type: 'null' }]
+        hasAttachments: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Thread:
+      type: object
+      additionalProperties: false
+      required:
+        - threadId
+        - issueId
+        - subject
+        - initialComment
+        - latestReply
+        - status
+        - priority
+        - assignee
+        - author
+        - perspectiveCode
+        - locator
+        - hasAttachments
+        - createdAt
+        - updatedAt
+        - description
+        - tracker
+        - timeline
+        - attachments
+        - redmineUrl
+        - diagnosticCount
+      properties:
+        threadId: { type: string, format: uuid }
+        issueId: { type: integer, minimum: 1 }
+        subject: { type: string, maxLength: 255 }
+        initialComment: { type: string, maxLength: 65535 }
+        latestReply: { type: [string, 'null'], maxLength: 65535 }
+        status: { $ref: '#/components/schemas/NamedValue' }
+        priority:
+          oneOf: [{ $ref: '#/components/schemas/NamedValue' }, { type: 'null' }]
+        assignee:
+          oneOf: [{ $ref: '#/components/schemas/NamedValue' }, { type: 'null' }]
+        author: { $ref: '#/components/schemas/NamedValue' }
+        perspectiveCode: { type: [string, 'null'], maxLength: 100 }
+        locator:
+          oneOf: [{ $ref: '#/components/schemas/Locator' }, { type: 'null' }]
+        hasAttachments: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        description: { type: string, maxLength: 65535 }
+        tracker: { $ref: '#/components/schemas/NamedValue' }
+        timeline:
+          type: array
+          items:
+            oneOf:
+              - { $ref: '#/components/schemas/Reply' }
+              - { $ref: '#/components/schemas/Activity' }
+              - { $ref: '#/components/schemas/DiagnosticActivity' }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/Attachment' }
+        redmineUrl: { type: [string, 'null'], format: uri }
+        diagnosticCount: { type: integer, minimum: 0 }
+    ThreadListResult:
+      type: object
+      additionalProperties: false
+      required: [threads, nextCursor]
+      properties:
+        threads:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ThreadSummary' }
+        nextCursor: { type: [string, 'null'], maxLength: 2048 }
+    ThreadResult:
+      type: object
+      additionalProperties: false
+      required: [thread]
+      properties:
+        thread: { $ref: '#/components/schemas/Thread' }
+    CreateThreadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - resourceRef
+        - threadId
+        - intentId
+        - comment
+        - perspectiveCode
+        - location
+        - target
+        - release
+        - locale
+        - capturedAt
+        - evidence
+      properties:
+        resourceRef: { $ref: '#/components/schemas/HostResourceRef' }
+        threadId: { type: string, format: uuid }
+        intentId: { type: string, format: uuid }
+        comment: { type: string, minLength: 1, maxLength: 20000 }
+        perspectiveCode: { type: string, minLength: 1, maxLength: 100 }
+        location: { $ref: '#/components/schemas/Location' }
+        target:
+          oneOf: [{ $ref: '#/components/schemas/Target' }, { type: 'null' }]
+        release: { type: string, minLength: 1, maxLength: 100 }
+        locale: { type: string, minLength: 2, maxLength: 35 }
+        capturedAt: { type: string, format: date-time }
+        evidence:
+          oneOf:
+            - $ref: '#/components/schemas/EvidenceMetadata'
+            - { type: 'null' }
+    EvidenceMetadata:
+      type: object
+      additionalProperties: false
+      required: [filename, contentType, byteSize, sha256, viewportWidth, viewportHeight, pixelRatio, capturedAt]
+      properties:
+        filename: { type: string, maxLength: 80 }
+        contentType: { type: string, enum: [image/png, image/webp] }
+        byteSize: { type: integer, minimum: 1, maximum: 10485760 }
+        sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        viewportWidth: { type: integer, minimum: 1, maximum: 32768 }
+        viewportHeight: { type: integer, minimum: 1, maximum: 32768 }
+        pixelRatio: { type: number, exclusiveMinimum: 0, maximum: 16 }
+        capturedAt: { type: string, format: date-time }
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable, requestId]
+      properties:
+        code:
+          type: string
+          enum:
+            - redmine.unauthenticated
+            - redmine.invalid_api_key
+            - redmine.permission_denied
+            - redmine.not_found
+            - redmine.duplicate_thread_id
+            - redmine.thread_mismatch
+            - redmine.content_type_rejected
+            - redmine.payload_too_large
+            - redmine.validation_failed
+            - redmine.rate_limited
+            - redmine.unavailable
+            - redmine.contract_invalid
+            - feedback.locator_too_large
+        message: { type: string, minLength: 1, maxLength: 500 }
+        retryable: { type: boolean }
+        upstreamStatus: { type: [integer, 'null'], minimum: 100, maximum: 599 }
+        requestId: { type: string, format: uuid }
+    ProblemEnvelope:
+      type: object
+      additionalProperties: false
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, const: false }
+        error: { $ref: '#/components/schemas/Problem' }

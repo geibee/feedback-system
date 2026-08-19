@@ -215,3 +215,335 @@ describe("Feedback JSON Schema", () => {
     expect(validate(withoutActor)).toBe(false);
   });
 });
+
+function redmineValidator(name: string) {
+  const localAjv = new Ajv2020({ allErrors: true, strict: false });
+  addFormats(localAjv);
+  const schemas = [
+    "location",
+    "target",
+    "redmine-host-resource-ref",
+    "redmine-client-profile",
+    "redmine-model",
+    "redmine-operation",
+    "redmine-client-state-message",
+    "redmine-extension-message",
+    "redmine-extension-profile",
+    "redmine-feedback-context"
+  ];
+  for (const dependency of schemas) {
+    const schema = JSON.parse(readFileSync(new URL(`../schemas/${dependency}.schema.json`, import.meta.url), "utf8"));
+    localAjv.addSchema(schema);
+  }
+  const validate = localAjv.getSchema(`https://feedback.example/schemas/${name}.v1.json`);
+  if (!validate) throw new Error(`${name}のvalidatorを作成できません`);
+  return validate;
+}
+
+const clientProfile = {
+  schemaVersion: "1",
+  id: "inventory-production",
+  displayName: "Inventory / Production",
+  applicationKey: "inventory",
+  environmentKey: "production",
+  externalWorkspaceKey: "production-review",
+  perspectives: [{ code: "ux", label: "UI/UX" }],
+  capture: {
+    enabled: true,
+    maximumUploadBytes: 10485760,
+    contentTypes: ["image/png", "image/webp"]
+  },
+  attachments: {
+    maximumInlinePreviewBytes: 10485760,
+    maximumDownloadBytes: 52428800
+  }
+};
+
+describe("Feedback Redmine JSON Schema", () => {
+  it("公開client profileへsecretや接続先を混入できない", () => {
+    const validate = redmineValidator("redmine-client-profile");
+    expect(validate(clientProfile), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...clientProfile, apiKey: "secret" })).toBe(false);
+    expect(validate({ ...clientProfile, redmineBaseUrl: "https://redmine.example.invalid" })).toBe(false);
+    expect(validate({ ...clientProfile, gatewayBasePath: "https://gateway.example.invalid" })).toBe(false);
+    expect(validate({ ...clientProfile, id: "Invalid Profile" })).toBe(false);
+  });
+
+  it("extension profileはHTTPS originと固定Redmine設定だけを受ける", () => {
+    const validate = redmineValidator("redmine-extension-profile");
+    const { schemaVersion: _schemaVersion, ...baseClientProfile } = clientProfile;
+    const extensionProfile = {
+      ...baseClientProfile,
+      hostOrigins: ["https://inventory.example.invalid"],
+      redmineBaseUrl: "https://redmine.example.invalid/redmine",
+      projectId: 12,
+      trackerId: 4,
+      isPrivate: true,
+      defaultPriorityId: 2,
+      customFieldIds: {
+        threadId: 21,
+        requestHash: 22,
+        applicationKey: 23,
+        environmentKey: 24,
+        externalWorkspaceKey: 25,
+        pageKey: 26,
+        hostResourceKey: 27,
+        perspectiveCode: 28,
+        locator: 29,
+        submittedById: 30,
+        submittedByName: 31,
+        submissionChannel: 32
+      }
+    };
+    expect(validate({ schemaVersion: "1", profiles: [extensionProfile] }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ schemaVersion: "1", profiles: [{ ...extensionProfile, apiKey: "secret" }] })).toBe(false);
+    expect(validate({ schemaVersion: "1", profiles: [{ ...extensionProfile, hostOrigins: ["http://inventory.example.invalid"] }] })).toBe(false);
+    expect(validate({ schemaVersion: "1", profiles: [{ ...extensionProfile, redmineBaseUrl: "https://user@redmine.example.invalid" }] })).toBe(false);
+  });
+
+  it("context attachmentは再構築情報を固定shapeで検証する", () => {
+    const validate = redmineValidator("redmine-feedback-context");
+    const context = {
+      schemaVersion: "1",
+      kind: "feedback-context",
+      threadId: "00000000-0000-4000-8000-000000000001",
+      intentId: "00000000-0000-4000-8000-000000000002",
+      requestHash: "a".repeat(64),
+      applicationKey: "inventory",
+      environmentKey: "production",
+      externalWorkspaceKey: "production-review",
+      pageKey: "orders.detail",
+      hostResourceKey: "opaque-resource-key",
+      release: "2026.08.19",
+      locale: "ja-JP",
+      perspectiveCode: "ux",
+      location: {
+        schemaVersion: "1",
+        pageKey: "orders.detail",
+        routeTemplate: "/orders/{orderId}",
+        pathParameters: { orderId: "sha256:value" },
+        queryParameters: {}
+      },
+      target: {
+        schemaVersion: "1",
+        kind: "ui-element",
+        elementKey: "approve-button",
+        relativeX: 0.5,
+        relativeY: 0.5
+      },
+      author: {
+        source: "host-session",
+        subjectId: "opaque-host-subject",
+        displayName: "利用者",
+        redmineUserId: null
+      },
+      capturedAt: "2026-08-19T00:00:00Z",
+      primaryEvidence: null
+    };
+    expect(validate(context), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...context, cookie: "session" })).toBe(false);
+    expect(validate({ ...context, requestHash: "ABC" })).toBe(false);
+  });
+
+  it("共通operationとextension固有messageをdiscriminatorごとに検証する", () => {
+    const operation = redmineValidator("redmine-operation");
+    const request = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000003",
+      type: "redmine.thread.get.v1",
+      payload: {
+        profileId: "inventory-production",
+        resourceRef: { schemaVersion: "1", kind: "record", key: "order-1" },
+        threadId: "00000000-0000-4000-8000-000000000001"
+      }
+    };
+    expect(operation(request), JSON.stringify(operation.errors)).toBe(true);
+    expect(operation({ ...request, url: "https://redmine.example.invalid/issues/1.json" })).toBe(false);
+    expect(operation({ ...request, payload: { ...request.payload, issueId: 1 } })).toBe(false);
+    expect(operation({
+      contractVersion: "1",
+      requestId: request.requestId,
+      type: "redmine.thread.list.v1",
+      ok: true,
+      result: { arbitrary: "value" }
+    })).toBe(false);
+
+    const streamStart = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000005",
+      type: "redmine.attachment.stream.start.v1",
+      payload: {
+        filename: "evidence.png",
+        contentType: "image/png",
+        byteSize: 4,
+        sha256: "a".repeat(64),
+        rawChunkSize: 196608,
+        totalChunks: 1
+      }
+    };
+
+    const extension = redmineValidator("redmine-extension-message");
+    expect(extension({
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000004",
+      type: "profile.unlock.v1",
+      payload: { profileId: "inventory-production", apiKey: "transient-user-key" }
+    }), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000004",
+      type: "profile.unlock.v1",
+      payload: { profileId: "inventory-production", apiKey: "key", redmineBaseUrl: "https://evil.invalid" }
+    })).toBe(false);
+    expect(extension({
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000004",
+      type: "profile.unlock.v1",
+      ok: true,
+      result: {
+        profileId: "inventory-production",
+        locked: false,
+        customFieldValidation: "not-yet-proven"
+      }
+    }), JSON.stringify(extension.errors)).toBe(true);
+    const diagnosticRequest = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000009",
+      type: "diagnostic.download.v1",
+      payload: { profileId: "inventory-production" }
+    };
+    expect(extension(diagnosticRequest), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({
+      contractVersion: "1",
+      requestId: diagnosticRequest.requestId,
+      type: diagnosticRequest.type,
+      ok: true,
+      result: {
+        schemaVersion: "1",
+        generatedAt: "2026-08-19T00:00:00Z",
+        entries: [{
+          requestId: "00000000-0000-4000-8000-000000000004",
+          operation: "profile.unlock.v1",
+          profileId: "inventory-production",
+          httpStatus: 200,
+          durationMilliseconds: 12.5,
+          errorCode: null
+        }]
+      }
+    }), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({ ...diagnosticRequest, payload: { ...diagnosticRequest.payload, threadId: "secret-business-key" } })).toBe(false);
+    expect(extension(streamStart), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({ ...streamStart, payload: { ...streamStart.payload, rawChunkSize: 1024 } })).toBe(false);
+    expect(extension({
+      contractVersion: "1",
+      requestId: streamStart.requestId,
+      type: "redmine.attachment.stream.chunk.v1",
+      payload: { index: 0, data: "dGVzdA==" }
+    }), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({
+      contractVersion: "1",
+      requestId: streamStart.requestId,
+      type: "redmine.attachment.stream.complete.v1",
+      payload: {}
+    }), JSON.stringify(extension.errors)).toBe(true);
+
+    const stateRequest = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000006",
+      type: "client-state.draft.set.v1",
+      payload: { profileId: "inventory-production", principalScopeHash: "a".repeat(64), draft: "draft" }
+    };
+    expect(extension(stateRequest), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({ ...stateRequest, payload: { ...stateRequest.payload, apiKey: "secret" } })).toBe(false);
+    const intentRequest = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000010",
+      type: "client-state.intent.set.v1",
+      payload: {
+        profileId: "inventory-production",
+        principalScopeHash: "b".repeat(64),
+        intent: {
+          schemaVersion: "1",
+          profileId: "inventory-production",
+          threadId: "00000000-0000-4000-8000-000000000001",
+          intentId: "00000000-0000-4000-8000-000000000002",
+          clientDraftHash: "c".repeat(64),
+          createdAt: "2026-08-19T00:00:00Z",
+          state: "uncertain"
+        }
+      }
+    };
+    expect(extension(intentRequest), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({
+      ...intentRequest,
+      payload: {
+        ...intentRequest.payload,
+        intent: { ...intentRequest.payload.intent, requestHash: "c".repeat(64) }
+      }
+    })).toBe(false);
+
+    const followStateRequest = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000008",
+      type: "client-state.follow.set.v1",
+      payload: {
+        profileId: "inventory-production",
+        state: {
+          schemaVersion: "1",
+          profileId: "inventory-production",
+          principalScopeHash: "a".repeat(64),
+          threadId: "00000000-0000-4000-8000-000000000001",
+          issueId: 123,
+          followed: true,
+          lastSeenJournalId: 100,
+          seenJournalIds: [10, 100],
+          lastSeenIssueUpdatedOn: "2026-08-19T00:00:00Z",
+          updatedAt: "2026-08-19T00:00:00Z"
+        }
+      }
+    };
+    expect(extension(followStateRequest), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({
+      ...followStateRequest,
+      payload: {
+        ...followStateRequest.payload,
+        state: { ...followStateRequest.payload.state, seenJournalIds: [10, 10] }
+      }
+    })).toBe(false);
+
+    const evidenceStart = {
+      contractVersion: "1",
+      requestId: "00000000-0000-4000-8000-000000000007",
+      type: "evidence.stream.start.v1",
+      payload: {
+        profileId: "inventory-production",
+        metadata: {
+          filename: "feedback-00000000-0000-4000-8000-000000000001.png",
+          contentType: "image/png",
+          byteSize: 4,
+          sha256: "a".repeat(64),
+          viewportWidth: 1,
+          viewportHeight: 1,
+          pixelRatio: 1,
+          capturedAt: "2026-08-19T00:00:00Z"
+        }
+      }
+    };
+    expect(extension(evidenceStart), JSON.stringify(extension.errors)).toBe(true);
+    expect(extension({ ...evidenceStart, profileId: "outside-envelope" })).toBe(false);
+  });
+
+  it("gateway OpenAPIは6つの共通operationを重複なく公開する", () => {
+    const source = readFileSync(new URL("../redmine-gateway.openapi.yaml", import.meta.url), "utf8");
+    const operations = [...source.matchAll(/x-feedback-operation: ([^\n]+)/g)].map((match) => match[1]);
+    expect(operations).toEqual([
+      "redmine.profile.get.v1",
+      "redmine.current-user.get.v1",
+      "redmine.thread.list.v1",
+      "redmine.thread.create.v1",
+      "redmine.thread.get.v1",
+      "redmine.attachment.get.v1"
+    ]);
+    expect(new Set(operations).size).toBe(6);
+  });
+});

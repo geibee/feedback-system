@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-model.v1.json",
+  "title": "Redmine公開response model v1",
+  "$defs": {
+    "namedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 }
+      }
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "location", "target"],
+      "properties": {
+        "v": { "const": "1" },
+        "location": { "$ref": "https://feedback.example/schemas/location.v1.json" },
+        "target": {
+          "oneOf": [
+            { "$ref": "https://feedback.example/schemas/target.v1.json" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canRead", "canCreate", "repliesReadOnly", "stateReadOnly"],
+      "properties": {
+        "canRead": { "type": "boolean" },
+        "canCreate": { "type": "boolean" },
+        "repliesReadOnly": { "const": true },
+        "stateReadOnly": { "const": true }
+      }
+    },
+    "profileResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "capabilities"],
+      "properties": {
+        "profile": { "$ref": "https://feedback.example/schemas/redmine-client-profile.v1.json" },
+        "capabilities": { "$ref": "#/$defs/capabilities" }
+      }
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectId", "displayName", "redmineUserId", "source"],
+      "properties": {
+        "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "displayName": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }] },
+        "redmineUserId": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "source": { "enum": ["host-session", "redmine-api-key"] }
+      }
+    },
+    "currentUserResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal"],
+      "properties": { "principal": { "$ref": "#/$defs/principal" } }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "filename", "byteSize", "contentType", "author", "createdAt", "inlinePreview", "primaryEvidence"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "byteSize": { "type": "integer", "minimum": 0 },
+        "contentType": { "oneOf": [{ "type": "string", "maxLength": 255 }, { "type": "null" }] },
+        "author": { "$ref": "#/$defs/namedValue" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "inlinePreview": { "type": "boolean" },
+        "primaryEvidence": { "type": "boolean" }
+      }
+    },
+    "reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "journalId", "body", "author", "createdAt", "updatedAt"],
+      "properties": {
+        "kind": { "const": "reply" },
+        "journalId": { "type": "integer", "minimum": 1 },
+        "body": { "type": "string", "maxLength": 65535 },
+        "author": { "$ref": "#/$defs/namedValue" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "journalId", "field", "oldValue", "newValue", "author", "createdAt"],
+      "properties": {
+        "kind": { "const": "activity" },
+        "journalId": { "type": "integer", "minimum": 1 },
+        "field": { "enum": ["status", "assignee", "priority", "tracker", "subject", "description", "attachment"] },
+        "oldValue": { "oneOf": [{ "type": "string", "maxLength": 65535 }, { "type": "null" }] },
+        "newValue": { "oneOf": [{ "type": "string", "maxLength": 65535 }, { "type": "null" }] },
+        "author": { "$ref": "#/$defs/namedValue" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "journalId", "message"],
+      "properties": {
+        "kind": { "const": "diagnostic" },
+        "journalId": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "threadSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threadId", "issueId", "subject", "initialComment", "latestReply", "status", "priority", "assignee", "author", "perspectiveCode", "locator", "hasAttachments", "createdAt", "updatedAt"],
+      "properties": {
+        "threadId": { "type": "string", "format": "uuid" },
+        "issueId": { "type": "integer", "minimum": 1 },
+        "subject": { "type": "string", "maxLength": 255 },
+        "initialComment": { "type": "string", "maxLength": 65535 },
+        "latestReply": { "oneOf": [{ "type": "string", "maxLength": 65535 }, { "type": "null" }] },
+        "status": { "$ref": "#/$defs/namedValue" },
+        "priority": { "oneOf": [{ "$ref": "#/$defs/namedValue" }, { "type": "null" }] },
+        "assignee": { "oneOf": [{ "$ref": "#/$defs/namedValue" }, { "type": "null" }] },
+        "author": { "$ref": "#/$defs/namedValue" },
+        "perspectiveCode": { "oneOf": [{ "type": "string", "maxLength": 100 }, { "type": "null" }] },
+        "locator": { "oneOf": [{ "$ref": "#/$defs/locator" }, { "type": "null" }] },
+        "hasAttachments": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "thread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threadId", "issueId", "subject", "initialComment", "latestReply", "status", "priority", "assignee", "author", "perspectiveCode", "locator", "hasAttachments", "createdAt", "updatedAt", "description", "tracker", "timeline", "attachments", "redmineUrl", "diagnosticCount"],
+      "properties": {
+        "threadId": { "type": "string", "format": "uuid" },
+        "issueId": { "type": "integer", "minimum": 1 },
+        "subject": { "type": "string", "maxLength": 255 },
+        "initialComment": { "type": "string", "maxLength": 65535 },
+        "latestReply": { "oneOf": [{ "type": "string", "maxLength": 65535 }, { "type": "null" }] },
+        "status": { "$ref": "#/$defs/namedValue" },
+        "priority": { "oneOf": [{ "$ref": "#/$defs/namedValue" }, { "type": "null" }] },
+        "assignee": { "oneOf": [{ "$ref": "#/$defs/namedValue" }, { "type": "null" }] },
+        "author": { "$ref": "#/$defs/namedValue" },
+        "perspectiveCode": { "oneOf": [{ "type": "string", "maxLength": 100 }, { "type": "null" }] },
+        "locator": { "oneOf": [{ "$ref": "#/$defs/locator" }, { "type": "null" }] },
+        "hasAttachments": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "description": { "type": "string", "maxLength": 65535 },
+        "tracker": { "$ref": "#/$defs/namedValue" },
+        "timeline": {
+          "type": "array",
+          "items": { "oneOf": [{ "$ref": "#/$defs/reply" }, { "$ref": "#/$defs/activity" }, { "$ref": "#/$defs/diagnostic" }] }
+        },
+        "attachments": { "type": "array", "items": { "$ref": "#/$defs/attachment" } },
+        "redmineUrl": { "oneOf": [{ "type": "string", "format": "uri" }, { "type": "null" }] },
+        "diagnosticCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "threadListResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threads", "nextCursor"],
+      "properties": {
+        "threads": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/threadSummary" } },
+        "nextCursor": { "oneOf": [{ "type": "string", "maxLength": 2048 }, { "type": "null" }] }
+      }
+    },
+    "threadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["thread"],
+      "properties": { "thread": { "$ref": "#/$defs/thread" } }
+    },
+    "attachmentContentMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "contentType", "byteSize", "sha256"],
+      "properties": {
+        "filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "contentType": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "byteSize": { "type": "integer", "minimum": 0, "maximum": 52428800 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

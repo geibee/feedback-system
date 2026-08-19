@@ -46,3 +46,21 @@ repositoryはKotlin/JDK/Gradleを含まず、空DB用clean V1をGo binaryへ埋�
 `bash scripts/verify-feedback.sh`と`bash scripts/smoke-feedback-standalone.sh`をJDKなしで完走させてからartifactを生成する。
 過去の稼働済みKotlin環境を移行する場合だけ、切替元image digestを別のrollback artifactとして保持する。
 release生成はGo 1.26.5とTrivy 0.70.0を要求し、別versionではfail-closedに停止する。
+
+## Redmine正本client
+
+Redmine正本経路のrelease候補は次で構成する。
+
+- `@feedback/redmine-core`、`@feedback/redmine-react`、`@feedback/redmine-plugin`、`@feedback/redmine-gateway`のtarball
+- React runtimeを含む`feedback-redmine-plugin-with-react.es.js`
+- reference gatewayのDocker image source
+- `apps/feedback-redmine-extension/dist/unpacked`と再現可能な`feedback-redmine-extension.zip`
+- OpenAPI、JSON Schema、Redmine gateway生成TypeScript型
+
+release前に`bash scripts/verify-feedback.sh`をskip変数なしで実行し、vanilla consumer、browser bundle scan、
+Chrome headless、non-root/read-only gateway container、digest固定Redmine matrixを通す。拡張ZIPは2回buildしたSHA-256が
+一致することを確認する。store署名・Chrome Web Store / Edge Add-onsへのupload、npm publish、OCI pushはrepositoryの
+release scriptでは行わない。registry/store credentialをrepositoryへ保存しない。
+
+対応下限はRedmine 5.1.12とする。`tests/redmine-conformance/images.lock.json`へ5.1.12、6.0.10、6.1.3、
+7.0.0のDocker Official Image digestを固定し、4-version matrixと全体検証を成功させてからreleaseを承認する。

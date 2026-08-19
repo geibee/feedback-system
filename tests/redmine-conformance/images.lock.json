@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "images": [
+    {
+      "version": "5.1.12",
+      "requestedTag": "5.1.12-bookworm",
+      "officialDigest": "sha256:074d757746f1439069f14d423bd0fa1a2861f7b3baa3014fab2d420f75828600",
+      "availability": "available"
+    },
+    {
+      "version": "6.0.10",
+      "requestedTag": "6.0.10-bookworm",
+      "officialDigest": "sha256:ad9c47dae308e5c04fe97433996c5defe21b8be39b1da86d43a50590f521e8c8",
+      "availability": "available"
+    },
+    {
+      "version": "6.1.3",
+      "requestedTag": "6.1.3-bookworm",
+      "officialDigest": "sha256:ed252f9d3c5eb928ea2aeb0d728a79f9590bf8ab4e7393ebe155055eb9af65eb",
+      "availability": "available"
+    },
+    {
+      "version": "7.0.0",
+      "requestedTag": "7.0.0-bookworm",
+      "officialDigest": "sha256:0ec7a0f75c42b89aab6872bfd73cfcce4547476da6a7ee065af2b960237bfb5c",
+      "availability": "available"
+    }
+  ]
+}

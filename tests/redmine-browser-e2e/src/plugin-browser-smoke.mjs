@@ -190,6 +190,55 @@ try {
     return launcher ? getComputedStyle(launcher).backgroundColor : "";
   });
   assert.equal(launcherBackground, "rgb(15, 23, 42)");
+  const maskRectangles = await page.evaluate(async () => {
+    document.body.style.minHeight = "1200px";
+    const fixture = document.createElement("section");
+    fixture.setAttribute("aria-label", "証跡マスク検査領域");
+    Object.assign(fixture.style, {
+      position: "absolute",
+      top: "360px",
+      left: "300px",
+      display: "grid",
+      gridTemplateColumns: "repeat(2, 110px)",
+      gap: "12px",
+      padding: "8px",
+      background: "white"
+    });
+    const text = document.createElement("div");
+    text.textContent = "顧客番号 12345";
+    text.dataset.feedbackMask = "";
+    Object.assign(text.style, { width: "110px", height: "44px", background: "#ef4444", color: "white" });
+    const input = document.createElement("input");
+    input.value = "secret@example.test";
+    input.dataset.feedbackMask = "";
+    Object.assign(input.style, { boxSizing: "border-box", width: "110px", height: "44px" });
+    const image = document.createElement("img");
+    image.alt = "秘匿画像";
+    image.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='110' height='44'%3E%3Crect width='110' height='44' fill='%232563eb'/%3E%3C/svg%3E";
+    image.dataset.feedbackMask = "";
+    Object.assign(image.style, { width: "110px", height: "44px" });
+    const nested = document.createElement("div");
+    nested.dataset.feedbackMask = "";
+    Object.assign(nested.style, { width: "110px", height: "44px", background: "#22c55e" });
+    const child = document.createElement("strong");
+    child.textContent = "ネストした秘密情報";
+    nested.appendChild(child);
+    fixture.append(text, input, image, nested);
+    document.body.appendChild(fixture);
+    await image.decode();
+    window.scrollTo(0, 250);
+    await new Promise((resolvePromise) => requestAnimationFrame(() => requestAnimationFrame(resolvePromise)));
+    return [text, input, image, nested].map((element, index) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        label: ["text", "input", "image", "nested"][index],
+        left: bounds.left,
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom
+      };
+    });
+  });
   await page.locator("[data-feedback-redmine-host]").evaluate((element) => {
     const launcher = element.shadowRoot?.querySelector(".feedback-redmine-launcher");
     if (!(launcher instanceof HTMLButtonElement)) throw new Error("launcherがありません");
@@ -228,6 +277,36 @@ try {
     return count;
   });
   assert(redMarkerPixels > 20, "スクリーンショットへFeedback位置ピンを焼き込む必要があります");
+  const maskedPixelRatios = await preview.evaluate(async (element, rectangles) => {
+    if (!(element instanceof HTMLImageElement)) throw new Error("証跡previewが画像ではありません");
+    await element.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = element.naturalWidth;
+    canvas.height = element.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("証跡previewを検査できません");
+    context.drawImage(element, 0, 0);
+    const scaleX = element.naturalWidth / window.innerWidth;
+    const scaleY = element.naturalHeight / window.innerHeight;
+    return rectangles.map((rectangle) => {
+      const inset = 2;
+      const left = Math.floor((rectangle.left + inset) * scaleX);
+      const top = Math.floor((rectangle.top + inset) * scaleY);
+      const right = Math.ceil((rectangle.right - inset) * scaleX);
+      const bottom = Math.ceil((rectangle.bottom - inset) * scaleY);
+      const pixels = context.getImageData(left, top, right - left, bottom - top).data;
+      let blackPixels = 0;
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] === 17 && pixels[index + 1] === 17 && pixels[index + 2] === 17 && pixels[index + 3] === 255) {
+          blackPixels += 1;
+        }
+      }
+      return { label: rectangle.label, ratio: blackPixels / (pixels.length / 4) };
+    });
+  }, maskRectangles);
+  maskedPixelRatios.forEach(({ label, ratio }) => {
+    assert(ratio > 0.99, `${label}の秘匿領域を最終PNG上で黒塗りする必要があります: ratio=${ratio}`);
+  });
   await page.getByLabel("最初のコメント").fill("実ブラウザからの初回投稿");
   await page.getByRole("button", { name: "Feedbackを送信" }).click();
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));

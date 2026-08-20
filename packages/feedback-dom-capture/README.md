@@ -14,5 +14,7 @@ const captureEvidence = createDomEvidenceProvider({
 
 既存consumerは`@geibee/react`または`@geibee/redmine-react`から同じAPIを引き続き利用できます。
 cross-origin画像やfontを含める場合は対象resourceのCORSを設定するか、capture対象から除外してください。
+mask selectorに一致する要素は、画像化後の最終PNG上で不透明な黒色に塗りつぶします。
+マスク画像のデコードまたは再生成に失敗した場合は、秘匿前の画像を返さずcapture全体を失敗させます。
 `html-to-image`が内部生成するSVGを画像化するため、HostのContent Security Policyでは
 `img-src`に`data:`を許可する必要があります。生成済みpreviewには`blob:`も使用します。

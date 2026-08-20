@@ -819,17 +819,6 @@
 .feedback-reply-form .feedback-button-primary,
 .feedback-status-button { align-self: flex-end; }
 
-.feedback-mask-active { position: relative !important; }
-.feedback-mask-active::after {
-  position: absolute;
-  z-index: 2147483640;
-  inset: 0;
-  display: block;
-  content: "";
-  pointer-events: none;
-  background: #111;
-}
-
 @media (max-width: 680px) {
   .feedback-review-guide-backdrop { padding: 8px; }
   .feedback-review-guide { max-height: calc(100vh - 16px); padding: 18px; }

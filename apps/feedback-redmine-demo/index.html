@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/demo.css" />
+    <title>Feedback Redmine ローカル評価</title>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">LOCAL EVALUATION</p>
+      <h1>Feedback Redmine</h1>
+      <p>右下のFeedbackボタンまたは画面上の右クリックから、このページへフィードバックを投稿できます。</p>
+      <section data-feedback-target="sample-card">
+        <h2>評価対象カード</h2>
+        <p>位置を指定して投稿し、スクリーンショット、詳細表示、返信、他の人の投稿一覧を確認してください。</p>
+        <a href="/?view=sample">サンプル導線</a>
+      </section>
+      <p id="feedback-status" role="status">Feedback設定を読み込んでいます…</p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

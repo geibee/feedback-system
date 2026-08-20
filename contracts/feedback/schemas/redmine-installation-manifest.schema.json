@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-installation-manifest.v1.json",
+  "title": "Feedback Redmine Installation Manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profileId",
+    "displayName",
+    "applicationKey",
+    "environmentKey",
+    "externalWorkspaceKey",
+    "redmineBaseUrl",
+    "project",
+    "trackerName",
+    "openStatusName",
+    "closedStatusName",
+    "defaultPriorityName",
+    "roleName",
+    "integrationUser",
+    "isPrivate",
+    "captureEnabled",
+    "showRedmineLink"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "profileId": { "$ref": "#/$defs/key" },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "applicationKey": { "$ref": "#/$defs/key" },
+    "environmentKey": { "$ref": "#/$defs/key" },
+    "externalWorkspaceKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "redmineBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identifier", "name"],
+      "properties": {
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 }
+      }
+    },
+    "trackerName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "openStatusName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "closedStatusName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "defaultPriorityName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "roleName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "integrationUser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["login", "firstName", "lastName", "mail"],
+      "properties": {
+        "login": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "firstName": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "lastName": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "mail": { "type": "string", "format": "email", "maxLength": 254 }
+      }
+    },
+    "isPrivate": { "type": "boolean" },
+    "captureEnabled": { "type": "boolean" },
+    "showRedmineLink": { "type": "boolean" }
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    }
+  }
+}

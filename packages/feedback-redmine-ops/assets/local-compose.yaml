@@ -1,0 +1,110 @@
+name: ${FEEDBACK_REDMINE_COMPOSE_PROJECT}
+
+services:
+  feedback-redmine-db:
+    image: docker.io/library/postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: redmine
+      POSTGRES_USER: redmine
+      POSTGRES_PASSWORD: ${FEEDBACK_REDMINE_DB_PASSWORD}
+    volumes:
+      - feedback-redmine-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  feedback-redmine:
+    image: redmine:7.0.0-bookworm@sha256:0ec7a0f75c42b89aab6872bfd73cfcce4547476da6a7ee065af2b960237bfb5c
+    restart: unless-stopped
+    environment:
+      REDMINE_DB_POSTGRES: feedback-redmine-db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: ${FEEDBACK_REDMINE_DB_PASSWORD}
+      REDMINE_SECRET_KEY_BASE: ${FEEDBACK_REDMINE_SECRET_KEY_BASE}
+      REDMINE_LANG: ja
+    ports:
+      - "127.0.0.1:${FEEDBACK_REDMINE_ADMIN_PORT}:3000"
+    volumes:
+      - feedback-redmine-files:/usr/src/redmine/files
+    depends_on:
+      feedback-redmine-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  feedback-redmine-bootstrap:
+    image: redmine:7.0.0-bookworm@sha256:0ec7a0f75c42b89aab6872bfd73cfcce4547476da6a7ee065af2b960237bfb5c
+    restart: "no"
+    user: "${FEEDBACK_REDMINE_HOST_UID}:${FEEDBACK_REDMINE_HOST_GID}"
+    working_dir: /usr/src/redmine
+    command: ["bundle", "exec", "rails", "runner", "/ops/provision.rb", "apply", "/state/installation.json", "/state", "--local-evaluation"]
+    environment:
+      RAILS_ENV: production
+      REDMINE_DB_POSTGRES: feedback-redmine-db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: ${FEEDBACK_REDMINE_DB_PASSWORD}
+      REDMINE_SECRET_KEY_BASE: ${FEEDBACK_REDMINE_SECRET_KEY_BASE}
+      REDMINE_NO_DB_MIGRATE: "1"
+    volumes:
+      - "${FEEDBACK_REDMINE_OPS_ASSETS}/provision.rb:/ops/provision.rb:ro"
+      - "${FEEDBACK_REDMINE_STATE_DIR}:/state"
+      - "${FEEDBACK_REDMINE_STATE_DIR}/database.yml:/usr/src/redmine/config/database.yml:ro"
+    depends_on:
+      feedback-redmine:
+        condition: service_healthy
+
+  feedback-redmine-gateway:
+    image: ${FEEDBACK_REDMINE_GATEWAY_IMAGE}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    user: "${FEEDBACK_REDMINE_HOST_UID}:${FEEDBACK_REDMINE_HOST_GID}"
+    environment:
+      NODE_ENV: development
+      PORT: "8080"
+      FEEDBACK_PUBLIC_ORIGIN: http://127.0.0.1:${FEEDBACK_REDMINE_DEMO_PORT}
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: /state/server-profile.json
+      FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE: /state/redmine-api-key
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: ${FEEDBACK_PARTICIPANT_SIGNING_KEY}
+    volumes:
+      - "${FEEDBACK_REDMINE_STATE_DIR}:/state:ro"
+    depends_on:
+      feedback-redmine-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:8080/internal/feedback-redmine/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  feedback-redmine-demo:
+    image: ${FEEDBACK_REDMINE_DEMO_IMAGE}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=16m,uid=101,gid=101,mode=0750
+      - /var/run:rw,noexec,nosuid,nodev,size=1m,uid=101,gid=101,mode=0750
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:${FEEDBACK_REDMINE_DEMO_PORT}:8080"
+    depends_on:
+      feedback-redmine-gateway:
+        condition: service_healthy
+
+volumes:
+  feedback-redmine-db:
+  feedback-redmine-files:

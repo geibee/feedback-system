@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** gateway processのlivenessを取得する */
+        get: operations["getRedmineGatewayLiveness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * gatewayの必須設定とsecretが読み込み済みか確認する
+         * @description Redmine上流の疎通は再起動判定へ含めず、運用doctorで確認する。
+         */
+        get: operations["getRedmineGatewayReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileId}/participants": {
         parameters: {
             query?: never;
@@ -150,6 +187,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Health: {
+            /** @constant */
+            status: "ok";
+        };
         HostResourceRef: {
             /** @constant */
             schemaVersion: "1";
@@ -516,6 +557,50 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRedmineGatewayLiveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description processはrequestを処理できる */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    "X-Content-Type-Options": components["headers"]["NoSniff"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    getRedmineGatewayReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description gatewayはFeedback requestを受け付けられる */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    "X-Content-Type-Options": components["headers"]["NoSniff"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
     createRedmineParticipant: {
         parameters: {
             query?: never;

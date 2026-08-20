@@ -1,7 +1,7 @@
 {
   "name": "@feedback/redmine-gateway-reference",
   "version": "1.0.0-alpha.2",
-  "description": "stateless Feedback Redmine gatewayのNode.js組込例",
+  "description": "本番配布可能なstateless Feedback Redmine gateway server",
   "private": true,
   "type": "module",
   "files": [

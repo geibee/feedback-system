@@ -40,9 +40,26 @@ APIまたはDTOを変更するときは、同じ変更で次を更新する。
 3. gateway、core、consumerのcontract test
 4. この互換性文書と各package CHANGELOG
 
+gatewayは`GET /health/live`と`GET /health/ready`を公開する。両endpointの成功bodyは`{"status":"ok"}`で、認証や
+Redmine業務データを返さない。readyはprocessと起動時設定の判定であり、Redmineまでの疎通契約はops CLIの`doctor`が担う。
+
+配備時設定`redmine-runtime-config.v1`は`schemaVersion`、`enabled`、`profileId`、root-relativeな`gatewayBasePath`だけを許可する。
+`@feedback/redmine-plugin/loader`のruntime loaderは同一originから`no-store`で取得し、unknown propertyや外部URLをfail-closedで拒否する。
+このschemaへsecretまたはRedmine数値IDを追加する変更は許可しない。
+
+repository内のSPAとclean consumer検証はVite 8.2を標準とする。公開`@feedback/*` packageはViteをruntime依存または
+peer dependencyに持たず、React 18または19とbundlerはhostが提供する。この標準bundlerの更新だけで公開API互換性は変更しない。
+
+既存Redmine導入は`redmine-installation-manifest.v1`を名前ベースの入力、`redmine-provision-plan.v1`と
+`redmine-provision-result.v1`をreview／実ID出力の契約とする。installation manifestへ環境固有IDやsecretを追加せず、
+provisionerのapplyは同じplan digestを必須にする。
+
 ### SPA loader contract
 
-標準入口は`@feedback/redmine-plugin/loader`の`createRedmineFeedbackPluginController()`である。公開controllerは次を持つ。
+標準入口は`@feedback/redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`である。
+host feature flagを直接制御する場合は`createRedmineFeedbackPluginController()`も維持する。公開controllerは次を持つ。
+runtime config取得は既定5秒でtimeoutし、`signal`でhost lifecycleから中止できる。callerによる中止はavailability errorとして
+`onUnavailable`へ通知せず、timeoutと取得失敗だけを通知する。
 
 - `state`: `disabled | loading | enabled | destroyed`
 - `setEnabled(boolean)`: feature flagに追従し、同値の重複操作を冪等に扱う

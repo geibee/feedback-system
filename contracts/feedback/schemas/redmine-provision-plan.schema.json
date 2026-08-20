@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-provision-plan.v1.json",
+  "title": "Feedback Redmine Provision Plan V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "redmineVersion", "profileId", "operations", "conflicts", "planDigest"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "redmineVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "profileId": { "$ref": "#/$defs/key" },
+    "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" }, "maxItems": 100 },
+    "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" }, "maxItems": 100 },
+    "planDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "$defs": {
+    "key": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "action", "detail"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "action": { "enum": ["create", "reuse"] },
+        "id": { "type": "integer", "minimum": 1 },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "detail"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "id": { "type": "integer", "minimum": 1 },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "expected": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{ "type": "integer", "minimum": 1 }, { "type": "integer", "minimum": 1 }],
+            "items": false
+          },
+          "maxItems": 100
+        },
+        "actual": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{ "type": "integer", "minimum": 1 }, { "type": "integer", "minimum": 1 }],
+            "items": false
+          },
+          "maxItems": 100
+        }
+      }
+    }
+  }
+}

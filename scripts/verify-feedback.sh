@@ -24,8 +24,11 @@ bash -n scripts/build-feedback-sdk-release.sh
 bash -n scripts/build-feedback-redmine-release.sh
 bash -n scripts/smoke-feedback-redmine.sh
 
-node_major=$(node -p 'Number(process.versions.node.split(".")[0])')
-(( node_major >= 22 )) || fail "Node.js 22以上が必要です"
+node_supported=$(node -p '
+  const [major, minor] = process.versions.node.split(".").map(Number);
+  String((major === 22 && minor >= 12) || major === 23 || major === 24);
+')
+[[ "$node_supported" == "true" ]] || fail "Node.js 22.12以上25未満が必要です"
 
 if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   log "clean npm install"
@@ -40,6 +43,7 @@ for package_name in @feedback/contracts @feedback/core; do
 done
 
 bash scripts/check-feedback-redmine-packages.sh
+bash scripts/check-feedback-redmine-ops.sh
 
 bash scripts/check-feedback-contracts.sh
 bash scripts/check-feedback-redmine-security.sh

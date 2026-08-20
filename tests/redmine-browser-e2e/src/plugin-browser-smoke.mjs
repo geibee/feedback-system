@@ -58,7 +58,7 @@ const entry = manifest["index.html"];
 if (!entry) throw new Error("fixtureのVite manifestにindex entryがありません");
 const lazyAssetPaths = (entry.dynamicImports ?? []).map((key) => {
   const chunk = manifest[key];
-  if (!chunk?.isDynamicEntry) throw new Error(`dynamic chunkがmanifestにありません: ${key}`);
+  if (!chunk?.file) throw new Error(`dynamic import先がmanifestにありません: ${key}`);
   return `/${chunk.file}`;
 });
 const mountAssetPath = Object.values(manifest).find((chunk) => chunk.isDynamicEntry && chunk.name === "mount")?.file;
@@ -87,6 +87,14 @@ const server = createServer(async (request, response) => {
     response.writeHead(204);
     response.end();
     return;
+  }
+  if (url.pathname === "/.well-known/feedback-redmine.json") {
+    return respondJson(response, {
+      schemaVersion: "1",
+      enabled: false,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1"
+    });
   }
   const base = "/internal/feedback-redmine/v1/profiles/inventory-production";
   if (request.method === "POST" && url.pathname === `${base}/participants`) {

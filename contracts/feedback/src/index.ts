@@ -7,6 +7,72 @@ export const feedbackManifestSchemaVersion = "1" as const;
 export const feedbackTargetSchemaVersion = "1" as const;
 export const feedbackRedmineContractVersion = "1" as const;
 
+export type RedmineRuntimeConfigV1 = {
+  schemaVersion: "1";
+  enabled: boolean;
+  profileId: string;
+  gatewayBasePath: string;
+};
+
+export type RedmineInstallationManifestV1 = {
+  schemaVersion: "1";
+  profileId: string;
+  displayName: string;
+  applicationKey: string;
+  environmentKey: string;
+  externalWorkspaceKey: string;
+  redmineBaseUrl: string;
+  project: { identifier: string; name: string };
+  trackerName: string;
+  openStatusName: string;
+  closedStatusName: string;
+  defaultPriorityName: string;
+  roleName: string;
+  integrationUser: { login: string; firstName: string; lastName: string; mail: string };
+  isPrivate: boolean;
+  captureEnabled: boolean;
+  showRedmineLink: boolean;
+};
+
+export type RedmineProvisionResultV1 = {
+  schemaVersion: "1";
+  redmineVersion: string;
+  projectId: number;
+  trackerId: number;
+  openStatusId: number;
+  closedStatusId: number;
+  defaultPriorityId: number;
+  integrationUserId: number;
+  customFieldIds: {
+    threadId: number;
+    requestHash: number;
+    applicationKey: number;
+    environmentKey: number;
+    externalWorkspaceKey: number;
+    pageKey: number;
+    hostResourceKey: number;
+    perspectiveCode: number;
+    locator: number;
+    submittedById: number;
+    submittedByName: number;
+  };
+};
+
+export type RedmineProvisionPlanV1 = {
+  schemaVersion: "1";
+  redmineVersion: string;
+  profileId: string;
+  operations: Array<{ key: string; action: "create" | "reuse"; id?: number; detail: string }>;
+  conflicts: Array<{
+    key: string;
+    id?: number;
+    detail: string;
+    expected?: Array<[number, number]>;
+    actual?: Array<[number, number]>;
+  }>;
+  planDigest: string;
+};
+
 export type FeedbackCapabilities = components["schemas"]["FeedbackCapabilities"];
 export type FeedbackHostContextV1 = components["schemas"]["FeedbackHostContextV1"];
 export type FeedbackApplicationManifestV1 = components["schemas"]["FeedbackApplicationManifestV1"];

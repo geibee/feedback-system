@@ -1,5 +1,15 @@
 # Redmine正本SPA Quickstart
 
+ローカル評価、既存Redmine、本番、backup、upgradeを含む完全な手順は
+[`feedback-redmine-installation.md`](feedback-redmine-installation.md)を参照する。
+
+ローカル評価だけなら次で起動できる。
+
+```bash
+npm ci
+npm run feedback:redmine:local
+```
+
 新規導入の標準構成は、Feedback pluginをSPA bundleへ同梱し、同一originのstateless gatewayからRedmineへ接続する方式である。
 Feedback専用PostgreSQL、object storage、OIDC Provider、browser拡張機能は必要ない。利用者はFeedback UIから位置指定投稿、
 返信、自己編集を行い、開発者はRedmineから返信、担当、優先度、状態を更新する。双方の更新は同じRedmine issue/journalから表示される。
@@ -22,32 +32,41 @@ participant credentialも自己編集の所有確認だけを目的とする。g
 ## 3. SPAへ同梱する
 
 React 18または19を使うSPAへ`@feedback/redmine-plugin`を追加し、単一のintegration moduleからloader controllerを作る。
-controllerの作成だけではReact UI、DOM、通信、timer、router購読を開始しない。
+runtime loaderは最初に公開設定だけを取得し、`enabled:false`ではReact UI、DOM、gateway通信、timer、router購読を開始しない。
 
 ```ts
-import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { useEffect } from "react";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
 
-export const feedback = createRedmineFeedbackPluginController({
-  profileId: "inventory-production",
-  adapter,
-  contextMenu: true,
-  targetResolver: mapTargetResolver,
-  pinPositionProvider: mapPinPositionProvider,
-  onUnavailable: (error) => console.error("Feedbackを利用できません", error)
-});
-
-await feedback.setEnabled(featureFlags.feedback ?? true);
-const unsubscribe = featureFlags.subscribe("feedback", (enabled) => {
-  void feedback.setEnabled(enabled);
-});
-
-export function disposeFeedback(): void {
-  unsubscribe();
-  feedback.destroy();
+export function FeedbackIntegration(): null {
+  useEffect(() => {
+    const abort = new AbortController();
+    let feedback: RedmineFeedbackPluginController | null = null;
+    void createRedmineFeedbackPluginControllerFromRuntimeConfig({
+      adapter,
+      contextMenu: true,
+      targetResolver: mapTargetResolver,
+      pinPositionProvider: mapPinPositionProvider,
+      signal: abort.signal,
+      onUnavailable: (error) => console.error("Feedbackを利用できません", error)
+    }).then((created) => {
+      if (abort.signal.aborted) created?.destroy();
+      else feedback = created;
+    });
+    return () => {
+      abort.abort();
+      feedback?.destroy();
+    };
+  }, []);
+  return null;
 }
 ```
 
-feature flag未指定時は有効を既定とする。`setEnabled(false)`は進行中request、polling、購読、React rootとcontroller所有DOMを
+`/.well-known/feedback-redmine.json`の`enabled`を配備時feature flagとして使い、次回ページロードから反映する。
+取得は既定5秒でtimeoutする。React cleanupの`AbortSignal`により、StrictMode、route遷移、microfrontend破棄後の遅延mountを防ぐ。
+origin rootを変更できないsubpath配備では`configPath: "/inventory/.well-known/feedback-redmine.json"`のように明示する。
+`setEnabled(false)`は進行中request、polling、購読、React rootとcontroller所有DOMを
 破棄するが、draft、follow、pending intentは保持する。再度`true`にするとdynamic importから再mountする。
 
 `＋ フィードバック`は対象選択modeへ入り、`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
@@ -73,8 +92,8 @@ digest固定conformanceを含み、未実行を成功として扱わない。
 
 ## 無効化と完全撤去
 
-- 一時停止: feature flagをfalseにし、`setEnabled(false)`を呼ぶ。SPAの再buildは不要で、ローカル状態は保持する。
-- 完全撤去: 先に`await feedback.purgeLocalState()`で現在origin・profileの端末状態だけを削除し、integration moduleの呼出し、
+- 一時停止: runtime configをfalseへ配備してページをreloadするか、`setEnabled(false)`を呼ぶ。SPAの再buildは不要で、ローカル状態は保持する。
+- 完全撤去: 先に`await feedback?.purgeLocalState()`で現在origin・profileの端末状態だけを削除し、integration moduleの呼出し、
   `@feedback/redmine-plugin`依存、gateway mountを削除する。
 - `purgeLocalState()`はparticipant credentialも削除する。再有効化後は新しいUUIDとなり、以前の投稿を自己編集できない。
 - Redmineのissue、journal、attachment、custom fieldsはpluginの無効化・撤去では削除しない。

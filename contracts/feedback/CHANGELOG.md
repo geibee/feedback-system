@@ -2,6 +2,8 @@
 
 ## 2026-08-20
 
+- Redmine gatewayのlive/ready health endpoint、配備時runtime config、名前ベースinstallation manifest、provision plan/result schemaを追加。
+- runtime configのgateway path制約をbrowser側validatorと同期した。
 - Redmine thread一覧へ後方互換なWorkspace scopeと`totalCount`を追加し、resource cursor v1と分離したWorkspace cursorを定義。
 - Redmine thread createへ、同一origin・対象threadへ限定した任意`threadUrl`を追加。
 

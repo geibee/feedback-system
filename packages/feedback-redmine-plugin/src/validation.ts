@@ -45,7 +45,8 @@ export function validateGatewayBasePath(value: string): string {
     value.includes("\\") ||
     value.includes("?") ||
     value.includes("#") ||
-    value.includes("@")
+    value.includes("@") ||
+    value.length > 512
   ) throw new Error("gatewayBasePathは同一originのrelative pathである必要があります");
   for (const segment of value.split("/")) {
     let decoded: string;

@@ -15,6 +15,8 @@ trap cleanup_feedback_package_tmp EXIT
 
 tarball_dir="$feedback_package_tmp/tarballs"
 feedback_npm_cache="$feedback_package_tmp/npm-cache"
+vite_version=8.2.1
+vite_react_plugin_version=6.0.5
 mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
   @feedback/contracts
@@ -101,7 +103,8 @@ for index in "${!react_versions[@]}"; do
     npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
       "react@$react_version" "react-dom@$react_version" \
       "@types/react@${react_type_versions[$index]}" "@types/react-dom@${react_dom_type_versions[$index]}" \
-      "typescript@${typescript_versions[$index]}" vite@5.4.21 @vitejs/plugin-react@4.7.0 \
+      "typescript@${typescript_versions[$index]}" "vite@$vite_version" \
+      "@vitejs/plugin-react@$vite_react_plugin_version" \
       vitest@4.1.9 jsdom@29.1.1 @testing-library/react@16.3.2 react-router-dom@6.30.1
     npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
       "${tarballs[contracts]}" "${tarballs[core]}" "${tarballs["dom-capture"]}" "${tarballs["react-ui"]}" "${tarballs[react]}"
@@ -123,7 +126,7 @@ for index in "${!react_versions[@]}"; do
       node --input-type=module -e 'await import("@feedback/admin-react")'
     fi
   )
-  echo "[feedback-package] PASS: clean Vite React $react_version fixture"
+  echo "[feedback-package] PASS: clean Vite $vite_version / React $react_version fixture"
 done
 
 # alpha tarballと同じ公開surfaceを、version/internal dependencyだけ1.0.0へ昇格した候補で再検証する。
@@ -159,7 +162,8 @@ cp -R tests/fixtures/feedback-sdk-vite "$stable_fixture"
   cd "$stable_fixture"
   npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
     react@19.1.1 react-dom@19.1.1 @types/react@19.1.9 @types/react-dom@19.1.7 \
-    typescript@5.9.3 vite@5.4.21 @vitejs/plugin-react@4.7.0 vitest@4.1.9 jsdom@29.1.1 \
+    typescript@5.9.3 "vite@$vite_version" "@vitejs/plugin-react@$vite_react_plugin_version" \
+    vitest@4.1.9 jsdom@29.1.1 \
     @testing-library/react@16.3.2 react-router-dom@6.30.1 maplibre-gl@5.24.0
   npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
     "${stable_tarballs[contracts]}" "${stable_tarballs[core]}" "${stable_tarballs["dom-capture"]}" \

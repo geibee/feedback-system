@@ -23,9 +23,10 @@ fi
 
 gateway_image='feedback-redmine-gateway-reference:verification'
 docker build -f apps/feedback-redmine-gateway-reference/Dockerfile -t "$gateway_image" .
-[[ "$(docker image inspect "$gateway_image" --format '{{.Config.User}}')" == "node" ]] || fail "gateway imageがnon-rootではありません"
+[[ "$(docker image inspect "$gateway_image" --format '{{.Config.User}}')" == "nonroot" ]] || fail "gateway imageがnon-rootではありません"
 
 gateway_tmp=$(mktemp -d -t feedback-redmine-gateway.XXXXXX)
+chmod 0755 "$gateway_tmp"
 gateway_container="feedback-redmine-gateway-smoke-$RANDOM-$$"
 cleanup_gateway() {
   docker rm -f "$gateway_container" >/dev/null 2>&1 || true
@@ -65,6 +66,7 @@ gateway_participant_secret=$(openssl rand -hex 64)
 docker run -d --name "$gateway_container" --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1::8080 \
   -v "$gateway_tmp:/config:ro" \
+  -e FEEDBACK_PUBLIC_ORIGIN=https://app.example.test \
   -e FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE=/config/profile.json \
   -e FEEDBACK_REDMINE_GATEWAY_API_KEY="$gateway_api_key" \
   -e FEEDBACK_PARTICIPANT_SIGNING_KEY="$gateway_participant_secret" \
@@ -75,7 +77,7 @@ ready=0
 status=000
 for _attempt in $(seq 1 40); do
   status=$(curl -sS -o /dev/null -w '%{http_code}' \
-    -H "Origin: http://127.0.0.1:$gateway_port" -H 'Sec-Fetch-Site: same-origin' \
+    -H "Origin: https://app.example.test" -H 'Sec-Fetch-Site: same-origin' \
     "http://127.0.0.1:$gateway_port/internal/feedback-redmine/v1/profiles/container-smoke" || true)
   if [[ "$status" == "200" ]]; then ready=1; break; fi
   sleep 0.25

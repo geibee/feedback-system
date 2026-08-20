@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1",
+  "profileId": "inventory-production",
+  "displayName": "Inventory / Production",
+  "applicationKey": "inventory",
+  "environmentKey": "production",
+  "externalWorkspaceKey": "production-review",
+  "redmineBaseUrl": "https://redmine.example.test",
+  "project": {
+    "identifier": "feedback-inventory",
+    "name": "Inventory Feedback"
+  },
+  "trackerName": "Feedback",
+  "openStatusName": "New",
+  "closedStatusName": "Closed",
+  "defaultPriorityName": "Normal",
+  "roleName": "Feedback integration",
+  "integrationUser": {
+    "login": "feedback_integration",
+    "firstName": "Feedback",
+    "lastName": "Integration",
+    "mail": "feedback-integration@example.test"
+  },
+  "isPrivate": true,
+  "captureEnabled": true,
+  "showRedmineLink": false
+}

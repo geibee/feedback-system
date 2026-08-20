@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- strictなsame-origin配備時設定`/.well-known/feedback-redmine.json`を読むruntime loaderを追加し、設定失敗時はfail-closedにした。
+- runtime config取得へ既定5秒のtimeoutと`AbortSignal`を追加し、React hostの破棄後に遅延mountしないようにした。
 - gateway署名participant credentialをlocalStorageへ保存し、OIDC/session/CSRF callbackに依存しない公開modeへ変更。
 - 位置選択、右クリック、MapLibre target/pin provider、返信、自己編集を追加。
 - Workspace scope一覧と総件数をgateway transportへ追加。

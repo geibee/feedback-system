@@ -14,11 +14,17 @@ export function createReferenceGatewayServer(
     participantSigningKey: config.participantSigningKey,
     loadProfile: async (profileId) => config.profiles.get(profileId) ?? null,
     loadSecret: async (secretRef) => config.secrets.get(secretRef) ?? null,
+    allowHttpDevelopment: config.allowHttpDevelopment,
     fetch: redmineFetch
   });
   return createServer(async (incoming, outgoing) => {
     try {
-      const request = toRequest(incoming);
+      if (incoming.method === "GET" && (incoming.url === "/internal/feedback-redmine/v1/health/live" ||
+          incoming.url === "/internal/feedback-redmine/v1/health/ready")) {
+        writeHealth(outgoing);
+        return;
+      }
+      const request = toRequest(incoming, config.publicOrigin);
       const response = await handler(request);
       await writeResponse(response, outgoing);
     } catch {
@@ -41,11 +47,7 @@ export function createReferenceGatewayServer(
   });
 }
 
-function toRequest(incoming: IncomingMessage): Request {
-  const host = incoming.headers.host;
-  if (!host) throw new Error("Host headerがありません");
-  const origin = incoming.headers.origin;
-  const scheme = origin?.startsWith("https://") ? "https" : "http";
+function toRequest(incoming: IncomingMessage, publicOrigin: string): Request {
   const headers = new Headers();
   for (const [name, value] of Object.entries(incoming.headers)) {
     if (Array.isArray(value)) value.forEach((entry) => headers.append(name, entry));
@@ -57,7 +59,16 @@ function toRequest(incoming: IncomingMessage): Request {
     init.body = Readable.toWeb(incoming) as ReadableStream<Uint8Array>;
     init.duplex = "half";
   }
-  return new Request(`${scheme}://${host}${incoming.url ?? "/"}`, init);
+  return new Request(new URL(incoming.url ?? "/", publicOrigin), init);
+}
+
+function writeHealth(outgoing: ServerResponse): void {
+  outgoing.writeHead(200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff"
+  });
+  outgoing.end(JSON.stringify({ status: "ok" }));
 }
 
 async function writeResponse(response: Response, outgoing: ServerResponse): Promise<void> {
@@ -71,6 +82,6 @@ if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const config = loadReferenceGatewayConfig();
   const server = createReferenceGatewayServer(config);
   server.listen(config.port, "0.0.0.0", () => {
-    process.stdout.write(`Feedback Redmine gateway reference listening on ${config.port}\n`);
+    process.stdout.write(`Feedback Redmine gateway listening on ${config.port}\n`);
   });
 }

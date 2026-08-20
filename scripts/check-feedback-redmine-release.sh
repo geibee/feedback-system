@@ -29,15 +29,24 @@ const expected = [
   "@feedback/redmine-core",
   "@feedback/redmine-react",
   "@feedback/redmine-plugin",
-  "@feedback/redmine-gateway"
+  "@feedback/redmine-gateway",
+  "@feedback/redmine-ops"
 ];
-if (manifest.schemaVersion !== "1" || manifest.product !== "feedback-redmine-spa" ||
+if (manifest.schemaVersion !== "1" || manifest.product !== "feedback-redmine" ||
     manifest.version !== "1.0.0-release-check.1" || JSON.stringify(manifest.publishOrder) !== JSON.stringify(expected)) {
   throw new Error("Redmine release manifestが不正です");
 }
 if (manifest.packages.length !== expected.length || manifest.packages.some((item, index) =>
   item.name !== expected[index] || !/^[a-f0-9]{64}$/u.test(item.sha256) || !fs.existsSync(path.join(directory, item.filename)))) {
   throw new Error("Redmine release package一覧が不正です");
+}
+if (!Array.isArray(manifest.images) || manifest.images.length !== 2 ||
+    manifest.images.map((item) => item.name).join(",") !== "feedback-redmine-gateway,feedback-redmine-demo" ||
+    manifest.images.some((item) => !/^[a-f0-9]{64}$/u.test(item.sha256) ||
+      item.platforms.join(",") !== "linux/amd64,linux/arm64" || !fs.existsSync(path.join(directory, item.archive)) ||
+      item.reports.length !== 2 || item.reports.some((report) =>
+        !fs.existsSync(path.join(directory, report.sbom)) || !fs.existsSync(path.join(directory, report.vulnerabilityReport))))) {
+  throw new Error("Redmine OCI release一覧が不正です");
 }
 const filenames = fs.readdirSync(directory).join("\n");
 if (/extension|with-react/iu.test(filenames)) throw new Error("廃止artifactがRedmine releaseへ混入しています");

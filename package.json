@@ -3,7 +3,7 @@
   "version": "1.0.0-alpha.2",
   "private": true,
   "engines": {
-    "node": ">=22 <25"
+    "node": ">=22.12 <25"
   },
   "workspaces": [
     "apps/feedback-admin",
@@ -20,7 +20,9 @@
     "packages/feedback-redmine-react",
     "packages/feedback-redmine-plugin",
     "packages/feedback-redmine-gateway",
+    "packages/feedback-redmine-ops",
     "apps/feedback-redmine-gateway-reference",
+    "apps/feedback-redmine-demo",
     "tests/redmine-conformance",
     "tests/redmine-browser-e2e",
     "tests/fixtures/feedback-redmine-plugin-vanilla"
@@ -29,14 +31,16 @@
     "build": "npm run build:redmine",
     "build:shared": "npm --workspace @feedback/contracts run build && npm --workspace @feedback/core run build && npm --workspace @feedback/dom-capture run build && npm --workspace @feedback/react-ui run build",
     "build:redmine:packages": "npm --workspace @feedback/maplibre run build && npm --workspace @feedback/redmine-core run build && npm --workspace @feedback/redmine-react run build && npm --workspace @feedback/redmine-plugin run build && npm --workspace @feedback/redmine-gateway run build",
+    "build:redmine:ops": "npm --workspace @feedback/redmine-ops run build",
     "build:legacy:packages": "npm --workspace @feedback/react run build && npm --workspace @feedback/maplibre run build && npm --workspace @feedback/admin-react run build",
     "build:legacy:apps": "npm --workspace @feedback/admin-console run build && npm --workspace @feedback/token-broker-reference run build && npm --workspace @feedback/conformance-consumer run build",
-    "build:redmine": "npm run build:shared && npm run build:redmine:packages",
-    "build:reference": "npm run build:redmine && npm --workspace @feedback/redmine-gateway-reference run build",
+    "build:redmine": "npm run build:shared && npm run build:redmine:packages && npm run build:redmine:ops",
+    "build:reference": "npm run build:redmine && npm --workspace @feedback/redmine-gateway-reference run build && npm --workspace @feedback/redmine-demo run build",
     "build:legacy": "npm run build:shared && npm run build:legacy:packages && npm run build:legacy:apps",
-    "build:all": "npm run build:shared && npm run build:redmine:packages && npm --workspace @feedback/redmine-gateway-reference run build && npm run build:legacy:packages && npm run build:legacy:apps",
+    "build:all": "npm run build:shared && npm run build:redmine:packages && npm run build:redmine:ops && npm --workspace @feedback/redmine-gateway-reference run build && npm --workspace @feedback/redmine-demo run build && npm run build:legacy:packages && npm run build:legacy:apps",
     "test": "bash scripts/verify-feedback.sh",
     "smoke:redmine": "bash scripts/smoke-feedback-redmine.sh",
+    "feedback:redmine:local": "bash scripts/start-feedback-redmine-local.sh",
     "release:redmine": "bash scripts/build-feedback-redmine-release.sh",
     "release:legacy:sdk": "bash scripts/build-feedback-sdk-release.sh",
     "release:legacy:go": "bash scripts/build-feedback-go-release.sh",

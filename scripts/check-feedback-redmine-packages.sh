@@ -13,7 +13,9 @@ packages=(
   @feedback/redmine-react
   @feedback/redmine-plugin
   @feedback/redmine-gateway
+  @feedback/redmine-ops
   @feedback/redmine-gateway-reference
+  @feedback/redmine-demo
   feedback-redmine-plugin-vanilla-fixture
   @feedback/redmine-browser-e2e
   @feedback/redmine-conformance

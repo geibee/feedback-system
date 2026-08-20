@@ -12,7 +12,37 @@ servers:
     description: 業務アプリケーションと同一originの相対path
 tags:
   - name: Redmine feedback
+  - name: Health
 paths:
+  /health/live:
+    get:
+      operationId: getRedmineGatewayLiveness
+      tags: [Health]
+      summary: gateway processのlivenessを取得する
+      responses:
+        '200':
+          description: processはrequestを処理できる
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /health/ready:
+    get:
+      operationId: getRedmineGatewayReadiness
+      tags: [Health]
+      summary: gatewayの必須設定とsecretが読み込み済みか確認する
+      description: Redmine上流の疎通は再起動判定へ含めず、運用doctorで確認する。
+      responses:
+        '200':
+          description: gatewayはFeedback requestを受け付けられる
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
   /profiles/{profileId}/participants:
     post:
       operationId: createRedmineParticipant
@@ -449,6 +479,12 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemEnvelope' }
   schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
     HostResourceRef:
       type: object
       additionalProperties: false

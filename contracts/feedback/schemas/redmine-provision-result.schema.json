@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-provision-result.v1.json",
+  "title": "Feedback Redmine Provision Result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "redmineVersion", "projectId", "trackerId", "openStatusId", "closedStatusId",
+    "defaultPriorityId", "integrationUserId", "customFieldIds"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "redmineVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "projectId": { "$ref": "#/$defs/id" },
+    "trackerId": { "$ref": "#/$defs/id" },
+    "openStatusId": { "$ref": "#/$defs/id" },
+    "closedStatusId": { "$ref": "#/$defs/id" },
+    "defaultPriorityId": { "$ref": "#/$defs/id" },
+    "integrationUserId": { "$ref": "#/$defs/id" },
+    "customFieldIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "threadId", "requestHash", "applicationKey", "environmentKey", "externalWorkspaceKey", "pageKey",
+        "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName"
+      ],
+      "properties": {
+        "threadId": { "$ref": "#/$defs/id" },
+        "requestHash": { "$ref": "#/$defs/id" },
+        "applicationKey": { "$ref": "#/$defs/id" },
+        "environmentKey": { "$ref": "#/$defs/id" },
+        "externalWorkspaceKey": { "$ref": "#/$defs/id" },
+        "pageKey": { "$ref": "#/$defs/id" },
+        "hostResourceKey": { "$ref": "#/$defs/id" },
+        "perspectiveCode": { "$ref": "#/$defs/id" },
+        "locator": { "$ref": "#/$defs/id" },
+        "submittedById": { "$ref": "#/$defs/id" },
+        "submittedByName": { "$ref": "#/$defs/id" }
+      }
+    }
+  },
+  "$defs": { "id": { "type": "integer", "minimum": 1 } }
+}

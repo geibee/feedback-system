@@ -31,6 +31,7 @@
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@feedback/contracts": "1.0.0-alpha.2",
     "@feedback/core": "1.0.0-alpha.2",
     "@feedback/redmine-core": "1.0.0-alpha.2",
     "@feedback/redmine-react": "1.0.0-alpha.2"

@@ -10,6 +10,8 @@ test("plugin consumerは単一integration moduleからloaderを使う", () => {
   );
   assert.match(main, /from\s+["']\.\/feedback-redmine\.js["']/u);
   assert.match(integration, /from\s+["']@feedback\/redmine-plugin\/loader["']/u);
-  assert.match(integration, /createRedmineFeedbackPluginController/u);
+  assert.match(integration, /createRedmineFeedbackPluginControllerFromRuntimeConfig/u);
+  assert.match(integration, /AbortController/u);
+  assert.doesNotMatch(integration, /=\s*await\s+createRedmineFeedbackPluginControllerFromRuntimeConfig/u);
   assert.doesNotMatch(`${main}\n${integration}`, /from\s+["'](?:react|react-dom)/u);
 });

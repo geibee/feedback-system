@@ -256,6 +256,107 @@ const clientProfile = {
 };
 
 describe("Feedback Redmine JSON Schema", () => {
+  it("runtime configは公開可能な同一origin設定だけを受ける", () => {
+    const validate = validator("redmine-runtime-config");
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1"
+    }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "https://gateway.example.test/v1"
+    })).toBe(false);
+    for (const gatewayBasePath of [
+      "//gateway.example.test/v1",
+      "/internal/../gateway",
+      "/internal/%2e%2E/gateway",
+      "/internal/gateway?token=value",
+      "/internal/gateway#fragment",
+      "/internal/gateway@evil",
+      "/internal\\gateway",
+      `/${"a".repeat(512)}`
+    ]) {
+      expect(validate({
+        schemaVersion: "1",
+        enabled: true,
+        profileId: "inventory-production",
+        gatewayBasePath
+      }), gatewayBasePath).toBe(false);
+    }
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      apiKey: "secret"
+    })).toBe(false);
+  });
+
+  it("既存Redmine導入manifestは名前ベースでsecretと数値IDを持たない", () => {
+    const validate = validator("redmine-installation-manifest");
+    const manifest = {
+      schemaVersion: "1",
+      profileId: "inventory-production",
+      displayName: "Inventory / Production",
+      applicationKey: "inventory",
+      environmentKey: "production",
+      externalWorkspaceKey: "production-review",
+      redmineBaseUrl: "https://redmine.example.test",
+      project: { identifier: "feedback", name: "Feedback" },
+      trackerName: "Feedback",
+      openStatusName: "New",
+      closedStatusName: "Closed",
+      defaultPriorityName: "Normal",
+      roleName: "Feedback integration",
+      integrationUser: {
+        login: "feedback_integration",
+        firstName: "Feedback",
+        lastName: "Integration",
+        mail: "feedback-integration@example.test"
+      },
+      isPrivate: true,
+      captureEnabled: true,
+      showRedmineLink: false
+    };
+    expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...manifest, projectId: 10 })).toBe(false);
+    expect(validate({ ...manifest, apiKey: "secret" })).toBe(false);
+  });
+
+  it("provision planとresultはdigestおよび実IDを固定shapeで検証する", () => {
+    const validatePlan = validator("redmine-provision-plan");
+    expect(validatePlan({
+      schemaVersion: "1",
+      redmineVersion: "7.0.0",
+      profileId: "inventory-production",
+      operations: [{ key: "project", action: "create", detail: "projectを作成" }],
+      conflicts: [],
+      planDigest: "a".repeat(64)
+    }), JSON.stringify(validatePlan.errors)).toBe(true);
+    const ids = Object.fromEntries([
+      "threadId", "requestHash", "applicationKey", "environmentKey", "externalWorkspaceKey", "pageKey",
+      "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName"
+    ].map((key, index) => [key, index + 20]));
+    const validateResult = validator("redmine-provision-result");
+    const result = {
+      schemaVersion: "1",
+      redmineVersion: "7.0.0",
+      projectId: 1,
+      trackerId: 2,
+      openStatusId: 3,
+      closedStatusId: 4,
+      defaultPriorityId: 5,
+      integrationUserId: 6,
+      customFieldIds: ids
+    };
+    expect(validateResult(result), JSON.stringify(validateResult.errors)).toBe(true);
+    expect(validateResult({ ...result, customFieldIds: { ...ids, apiKey: 99 } })).toBe(false);
+  });
+
   it("公開client profileへsecretや接続先を混入できない", () => {
     const validate = redmineValidator("redmine-client-profile");
     expect(validate(clientProfile), JSON.stringify(validate.errors)).toBe(true);

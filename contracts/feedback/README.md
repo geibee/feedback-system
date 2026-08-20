@@ -1,7 +1,7 @@
 # @geibee/contracts
 
 Feedback Service v1 とDBレスRedmine gatewayのOpenAPI 3.1、application manifest/location/target/webhook、
-Redmine context/profile/model、runtime config、既存Redmine installation/provision resultのJSON Schema、生成済みTypeScript/Kotlin型を提供する契約packageです。
+Redmine context/profile/model、runtime config、既存Redmine installation/provision/inspectionのJSON Schema、生成済みTypeScript/Kotlin型を提供する契約packageです。
 GIS APIや特定ホストのroute型には依存しません。
 
 ```ts
@@ -17,6 +17,8 @@ thread一覧は既存resource scopeと追加の`scope=workspace`を持ち、両�
 `participant-credential`だけを許可し、browser profile UUIDを参加者IDとして保存します。
 配備時公開設定は`schemas/redmine-runtime-config.schema.json`、名前ベースの導入宣言とplan/resultは
 `schemas/redmine-installation-manifest.schema.json`、`schemas/redmine-provision-*.schema.json`を正本にします。
+REST検査、15件の手動確認、承認digest、生成profileを含むread-only inspection出力は
+`schemas/redmine-inspection-report.schema.json`を正本にし、credential fieldとunknown propertyを全階層で拒否します。
 直接OIDC JWTはOpenAPIの `bearerAuth` に従い、固定語彙の `feedback_permissions`文字列配列を必須とします。
 CI/CDでresourceを同期するinstallation manifestのschemaも`schemas/installation-manifest.schema.json`に含みます。
 `npm run generate`はlegacy `src/generated.ts`とRedmine専用`src/redmine-gateway.generated.ts`を生成します。

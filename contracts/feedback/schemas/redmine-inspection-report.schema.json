@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/redmine-inspection-report.v1.json",
+  "title": "Feedback Redmine Inspection Report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "redmineVersion",
+    "principal",
+    "checks",
+    "manualChecks",
+    "manualCheckDigest",
+    "resolvedIds",
+    "generated"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "redmineVersion": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "principal": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/principal" }
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/restCheck" }
+    },
+    "manualChecks": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": { "$ref": "#/$defs/manualCheck" }
+    },
+    "manualCheckDigest": { "$ref": "#/$defs/digest" },
+    "resolvedIds": { "$ref": "#/$defs/resolvedIds" },
+    "generated": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/generated" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "generated": { "type": "object" } },
+        "required": ["generated"]
+      },
+      "then": {
+        "properties": {
+          "checks": {
+            "items": {
+              "properties": { "status": { "const": "ok" } },
+              "required": ["status"]
+            }
+          },
+          "manualChecks": {
+            "items": {
+              "properties": { "status": { "const": "accepted" } },
+              "required": ["status"]
+            }
+          },
+          "resolvedIds": {
+            "properties": {
+              "projectId": { "$ref": "#/$defs/id" },
+              "trackerId": { "$ref": "#/$defs/id" },
+              "roleId": { "$ref": "#/$defs/id" },
+              "integrationUserId": { "$ref": "#/$defs/id" },
+              "defaultPriorityId": { "$ref": "#/$defs/id" },
+              "openStatusId": { "$ref": "#/$defs/id" },
+              "closedStatusIds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": { "$ref": "#/$defs/id" }
+              },
+              "customFieldIds": { "$ref": "#/$defs/completeCustomFieldIds" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "integer", "minimum": 1 },
+    "nullableId": { "type": ["integer", "null"], "minimum": 1 },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$"
+    },
+    "profileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "digest": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "login", "admin"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "login": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "admin": { "type": "boolean" }
+      }
+    },
+    "restCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "status", "detail"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "status": { "enum": ["ok", "missing", "mismatch"] },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
+    "manualCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "detail", "status"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "status": { "enum": ["unverified", "accepted"] }
+      }
+    },
+    "customFieldIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "threadId": { "$ref": "#/$defs/id" },
+        "requestHash": { "$ref": "#/$defs/id" },
+        "applicationKey": { "$ref": "#/$defs/id" },
+        "environmentKey": { "$ref": "#/$defs/id" },
+        "externalWorkspaceKey": { "$ref": "#/$defs/id" },
+        "pageKey": { "$ref": "#/$defs/id" },
+        "hostResourceKey": { "$ref": "#/$defs/id" },
+        "perspectiveCode": { "$ref": "#/$defs/id" },
+        "locator": { "$ref": "#/$defs/id" },
+        "submittedById": { "$ref": "#/$defs/id" },
+        "submittedByName": { "$ref": "#/$defs/id" }
+      }
+    },
+    "completeCustomFieldIds": {
+      "allOf": [
+        { "$ref": "#/$defs/customFieldIds" },
+        {
+          "required": [
+            "threadId",
+            "requestHash",
+            "applicationKey",
+            "environmentKey",
+            "externalWorkspaceKey",
+            "pageKey",
+            "hostResourceKey",
+            "perspectiveCode",
+            "locator",
+            "submittedById",
+            "submittedByName"
+          ]
+        }
+      ]
+    },
+    "resolvedIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectId",
+        "trackerId",
+        "roleId",
+        "integrationUserId",
+        "defaultPriorityId",
+        "openStatusId",
+        "closedStatusIds",
+        "customFieldIds"
+      ],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/nullableId" },
+        "trackerId": { "$ref": "#/$defs/nullableId" },
+        "roleId": { "$ref": "#/$defs/nullableId" },
+        "integrationUserId": { "$ref": "#/$defs/nullableId" },
+        "defaultPriorityId": { "$ref": "#/$defs/nullableId" },
+        "openStatusId": { "$ref": "#/$defs/nullableId" },
+        "closedStatusIds": {
+          "type": "array",
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "customFieldIds": { "$ref": "#/$defs/customFieldIds" }
+      }
+    },
+    "serverProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "clientProfileRef",
+        "redmineBaseUrl",
+        "projectId",
+        "trackerId",
+        "isPrivate",
+        "defaultPriorityId",
+        "closedStatusIds",
+        "customFieldIds",
+        "authorizationMode",
+        "showRedmineLink",
+        "secretRef"
+      ],
+      "properties": {
+        "profileId": { "$ref": "#/$defs/profileId" },
+        "clientProfileRef": { "const": "client-profile.json" },
+        "redmineBaseUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "projectId": { "$ref": "#/$defs/id" },
+        "trackerId": { "$ref": "#/$defs/id" },
+        "isPrivate": { "type": "boolean" },
+        "defaultPriorityId": { "$ref": "#/$defs/nullableId" },
+        "closedStatusIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "customFieldIds": { "$ref": "#/$defs/completeCustomFieldIds" },
+        "authorizationMode": { "const": "resource-scoped" },
+        "showRedmineLink": { "type": "boolean" },
+        "secretRef": { "const": "FEEDBACK_REDMINE_GATEWAY_API_KEY" }
+      }
+    },
+    "generated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clientProfile", "serverProfile", "runtimeConfig"],
+      "properties": {
+        "clientProfile": { "$ref": "redmine-client-profile.v1.json" },
+        "serverProfile": { "$ref": "#/$defs/serverProfile" },
+        "runtimeConfig": { "$ref": "redmine-runtime-config.v1.json" }
+      }
+    }
+  }
+}

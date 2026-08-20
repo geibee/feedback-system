@@ -4,6 +4,8 @@
 
 - `FeedbackTargetV1`へ名前空間付きprovider、安定target key、画面fallback座標、scalar metadataを持つ
   `custom` variantを後方互換で追加。
+- managed RedmineのREST検査、15件の手動確認、承認digest、生成profileを固定shapeで表す
+  `redmine-inspection-report.v1` schemaとTypeScript型を追加。
 
 ## 2026-08-20
 

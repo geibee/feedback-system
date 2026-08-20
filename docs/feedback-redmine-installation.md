@@ -75,10 +75,13 @@ feedback-redmine local reset --yes
 
 ### 3.1 変更方式を選ぶ
 
-既存Redmine instanceへの導入は、次のいずれかを選ぶ。
+既存Redmine instanceへの導入可否と経路を最初に判定する。
 
-1. 専用projectを新設できる場合: 同梱provisionerのplanを実行し、競合とdigestをレビューしてからapplyする。
-2. 既存projectや組織共通roleを使う場合: 管理画面で手動設定し、RESTの`inspect`とRails側planで差分を確認する。
+| 環境 | 導入経路 | 判定 |
+| --- | --- | --- |
+| Redmineと同じRails runnerを実行できる | provisionerのplan、digestレビュー、apply | 推奨 |
+| managed Redmineで管理画面とadministrator REST APIを利用できる | 管理画面で手動設定し、REST inspectのchecklistとdigestを二段階確認 | 対応 |
+| custom field、role、user、workflowの管理権限またはadministrator REST APIを利用できない | 安全な検査とprofile生成ができない | 非対応 |
 
 provisionerは同名の既存projectを無断で採用しない。Feedback管理markerがないproject、形式や公開範囲が違うcustom field、
 権限が多い同名role、属性が違う同名user、異なるworkflowを競合として停止する。競合を自動上書きするoptionはない。
@@ -143,21 +146,46 @@ applyはREST APIを有効化し、必要な設定を名前ベースで作成ま�
 | `submittedById` | Feedback Submitted By ID | テキスト（1行） | 無効 | participant ID |
 | `submittedByName` | Feedback Submitted By Name | テキスト（1行） | 無効 | 自己申告表示名 |
 
-数値IDはRedmine環境固有である。provisionerの`provision-result.json`を正本にするか、管理者API keyを一時的に環境変数へ入れて
-read-only inspectを実行する。
+数値IDはRedmine環境固有である。provisionerの`provision-result.json`を正本にするか、Rails runnerを利用できないmanaged Redmineでは
+管理者API keyを一時的に環境変数へ入れ、read-only inspectを二段階で実行する。API keyをcommand引数、manifest、inspection、checklist、
+profileへ保存してはならない。
+
+最初のinspectでREST検査結果、手動checklist、現在の`manualCheckDigest`を取得する。この時点では手動項目が未承認なので終了code 2が正常であり、
+profileは生成されない。
 
 ```bash
 export FEEDBACK_REDMINE_INSPECT_API_KEY='<temporary-admin-api-key>'
 feedback-redmine inspect \
   --manifest /secure/feedback-redmine/installation.json \
-  --generated-dir /secure/feedback-redmine/generated \
+  --manual-checklist /secure/feedback-redmine/manual-checklist.md \
   --output /secure/feedback-redmine/inspection.json
 unset FEEDBACK_REDMINE_INSPECT_API_KEY
 ```
 
 inspectは`/users/current.json`、project、tracker、status、priority、custom field、role、user、membershipをGETするだけで、Redmineを変更しない。
-管理用endpointを読むため、一時的なadministrator API keyを使用し、integration API keyとは分離する。不足または不一致があれば終了code 2となり、
-profileを生成しない。custom fieldのproject/tracker/role割当とworkflowの最終確認はRESTだけでは不足するため、Rails側planまたは管理画面でも確認する。
+管理用endpointを読むため、一時的なadministrator API keyを使用し、integration API keyとは分離する。`inspection.json`のREST `checks`に
+`missing`または`mismatch`がある場合は、Redmine管理画面で設定を修正して最初のinspectからやり直す。
+
+RESTだけでは確認できない次の15項目を、出力されたMarkdown checklistに従ってRedmine管理画面で確認する。
+
+- 11 custom fieldsそれぞれのfilter・検索設定、対象project/tracker/roleだけへの割当、「全プロジェクト向け」の無効化
+- integration tracker・roleに対するopen→open、open→closed、closed→open、closed→closedの4 workflow遷移
+
+全項目を確認したら、`inspection.json`の`manualCheckDigest`をそのまま指定し、存在しない新規`generated-dir`へprofileを生成する。
+
+```bash
+export FEEDBACK_REDMINE_INSPECT_API_KEY='<temporary-admin-api-key>'
+feedback-redmine inspect \
+  --manifest /secure/feedback-redmine/installation.json \
+  --accept-manual-checks <manualCheckDigest> \
+  --generated-dir /secure/feedback-redmine/generated-20260821 \
+  --output /secure/feedback-redmine/inspection-accepted.json
+unset FEEDBACK_REDMINE_INSPECT_API_KEY
+```
+
+終了codeは、REST不足・不一致または手動項目未承認が2、staleまたは異なるdigestが1、REST検査成功かつ現在のdigestを承認した場合が0である。
+終了code 0の場合だけ`client-profile.json`、`server-profile.json`、`runtime-config.json`を生成する。設定またはmanifestを変更した場合、以前のdigestを
+再利用せず、最初のinspectからやり直してchecklistとdigestを再取得する。
 
 同名fieldのID競合は、目的が同じで形式・filter・対象project/tracker/roleが完全一致する場合だけ再利用する。それ以外は既存fieldを変更せず、
 Redmine管理者と別名称または専用projectを決めてmanifestとprofileを再作成する。server profileへ推測したIDや別環境のIDをコピーしない。

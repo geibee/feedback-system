@@ -1,32 +1,16 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import type {
+  RedmineInspectionCheckV1,
+  RedmineInspectionCustomFieldIdsV1,
+  RedmineInspectionReportV1,
+  RedmineManualInspectionCheckV1
+} from "@geibee/contracts";
 import { redmineCustomFieldSpecs, validateInstallationManifest } from "./manifest.js";
 
-export type InspectionCheck = { key: string; status: "ok" | "missing" | "mismatch"; detail: string };
-export type ManualInspectionCheck = { key: string; detail: string; status: "unverified" | "accepted" };
-export type InspectionReport = {
-  schemaVersion: "1";
-  redmineVersion: string | null;
-  principal: { id: number; login: string; admin: boolean } | null;
-  checks: InspectionCheck[];
-  manualChecks: ManualInspectionCheck[];
-  manualCheckDigest: string;
-  resolvedIds: {
-    projectId: number | null;
-    trackerId: number | null;
-    roleId: number | null;
-    integrationUserId: number | null;
-    defaultPriorityId: number | null;
-    openStatusId: number | null;
-    closedStatusIds: number[];
-    customFieldIds: Record<string, number>;
-  };
-  generated: {
-    clientProfile: Record<string, unknown>;
-    serverProfile: Record<string, unknown>;
-    runtimeConfig: Record<string, unknown>;
-  } | null;
-};
+export type InspectionCheck = RedmineInspectionCheckV1;
+export type ManualInspectionCheck = RedmineManualInspectionCheckV1;
+export type InspectionReport = RedmineInspectionReportV1;
 
 export async function inspectRedmine(input: {
   manifestPath: string;
@@ -132,7 +116,7 @@ export async function inspectRedmine(input: {
     status: manualChecksAccepted ? "accepted" : "unverified"
   }));
   const complete = restComplete && manualChecksAccepted;
-  const clientProfile = {
+  const clientProfile: NonNullable<InspectionReport["generated"]>["clientProfile"] = {
     schemaVersion: "1",
     id: manifest.profileId,
     displayName: manifest.displayName,
@@ -160,12 +144,12 @@ export async function inspectRedmine(input: {
         profileId: manifest.profileId,
         clientProfileRef: "client-profile.json",
         redmineBaseUrl: manifest.redmineBaseUrl,
-        projectId: resolvedIds.projectId,
-        trackerId: resolvedIds.trackerId,
+        projectId: resolvedIds.projectId!,
+        trackerId: resolvedIds.trackerId!,
         isPrivate: manifest.isPrivate,
         defaultPriorityId: resolvedIds.defaultPriorityId,
         closedStatusIds: resolvedIds.closedStatusIds,
-        customFieldIds,
+        customFieldIds: customFieldIds as RedmineInspectionCustomFieldIdsV1,
         authorizationMode: "resource-scoped",
         showRedmineLink: manifest.showRedmineLink,
         secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY"

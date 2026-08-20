@@ -19,15 +19,24 @@ export function parseResourceQuery(query: URLSearchParams, allowedExtra: readonl
 }
 
 export function parseListQuery(query: URLSearchParams): {
+  scope?: "resource";
   resourceRef: FeedbackHostResourceRefV1;
   pageKey: string;
   sort: RedmineThreadSort;
   filter: RedmineThreadFilter;
   cursor?: string;
+} | {
+  scope: "workspace";
+  sort: RedmineThreadSort;
+  filter: RedmineThreadFilter;
+  cursor?: string;
 } {
-  const extras = ["pageKey", "sort", "status", "perspectiveCode", "assigneeId", "priorityId", "q", "cursor"];
-  const resource = parseResourceQuery(query, extras);
-  const pageKey = requiredQuery(query, "pageKey", 100);
+  rejectUnknownQuery(query, [
+    "scope", "resourceKind", "resourceKey", "pageKey", "sort", "status", "perspectiveCode", "assigneeId",
+    "priorityId", "q", "cursor"
+  ]);
+  const scope = query.get("scope");
+  if (scope !== null && scope !== "resource" && scope !== "workspace") invalid("scopeが不正です");
   const sort = query.get("sort");
   if (sort !== "created_desc" && sort !== "created_asc" && sort !== "updated_desc") invalid("sortが不正です");
   const filter: RedmineThreadFilter = {};
@@ -47,7 +56,19 @@ export function parseListQuery(query: URLSearchParams): {
   if (q) filter.q = bounded(q, "q", 200);
   const cursor = query.get("cursor");
   if (cursor && cursor.length > 2048) invalid("cursorが長すぎます");
-  return { resourceRef: resource, pageKey, sort, filter, ...(cursor ? { cursor } : {}) };
+  if (scope === "workspace") {
+    if (query.has("resourceKind") || query.has("resourceKey") || query.has("pageKey")) {
+      invalid("workspace scopeへresource/page queryは指定できません");
+    }
+    return { scope: "workspace", sort, filter, ...(cursor ? { cursor } : {}) };
+  }
+  const resource = resourceRef({
+    schemaVersion: "1",
+    kind: query.get("resourceKind"),
+    key: query.get("resourceKey")
+  });
+  const pageKey = requiredQuery(query, "pageKey", 100);
+  return { ...(scope === "resource" ? { scope } : {}), resourceRef: resource, pageKey, sort, filter, ...(cursor ? { cursor } : {}) };
 }
 
 export function parseCreateRequest(value: unknown, profileId: string): RedmineThreadCreateInput {

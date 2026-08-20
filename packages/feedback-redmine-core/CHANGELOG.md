@@ -3,6 +3,7 @@
 ## Unreleased
 
 - browser profile UUIDを参加者IDとするcontext、participant message marker、返信journal、追記型編集、version fold、終了status判定を追加。
+- Profile内Workspace一覧、一覧総件数、scopeへ束縛したcursor v2を追加し、既存resource cursor v1を維持。
 
 ## 1.0.0-alpha.1
 

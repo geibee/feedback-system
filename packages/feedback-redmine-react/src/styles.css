@@ -1,79 +1,502 @@
+:root,
 :host {
-  color: #172033;
-  color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  --feedback-redmine-accent: #0f766e;
+  --feedback-redmine-launcher-bg: #0f172a;
+  --feedback-redmine-pin: #dc2626;
+  --feedback-redmine-pin-resolved: #64748b;
+  --feedback-redmine-surface: #f8fafc;
+  --feedback-redmine-text: #1e293b;
+  --feedback-redmine-muted: #64748b;
+  --feedback-redmine-border: #cbd5e1;
+  --feedback-redmine-error: #b91c1c;
+  --feedback-redmine-z-pins: 2147482998;
+  --feedback-redmine-z-overlay: 2147483000;
+  --feedback-redmine-z-panel: 2147483001;
+  --feedback-redmine-z-menu: 2147483002;
+  --feedback-redmine-launcher-right: 20px;
+  --feedback-redmine-launcher-bottom: 20px;
+  --feedback-redmine-panel-width: 440px;
 }
 
-* { box-sizing: border-box; }
-button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
+.feedback-redmine-root {
+  color: var(--feedback-redmine-text);
+  font-family: "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", "Hiragino Kaku Gothic ProN", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
 
-.feedback-redmine-root { position: fixed; z-index: 2147483000; inset: auto 20px 20px auto; }
-.feedback-redmine-launcher {
-  border: 0;
-  border-radius: 999px;
-  background: #1746a2;
-  color: white;
-  padding: 12px 18px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+.feedback-redmine-root *,
+.feedback-redmine-root *::before,
+.feedback-redmine-root *::after {
+  box-sizing: border-box;
+  font-family: inherit;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
 }
-.feedback-redmine-badge { margin-left: 6px; border-radius: 999px; background: #d93025; padding: 2px 7px; }
-.feedback-redmine-pin { position: fixed; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 999px; background: #d93025; color: white; min-width: 28px; height: 28px; padding: 0 5px; box-shadow: 0 2px 8px rgb(0 0 0 / 35%); font-size: 11px; font-weight: 700; }
-.feedback-redmine-panel {
-  position: absolute;
-  right: 0;
-  bottom: 54px;
-  width: min(760px, calc(100vw - 32px));
-  max-height: min(800px, calc(100vh - 100px));
-  overflow: auto;
-  border: 1px solid #ccd5e3;
-  border-radius: 14px;
-  background: white;
-  padding: 18px;
-  box-shadow: 0 18px 48px rgb(0 0 0 / 26%);
+
+.feedback-redmine-root button,
+.feedback-redmine-root input,
+.feedback-redmine-root select,
+.feedback-redmine-root textarea {
+  font: inherit;
 }
-.feedback-redmine-panel h1 { margin: 0; font-size: 20px; }
-.feedback-redmine-create, .feedback-redmine-toolbar { display: grid; gap: 10px; margin: 16px 0; }
-.feedback-redmine-create label, .feedback-redmine-toolbar label { display: grid; gap: 4px; }
-.feedback-redmine-create textarea { min-height: 90px; resize: vertical; }
-.feedback-redmine-target { margin: 0; color: #385070; font-size: 13px; }
-.feedback-redmine-create input, .feedback-redmine-create select, .feedback-redmine-create textarea,
-.feedback-redmine-toolbar input, .feedback-redmine-toolbar select { border: 1px solid #9ba9bd; border-radius: 6px; padding: 7px; }
-.feedback-redmine-capture-preview img { display: block; max-width: 100%; max-height: 240px; border: 1px solid #ccd5e3; }
-.feedback-redmine-threads, .feedback-redmine-timeline { list-style: none; margin: 0; padding: 0; }
-.feedback-redmine-threads button { width: 100%; display: grid; gap: 5px; border: 0; border-top: 1px solid #e2e7ef; background: white; padding: 12px 4px; text-align: left; }
-.feedback-redmine-status { justify-self: start; border-radius: 5px; background: #e8eef9; padding: 2px 6px; font-size: 12px; }
-.feedback-redmine-latest, .feedback-redmine-threads small { color: #526178; }
-.feedback-redmine-drawer {
+
+.feedback-redmine-launcher,
+.feedback-redmine-thread-list-launcher {
   position: fixed;
-  z-index: 2147483001;
-  inset: 0 0 0 auto;
-  width: min(560px, 100vw);
-  overflow: auto;
-  background: white;
-  border-left: 1px solid #ccd5e3;
-  box-shadow: -12px 0 36px rgb(0 0 0 / 22%);
-  padding: 18px;
+  right: var(--feedback-redmine-launcher-right);
+  z-index: var(--feedback-redmine-z-overlay);
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
 }
-.feedback-redmine-drawer header { display: flex; justify-content: space-between; align-items: center; }
-.feedback-redmine-drawer dl div { display: flex; gap: 12px; }
-.feedback-redmine-drawer dt { font-weight: 700; min-width: 80px; }
-.feedback-redmine-body { white-space: pre-wrap; overflow-wrap: anywhere; }
-.feedback-redmine-messages { list-style: none; margin: 16px 0; padding: 0; }
-.feedback-redmine-messages > li { border-top: 1px solid #e2e7ef; padding: 14px 0; }
-.feedback-redmine-messages article { display: grid; gap: 7px; }
-.feedback-redmine-messages time, .feedback-redmine-messages small { color: #526178; font-size: 12px; }
-.feedback-redmine-edit, .feedback-redmine-reply label { display: grid; gap: 8px; }
-.feedback-redmine-edit textarea, .feedback-redmine-reply textarea { min-height: 90px; resize: vertical; border: 1px solid #9ba9bd; border-radius: 6px; padding: 7px; }
-.feedback-redmine-reply { display: grid; gap: 10px; margin: 18px 0; }
-.feedback-redmine-activities:empty { display: none; }
-.feedback-redmine-timeline li { border-top: 1px solid #e2e7ef; padding: 12px 0; }
-.feedback-redmine-timeline time { margin-left: 8px; color: #526178; font-size: 12px; }
-.feedback-redmine-drawer img { max-width: 100%; max-height: 400px; }
-.feedback-redmine-readonly { border-radius: 6px; background: #f3f6fa; padding: 10px; }
 
-@media (max-width: 640px) {
-  .feedback-redmine-root { inset: auto 12px 12px auto; }
-  .feedback-redmine-panel { position: fixed; inset: auto 0 0 0; width: 100vw; max-height: 82vh; border-radius: 18px 18px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
-  .feedback-redmine-drawer { inset: auto 0 0 0; width: 100vw; height: 88vh; border: 0; border-radius: 18px 18px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+.feedback-redmine-launcher {
+  bottom: var(--feedback-redmine-launcher-bottom);
+  gap: 6px;
+  padding: 10px 16px;
+  border: 0;
+  background: var(--feedback-redmine-launcher-bg);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 25%);
+  color: #fff;
+  font-size: 13px;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.feedback-redmine-launcher:hover {
+  box-shadow: 0 8px 20px rgb(15 23 42 / 32%);
+  transform: translateY(-1px);
+}
+
+.feedback-redmine-thread-list-launcher {
+  bottom: calc(var(--feedback-redmine-launcher-bottom) + 48px);
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--feedback-redmine-border);
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 16%);
+  color: #334155;
+  font-size: 12px;
+}
+
+.feedback-redmine-thread-list-launcher:hover {
+  border-color: var(--feedback-redmine-accent);
+  background: #f0fdfa;
+}
+
+.feedback-redmine-thread-count {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 11px;
+}
+
+.feedback-redmine-unread-badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  padding-inline: 5px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.feedback-redmine-launcher:focus-visible,
+.feedback-redmine-thread-list-launcher:focus-visible,
+.feedback-redmine-pin:focus-visible,
+.feedback-redmine-button-primary:focus-visible,
+.feedback-redmine-button-secondary:focus-visible,
+.feedback-redmine-icon-button:focus-visible,
+.feedback-redmine-text-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--feedback-redmine-accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.feedback-redmine-picking-bar {
+  position: fixed;
+  bottom: var(--feedback-redmine-launcher-bottom);
+  left: 50%;
+  z-index: var(--feedback-redmine-z-overlay);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--feedback-redmine-accent);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 25%);
+  color: #fff;
+  font-size: 13px;
+}
+
+.feedback-redmine-picking-bar .feedback-redmine-button-secondary {
+  border-color: rgb(255 255 255 / 60%);
+  background: transparent;
+  color: #fff;
+}
+
+.feedback-redmine-context-menu-layer,
+.feedback-redmine-screen-pins {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.feedback-redmine-context-menu-layer { z-index: var(--feedback-redmine-z-menu); }
+.feedback-redmine-screen-pins { z-index: var(--feedback-redmine-z-pins); }
+.feedback-redmine-context-menu-host,
+.feedback-redmine-pin-host { overflow: visible; pointer-events: auto; }
+
+.feedback-redmine-context-menu {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 22%);
+}
+
+.feedback-redmine-context-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--feedback-redmine-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.feedback-redmine-context-menu button:hover,
+.feedback-redmine-context-menu button:focus-visible {
+  background: #f1f5f9;
+  outline: none;
+}
+
+.feedback-redmine-pin {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 4px;
+  background: var(--feedback-redmine-pin);
+  box-shadow: 0 3px 9px rgb(15 23 42 / 35%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: rotate(-45deg);
+}
+
+.feedback-redmine-pin > span { transform: rotate(45deg); }
+.feedback-redmine-pin.is-resolved { background: var(--feedback-redmine-pin-resolved); }
+.feedback-redmine-pin.is-active {
+  outline: 3px solid color-mix(in srgb, var(--feedback-redmine-pin) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.feedback-redmine-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--feedback-redmine-z-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(var(--feedback-redmine-panel-width), 100vw);
+  margin: 0;
+  padding: 20px;
+  overflow: auto;
+  border: 0;
+  border-left: 1px solid var(--feedback-redmine-border);
+  background: var(--feedback-redmine-surface);
+  box-shadow: -8px 0 24px rgb(15 23 42 / 14%);
+}
+
+.feedback-redmine-composer { --feedback-redmine-panel-width: 420px; background: #fff; }
+.feedback-redmine-drawer.is-left {
+  right: auto;
+  left: 0;
+  border-right: 1px solid var(--feedback-redmine-border);
+  border-left: 0;
+  box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
+}
+
+.feedback-redmine-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedback-redmine-panel-header h2 { margin: 0; font-size: 18px; }
+
+.feedback-redmine-icon-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--feedback-redmine-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.feedback-redmine-icon-button:hover { background: #e2e8f0; color: var(--feedback-redmine-text); }
+
+.feedback-redmine-button-primary,
+.feedback-redmine-button-secondary {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 11px;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.feedback-redmine-button-primary { border-color: var(--feedback-redmine-accent); background: var(--feedback-redmine-accent); color: #fff; }
+.feedback-redmine-button-primary:hover { filter: brightness(.94); }
+.feedback-redmine-button-secondary { background: #fff; color: #334155; }
+.feedback-redmine-button-secondary:hover { border-color: #94a3b8; background: #f8fafc; }
+.feedback-redmine-button-primary:disabled,
+.feedback-redmine-button-secondary:disabled { cursor: not-allowed; opacity: .55; }
+
+.feedback-redmine-text-button {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--feedback-redmine-accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.feedback-redmine-browse-threads {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.feedback-redmine-button-row,
+.feedback-redmine-list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedback-redmine-list-footer { justify-content: space-between; margin-top: auto; }
+.feedback-redmine-target-summary,
+.feedback-redmine-note,
+.feedback-redmine-evidence p { margin: 0; color: var(--feedback-redmine-muted); font-size: 12px; }
+.feedback-redmine-target-summary code { padding: 1px 6px; border-radius: 4px; background: #f1f5f9; }
+
+.feedback-redmine-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: var(--feedback-redmine-error);
+  font-size: 12px;
+}
+
+.feedback-redmine-toast {
+  position: fixed;
+  right: var(--feedback-redmine-launcher-right);
+  bottom: calc(var(--feedback-redmine-launcher-bottom) + 152px);
+  z-index: var(--feedback-redmine-z-menu);
+  max-width: min(360px, calc(100vw - 40px));
+  box-shadow: 0 6px 20px rgb(15 23 42 / 20%);
+}
+
+.feedback-redmine-evidence { display: grid; gap: 6px; }
+.feedback-redmine-evidence img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 6px;
+}
+
+.feedback-redmine-perspectives {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 8px;
+}
+
+.feedback-redmine-perspectives legend { padding: 0 4px; color: #475569; font-size: 12px; font-weight: 700; }
+.feedback-redmine-perspectives label {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+}
+.feedback-redmine-perspectives label:has(input:checked) { border-color: var(--feedback-redmine-accent); background: #f0fdfa; }
+.feedback-redmine-perspectives input { appearance: auto; width: 15px; height: 15px; margin: 2px 0 0; }
+
+.feedback-redmine-field,
+.feedback-redmine-toolbar label,
+.feedback-redmine-reply label,
+.feedback-redmine-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.feedback-redmine-field textarea,
+.feedback-redmine-field input,
+.feedback-redmine-toolbar input,
+.feedback-redmine-toolbar select,
+.feedback-redmine-reply textarea,
+.feedback-redmine-edit textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--feedback-redmine-text);
+  resize: vertical;
+}
+
+.feedback-redmine-field textarea:focus,
+.feedback-redmine-field input:focus,
+.feedback-redmine-toolbar input:focus,
+.feedback-redmine-toolbar select:focus,
+.feedback-redmine-reply textarea:focus,
+.feedback-redmine-edit textarea:focus {
+  border-color: var(--feedback-redmine-accent);
+  outline: 3px solid color-mix(in srgb, var(--feedback-redmine-accent) 14%, transparent);
+}
+
+.feedback-redmine-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.feedback-redmine-thread-groups { display: grid; gap: 18px; }
+.feedback-redmine-thread-group { display: grid; gap: 8px; }
+.feedback-redmine-thread-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--feedback-redmine-border);
+}
+.feedback-redmine-thread-group > header h3 { margin: 0; color: #334155; font-size: 14px; }
+.feedback-redmine-thread-group > header span { color: var(--feedback-redmine-muted); font-size: 12px; font-weight: 700; }
+.feedback-redmine-thread-group ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.feedback-redmine-thread-group li button {
+  display: grid;
+  width: 100%;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--feedback-redmine-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--feedback-redmine-text);
+  text-align: left;
+  cursor: pointer;
+}
+.feedback-redmine-thread-group li button:hover { border-color: var(--feedback-redmine-accent); background: #f0fdfa; }
+.feedback-redmine-thread-group li button:disabled { cursor: not-allowed; opacity: .62; }
+.feedback-redmine-thread-group li span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.feedback-redmine-thread-group li small { color: var(--feedback-redmine-muted); font-size: 11px; }
+.feedback-redmine-thread-group li p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.feedback-redmine-thread-meta { display: grid; gap: 5px; margin: 0; }
+.feedback-redmine-thread-meta div { display: flex; gap: 12px; }
+.feedback-redmine-thread-meta dt { min-width: 80px; font-weight: 700; }
+.feedback-redmine-thread-meta dd { margin: 0; }
+.feedback-redmine-follow { font-size: 12px; }
+.feedback-redmine-messages,
+.feedback-redmine-timeline { margin: 0; padding: 0; list-style: none; }
+.feedback-redmine-messages { display: flex; flex-direction: column; gap: 10px; }
+.feedback-redmine-messages > li { padding: 12px; border: 1px solid #dbe3eb; border-radius: 8px; background: #fff; }
+.feedback-redmine-messages article { display: grid; gap: 7px; }
+.feedback-redmine-messages time,
+.feedback-redmine-messages small { color: var(--feedback-redmine-muted); font-size: 11px; }
+.feedback-redmine-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.55; }
+.feedback-redmine-edit textarea,
+.feedback-redmine-reply textarea { min-height: 90px; }
+.feedback-redmine-reply { display: grid; gap: 8px; }
+.feedback-redmine-activities:empty { display: none; }
+.feedback-redmine-timeline li { border-top: 1px solid #e2e8f0; padding: 10px 0; }
+.feedback-redmine-drawer section[aria-label="添付ファイル"] ul { display: grid; gap: 10px; padding-left: 20px; }
+.feedback-redmine-drawer section[aria-label="添付ファイル"] li { display: grid; gap: 7px; }
+.feedback-redmine-drawer img { width: 100%; max-height: 400px; object-fit: contain; border: 1px solid var(--feedback-redmine-border); border-radius: 6px; }
+.feedback-redmine-readonly { margin: 0; border-radius: 6px; background: #f1f5f9; padding: 10px; color: #475569; font-size: 12px; }
+
+@media (max-width: 680px) {
+  .feedback-redmine-picking-bar { width: calc(100vw - 24px); justify-content: space-between; border-radius: 12px; }
+  .feedback-redmine-panel { width: 100vw; border-left: 0; }
+  .feedback-redmine-toolbar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 920px) {
+  .feedback-redmine-drawer,
+  .feedback-redmine-drawer.is-left {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    max-height: min(40vh, 28rem);
+    border-top: 1px solid var(--feedback-redmine-border);
+    border-right: 0;
+    border-left: 0;
+    box-shadow: 0 -8px 24px rgb(15 23 42 / 14%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-redmine-launcher { transition: none; }
 }

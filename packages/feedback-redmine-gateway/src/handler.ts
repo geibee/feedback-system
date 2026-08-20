@@ -111,18 +111,38 @@ async function handlePublicRoute(
   const url = new URL(request.url);
   if (route.kind === "list") {
     const input = parseListQuery(url.searchParams);
-    const hostResourceKey = publicResourceKey(input.resourceRef.key);
+    if (input.scope === "workspace") {
+      const cursorInput = {
+        v: "2" as const,
+        scope: "workspace" as const,
+        profileId: route.profileId,
+        filter: input.filter,
+        sort: input.sort
+      };
+      const offset = input.cursor ? decodeListCursor(input.cursor, cursorInput).offset : 0;
+      const result = await client.listThreads({
+        scope: "workspace",
+        sort: input.sort,
+        filter: input.filter,
+        offset
+      }, request.signal);
+      return jsonResponse({
+        threads: result.threads,
+        totalCount: result.totalCount,
+        nextCursor: result.nextOffset !== null ? encodeListCursor({ ...cursorInput, offset: result.nextOffset }) : null
+      });
+    }
     const cursorInput = {
-      v: "1" as const,
-      profileId: route.profileId,
-      hostResourceKey,
-      pageKey: input.pageKey,
-      filter: input.filter,
-      sort: input.sort
+        v: "1" as const,
+        profileId: route.profileId,
+        hostResourceKey: publicResourceKey(input.resourceRef.key),
+        pageKey: input.pageKey,
+        filter: input.filter,
+        sort: input.sort
     };
     const offset = input.cursor ? decodeListCursor(input.cursor, cursorInput).offset : 0;
     const result = await client.listThreads({
-      hostResourceKey,
+      hostResourceKey: cursorInput.hostResourceKey,
       pageKey: input.pageKey,
       sort: input.sort,
       filter: input.filter,
@@ -130,6 +150,7 @@ async function handlePublicRoute(
     }, request.signal);
     return jsonResponse({
       threads: result.threads,
+      totalCount: result.totalCount,
       nextCursor: result.nextOffset !== null ? encodeListCursor({ ...cursorInput, offset: result.nextOffset }) : null
     });
   }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RedmineAttachmentContent, RedmineThreadV1 } from "@feedback/redmine-core";
+import { useDismissiblePanel } from "./dismissible.js";
 import { feedbackErrorMessage } from "./error-message.js";
 
 export type ThreadDrawerProps = {
@@ -12,6 +13,7 @@ export type ThreadDrawerProps = {
   canReply: boolean;
   canEditOwn: boolean;
   participantName: string;
+  side: "left" | "right";
   onReply(body: string): Promise<void>;
   onEdit(messageId: string, body: string, expectedVersion: number): Promise<void>;
   onAttachment(attachmentId: number): Promise<RedmineAttachmentContent>;
@@ -20,6 +22,7 @@ export type ThreadDrawerProps = {
 type Preview = { attachmentId: number; url: string; contentType: string; filename: string };
 
 export function ThreadDrawer(props: ThreadDrawerProps) {
+  const panelRef = useDismissiblePanel<HTMLElement>(props.onClose);
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
@@ -34,6 +37,14 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
   }, []);
+  useEffect(() => {
+    revokeTimers.current.forEach((timer) => clearTimeout(timer));
+    revokeTimers.current.clear();
+    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.current.clear();
+    setPreviews([]);
+    setAttachmentError(null);
+  }, [props.thread?.threadId]);
   const download = async (attachmentId: number) => {
     try {
       const content = await props.onAttachment(attachmentId);
@@ -85,15 +96,20 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
     }
   };
   const messages = props.thread ? conversationMessages(props.thread) : [];
-  return <aside className="feedback-redmine-drawer" aria-label="Feedback thread詳細">
-    <header>
-      <h2>Feedback</h2>
-      <button type="button" onClick={props.onClose} aria-label="閉じる">×</button>
+  return <aside
+    ref={panelRef}
+    role="dialog"
+    className={`feedback-redmine-panel feedback-redmine-drawer is-${props.side}`}
+    aria-label="フィードバックスレッド"
+  >
+    <header className="feedback-redmine-panel-header">
+      <h2>{props.thread ? `#${props.thread.issueId} Feedback` : "Feedback"}</h2>
+      <button type="button" className="feedback-redmine-icon-button" onClick={props.onClose} aria-label="スレッドを閉じる">×</button>
     </header>
     {props.loading && !props.thread && <p role="status">Redmineから詳細を取得しています…</p>}
     {props.error && <p role="alert">{props.error}</p>}
     {props.thread && <>
-      <dl>
+      <dl className="feedback-redmine-thread-meta">
         <div><dt>状態</dt><dd>{props.thread.status.name}</dd></div>
         <div><dt>担当者</dt><dd>{props.thread.assignee?.name ?? "未担当"}</dd></div>
         <div><dt>優先度</dt><dd>{props.thread.priority?.name ?? "なし"}</dd></div>
@@ -151,9 +167,13 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
           const preview = previews.find((value) => value.attachmentId === attachment.id);
           return <li key={attachment.id}>
             <span>{attachment.filename} ({attachment.byteSize} bytes)</span>
-            <button type="button" onClick={() => void download(attachment.id)}>安全に取得</button>
+            <button
+              type="button"
+              className={attachment.primaryEvidence && attachment.inlinePreview ? "feedback-redmine-button-primary" : "feedback-redmine-button-secondary"}
+              onClick={() => void download(attachment.id)}
+            >{attachment.primaryEvidence && attachment.inlinePreview ? "証跡" : "安全に取得"}</button>
             {preview && attachment.inlinePreview && (preview.contentType === "image/png" || preview.contentType === "image/webp") &&
-              <img src={preview.url} alt={preview.filename} />}
+              <img src={preview.url} alt={attachment.primaryEvidence ? "証跡画像" : preview.filename} />}
             {preview && (!attachment.inlinePreview || (preview.contentType !== "image/png" && preview.contentType !== "image/webp")) &&
               <a href={preview.url} download={preview.filename}>ダウンロード</a>}
           </li>;

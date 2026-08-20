@@ -29,6 +29,11 @@ POSTは`Origin`完全一致を必須とする。same-origin GETはbrowserが`Ori
 ない。Origin/Fetch Metadata headerは通常のHTTP clientでも生成できるため、公開範囲を制限したい配備ではgatewayの外側にアクセス制御を置く。
 SDKからOIDC JWT、access token、host cookie内容をgateway bodyへPOSTしない。
 
+`GET /profiles/{profileId}/threads`は、scope省略または`resource`ではresourceKind/resourceKey/pageKeyを必須とする。
+`scope=workspace`では3項目を禁止し、server profileに固定されたapplication、environment、external workspace、project、tracker全体を返す。
+この一覧は追加のhost認可を行わないため、同一originからProfileへ到達できる利用者全員が閲覧可能である。詳細とattachmentは
+保存済みhost resource keyとの一致を引き続き必須とし、Workspace一覧によってresource IDOR防止を緩和しない。
+
 ## server profile
 
 server profileはRedmine URL、project/tracker/default priority、private flag、終了status ID、11個のcustom field ID、公開client profile、

@@ -1,6 +1,9 @@
 import { RedmineFeedbackError } from "@feedback/redmine-core";
 
-export function feedbackErrorMessage(error: unknown, target: "接続" | "一覧" | "詳細" | "投稿" | "返信" | "編集" | "添付ファイル"): string {
+export function feedbackErrorMessage(
+  error: unknown,
+  target: "接続" | "一覧" | "詳細" | "投稿" | "返信" | "編集" | "添付ファイル" | "画面移動"
+): string {
   if (!(error instanceof RedmineFeedbackError)) return `${target}を完了できません。時間をおいて再試行してください。`;
   if (error.code === "redmine.invalid_api_key" || error.code === "redmine.unauthenticated") {
     return "Redmineの認証を確認してください。拡張機能ではoptionsからAPI keyを再入力してください。";

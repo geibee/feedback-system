@@ -94,14 +94,19 @@ paths:
       operationId: listRedmineThreads
       x-feedback-operation: redmine.thread.list.v1
       tags: [Redmine feedback]
-      summary: 認可済みresourceのthreadを一覧する
+      summary: 現在resourceまたはProfile内Workspaceのthreadを一覧する
+      description: |
+        scope省略時またはresourceではresourceKind、resourceKey、pageKeyが必須。
+        scope=workspaceではこれら3項目を指定せず、Profileに固定されたWorkspace全体を一覧する。
+        Origin検査はCSRF緩和であり利用者認証ではないため、Profileの公開範囲を閲覧境界として扱う。
       parameters:
         - $ref: '#/components/parameters/ProfileId'
         - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
-        - $ref: '#/components/parameters/ResourceKind'
-        - $ref: '#/components/parameters/ResourceKey'
-        - $ref: '#/components/parameters/PageKey'
+        - $ref: '#/components/parameters/ListScope'
+        - $ref: '#/components/parameters/ListResourceKind'
+        - $ref: '#/components/parameters/ListResourceKey'
+        - $ref: '#/components/parameters/ListPageKey'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/StatusFilter'
         - $ref: '#/components/parameters/PerspectiveFilter'
@@ -376,16 +381,35 @@ components:
       in: query
       required: true
       schema: { type: string, enum: [record, page] }
+    ListScope:
+      name: scope
+      in: query
+      required: false
+      description: 省略時はresource。workspaceではProfile内Workspace全体を一覧する
+      schema: { type: string, enum: [resource, workspace], default: resource }
+    ListResourceKind:
+      name: resourceKind
+      in: query
+      required: false
+      description: resource scopeでは必須、workspace scopeでは指定禁止
+      schema: { type: string, enum: [record, page] }
+    ListResourceKey:
+      name: resourceKey
+      in: query
+      required: false
+      description: resource scopeでは必須、workspace scopeでは指定禁止
+      schema: { type: string, minLength: 1, maxLength: 500 }
+    ListPageKey:
+      name: pageKey
+      in: query
+      required: false
+      description: resource scopeでは必須、workspace scopeでは指定禁止
+      schema: { type: string, minLength: 1, maxLength: 100 }
     ResourceKey:
       name: resourceKey
       in: query
       required: true
       schema: { type: string, minLength: 1, maxLength: 500 }
-    PageKey:
-      name: pageKey
-      in: query
-      required: true
-      schema: { type: string, minLength: 1, maxLength: 100 }
     Sort:
       name: sort
       in: query
@@ -795,12 +819,13 @@ components:
     ThreadListResult:
       type: object
       additionalProperties: false
-      required: [threads, nextCursor]
+      required: [threads, totalCount, nextCursor]
       properties:
         threads:
           type: array
           maxItems: 50
           items: { $ref: '#/components/schemas/ThreadSummary' }
+        totalCount: { type: integer, minimum: 0 }
         nextCursor: { type: [string, 'null'], maxLength: 2048 }
     ThreadResult:
       type: object

@@ -80,8 +80,8 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
 
   async listThreads(input: RedmineThreadListInput, signal?: AbortSignalLike): Promise<RedmineThreadListResult> {
     this.#assertProfile(input.profileId);
-    const query = resourceQuery(input.resourceRef);
-    query.set("pageKey", input.pageKey);
+    const query = input.scope === "workspace" ? new URLSearchParams({ scope: "workspace" }) : resourceQuery(input.resourceRef);
+    if (input.scope !== "workspace") query.set("pageKey", input.pageKey);
     query.set("sort", input.sort);
     if (input.filter?.status !== undefined) query.set("status", String(input.filter.status));
     if (input.filter?.perspectiveCode) query.set("perspectiveCode", input.filter.perspectiveCode);

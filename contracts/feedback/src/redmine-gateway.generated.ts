@@ -62,7 +62,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 認可済みresourceのthreadを一覧する */
+        /**
+         * 現在resourceまたはProfile内Workspaceのthreadを一覧する
+         * @description scope省略時またはresourceではresourceKind、resourceKey、pageKeyが必須。
+         *     scope=workspaceではこれら3項目を指定せず、Profileに固定されたWorkspace全体を一覧する。
+         *     Origin検査はCSRF緩和であり利用者認証ではないため、Profileの公開範囲を閲覧境界として扱う。
+         */
         get: operations["listRedmineThreads"];
         put?: never;
         /** Redmine issueとして初回投稿を作成する */
@@ -397,6 +402,7 @@ export interface components {
         };
         ThreadListResult: {
             threads: components["schemas"]["ThreadSummary"][];
+            totalCount: number;
             nextCursor: string | null;
         };
         ThreadResult: {
@@ -482,8 +488,15 @@ export interface components {
         ParticipantCredential: string;
         IdempotencyKey: string;
         ResourceKind: "record" | "page";
+        /** @description 省略時はresource。workspaceではProfile内Workspace全体を一覧する */
+        ListScope: "resource" | "workspace";
+        /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+        ListResourceKind: "record" | "page";
+        /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+        ListResourceKey: string;
+        /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+        ListPageKey: string;
         ResourceKey: string;
-        PageKey: string;
         Sort: "created_desc" | "created_asc" | "updated_desc";
         StatusFilter: string;
         PerspectiveFilter: string;
@@ -605,9 +618,14 @@ export interface operations {
     listRedmineThreads: {
         parameters: {
             query: {
-                resourceKind: components["parameters"]["ResourceKind"];
-                resourceKey: components["parameters"]["ResourceKey"];
-                pageKey: components["parameters"]["PageKey"];
+                /** @description 省略時はresource。workspaceではProfile内Workspace全体を一覧する */
+                scope?: components["parameters"]["ListScope"];
+                /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+                resourceKind?: components["parameters"]["ListResourceKind"];
+                /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+                resourceKey?: components["parameters"]["ListResourceKey"];
+                /** @description resource scopeでは必須、workspace scopeでは指定禁止 */
+                pageKey?: components["parameters"]["ListPageKey"];
                 sort: components["parameters"]["Sort"];
                 status?: components["parameters"]["StatusFilter"];
                 perspectiveCode?: components["parameters"]["PerspectiveFilter"];

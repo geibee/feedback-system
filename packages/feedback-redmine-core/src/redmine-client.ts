@@ -30,13 +30,23 @@ import type { RedmineConnectorProfile } from "./profile.js";
 import { validateBaseUrl } from "./profile.js";
 import { buildRedmineSubject } from "./subject.js";
 
-export type TrustedListInput = {
+export type TrustedResourceListInput = {
+  scope?: "resource";
   hostResourceKey: string;
   pageKey: string;
   sort: RedmineThreadSort;
   filter?: RedmineThreadFilter;
   offset: number;
 };
+
+export type TrustedWorkspaceListInput = {
+  scope: "workspace";
+  sort: RedmineThreadSort;
+  filter?: RedmineThreadFilter;
+  offset: number;
+};
+
+export type TrustedListInput = TrustedResourceListInput | TrustedWorkspaceListInput;
 
 export type TrustedThreadInput = {
   hostResourceKey: string;
@@ -171,7 +181,9 @@ export class RedmineTrustedClient {
     let totalCount = input.offset;
 
     while (threads.length < 50 && scanOffset <= 10_000) {
-      const query = this.#scopeQuery(input.hostResourceKey, input.pageKey);
+      const query = input.scope === "workspace"
+        ? this.#scopeQuery(null)
+        : this.#scopeQuery(input.hostResourceKey, input.pageKey);
       query.set("limit", "100");
       query.set("offset", String(scanOffset));
       query.set("sort", sortValue(input.sort));

@@ -27,12 +27,17 @@ export function parseCurrentUserResult(value: unknown): RedmineCurrentPrincipalV
 }
 
 export function parseThreadListResult(value: unknown): RedmineThreadListResult {
-  const result = exact(value, ["threads", "nextCursor"], "thread list result");
+  const result = exact(value, ["threads", "totalCount", "nextCursor"], "thread list result");
   if (!Array.isArray(result.threads) || result.threads.length > 50 ||
+    !Number.isSafeInteger(result.totalCount) || (result.totalCount as number) < 0 ||
     (result.nextCursor !== null && (typeof result.nextCursor !== "string" || result.nextCursor.length > 2048))) {
     throw invalid("thread list");
   }
-  return { threads: result.threads.map(parseThreadSummary), nextCursor: result.nextCursor };
+  return {
+    threads: result.threads.map(parseThreadSummary),
+    totalCount: result.totalCount as number,
+    nextCursor: result.nextCursor as string | null
+  };
 }
 
 export function parseThreadResult(value: unknown): RedmineThreadV1 {

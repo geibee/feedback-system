@@ -20,6 +20,8 @@ export type {
   TrustedCreateInput,
   TrustedCreateResult,
   TrustedListInput,
+  TrustedResourceListInput,
+  TrustedWorkspaceListInput,
   TrustedMessageCreateInput,
   TrustedMessageUpdateInput,
   TrustedMessageOwnership,

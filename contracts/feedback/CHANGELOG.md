@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-20
+
+- Redmine thread一覧へ後方互換なWorkspace scopeと`totalCount`を追加し、resource cursor v1と分離したWorkspace cursorを定義。
+
 ## 2026-08-19
 
 - Redmine公開participant credential、返信・自己編集、会話message、閉鎖状態の契約を追加し、旧host-session/CSRF契約を削除。

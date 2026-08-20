@@ -41,12 +41,14 @@ export type {
   RedmineMessageCreateInput,
   RedmineMessageUpdateInput,
   RedmineParticipantV1,
+  RedmineResourceThreadListInput,
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadListInput,
   RedmineThreadListResult,
   RedmineThreadLookupInput,
-  RedmineThreadSort
+  RedmineThreadSort,
+  RedmineWorkspaceThreadListInput
 } from "./model.js";
 export type { AbortSignalLike, RedmineFeedbackPort, RedmineProfileResult } from "./port.js";
 export type {
@@ -59,7 +61,7 @@ export type {
   RequestHashInput,
   TrustedFeedbackAuthor
 } from "./context.js";
-export type { RedmineListCursorV1 } from "./pagination.js";
+export type { RedmineListCursor, RedmineListCursorV1, RedmineWorkspaceListCursorV2 } from "./pagination.js";
 export type { RedmineDiagnosticDocumentV1, RedmineDiagnosticEntryV1 } from "./diagnostic.js";
 export type { RedmineErrorCode } from "./errors.js";
 export type {

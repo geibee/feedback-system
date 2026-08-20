@@ -50,9 +50,10 @@ export function disposeFeedback(): void {
 feature flag未指定時は有効を既定とする。`setEnabled(false)`は進行中request、polling、購読、React rootとcontroller所有DOMを
 破棄するが、draft、follow、pending intentは保持する。再度`true`にするとdynamic importから再mountする。
 
-通常クリックの「場所を選択」は`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
+`＋ フィードバック`は対象選択modeへ入り、`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
 `contextMenu: true`の場合だけ右クリック投稿を有効化する。MapLibreでは`@feedback/maplibre`のtarget resolverとpin providerを渡す。
-スクリーンショットは位置選択後にpreviewするが、添付checkboxは既定OFFであり、画像なしでも送信できる。
+スクリーンショットは位置選択後にpreviewし、取得成功時は投稿へ自動添付する。取得失敗時は理由を表示し、画像なしでも送信できる。
+`他の人の投稿を見る`は同じProfileのWorkspace全体を画面単位で表示し、別画面の項目はadapterの`navigate`完了後に開く。
 
 ## 4. 確認する
 

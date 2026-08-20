@@ -12,7 +12,18 @@ export type RedmineListCursorV1 = {
   offset: number;
 };
 
-export function encodeListCursor(cursor: RedmineListCursorV1): string {
+export type RedmineWorkspaceListCursorV2 = {
+  v: "2";
+  scope: "workspace";
+  profileId: string;
+  filter: RedmineThreadFilter;
+  sort: RedmineThreadSort;
+  offset: number;
+};
+
+export type RedmineListCursor = RedmineListCursorV1 | RedmineWorkspaceListCursorV2;
+
+export function encodeListCursor(cursor: RedmineListCursor): string {
   validateCursor(cursor);
   const encoded = base64Encode(utf8(canonicalJson(cursor)))
     .replace(/\+/gu, "-")
@@ -22,7 +33,12 @@ export function encodeListCursor(cursor: RedmineListCursorV1): string {
   return encoded;
 }
 
-export function decodeListCursor(encoded: string, expected: Omit<RedmineListCursorV1, "offset">): RedmineListCursorV1 {
+export function decodeListCursor(encoded: string, expected: Omit<RedmineListCursorV1, "offset">): RedmineListCursorV1;
+export function decodeListCursor(encoded: string, expected: Omit<RedmineWorkspaceListCursorV2, "offset">): RedmineWorkspaceListCursorV2;
+export function decodeListCursor(
+  encoded: string,
+  expected: Omit<RedmineListCursorV1, "offset"> | Omit<RedmineWorkspaceListCursorV2, "offset">
+): RedmineListCursor {
   if (!/^[A-Za-z0-9_-]+$/u.test(encoded) || encoded.length > 2048) throw contractError("cursor形式が不正です");
   let value: unknown;
   try {
@@ -33,31 +49,33 @@ export function decodeListCursor(encoded: string, expected: Omit<RedmineListCurs
     throw contractError("cursorをdecodeできません");
   }
   validateCursor(value);
-  const cursor = value as RedmineListCursorV1;
+  const cursor = value as RedmineListCursor;
   if (canonicalJson({ ...cursor, offset: undefined }) !== canonicalJson(expected)) {
     throw contractError("cursorが現在のqueryへ束縛されていません");
   }
   return cursor;
 }
 
-function validateCursor(value: unknown): asserts value is RedmineListCursorV1 {
+function validateCursor(value: unknown): asserts value is RedmineListCursor {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw contractError("cursorはobjectである必要があります");
   const cursor = value as Record<string, unknown>;
-  const allowed = new Set(["v", "profileId", "hostResourceKey", "pageKey", "filter", "sort", "offset"]);
+  const allowed = cursor.v === "2"
+    ? new Set(["v", "scope", "profileId", "filter", "sort", "offset"])
+    : new Set(["v", "profileId", "hostResourceKey", "pageKey", "filter", "sort", "offset"]);
   if (Object.keys(cursor).some((key) => !allowed.has(key))) throw contractError("cursorにunknown propertyがあります");
-  if (
-    cursor.v !== "1" ||
+  const commonInvalid =
     typeof cursor.profileId !== "string" ||
-    typeof cursor.hostResourceKey !== "string" ||
-    typeof cursor.pageKey !== "string" ||
     !cursor.filter ||
     typeof cursor.filter !== "object" ||
     Array.isArray(cursor.filter) ||
     !["created_desc", "created_asc", "updated_desc"].includes(cursor.sort as string) ||
     !Number.isInteger(cursor.offset) ||
     (cursor.offset as number) < 0 ||
-    (cursor.offset as number) > 10_000
-  ) {
+    (cursor.offset as number) > 10_000;
+  const resourceInvalid = cursor.v === "1" &&
+    (typeof cursor.hostResourceKey !== "string" || typeof cursor.pageKey !== "string");
+  const workspaceInvalid = cursor.v === "2" && cursor.scope !== "workspace";
+  if ((cursor.v !== "1" && cursor.v !== "2") || commonInvalid || resourceInvalid || workspaceInvalid) {
     throw contractError("cursor値が不正です");
   }
 }

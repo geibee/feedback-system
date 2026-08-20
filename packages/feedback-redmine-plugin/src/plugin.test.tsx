@@ -112,6 +112,29 @@ describe("gateway transport", () => {
     await expect(transport.getCapabilities("other-profile")).rejects.toThrow(/一致しません/u);
   });
 
+  it("Workspace一覧ではresource queryを送らず総件数を検証する", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      threads: [],
+      totalCount: 12,
+      nextCursor: null
+    }), { headers: { "content-type": "application/json" } }));
+    const transport = new GatewayRedmineFeedbackTransport({
+      profileId: profile.id,
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      fetch
+    });
+    expect(await transport.listThreads({
+      profileId: profile.id,
+      scope: "workspace",
+      sort: "updated_desc"
+    })).toEqual({ threads: [], totalCount: 12, nextCursor: null });
+    const url = new URL(String(fetch.mock.calls[0]?.[0]), "https://app.example");
+    expect(url.searchParams.get("scope")).toBe("workspace");
+    expect(url.searchParams.has("resourceKind")).toBe(false);
+    expect(url.searchParams.has("resourceKey")).toBe(false);
+    expect(url.searchParams.has("pageKey")).toBe(false);
+  });
+
   it("operation結果をlocal diagnosticへ記録し、明示操作だけでJSON downloadする", async () => {
     const diagnostics = new RedmineDiagnosticBuffer();
     const transport = new GatewayRedmineFeedbackTransport({
@@ -268,8 +291,8 @@ describe("plugin lifecycleとstorage", () => {
     document.body.append(mount);
     const handle = createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter });
     expect(() => createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter })).toThrow(/二重mount/u);
-    await waitFor(() => expect(mount.shadowRoot?.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")).toBeTruthy());
-    fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")!);
+    await waitFor(() => expect(mount.shadowRoot?.querySelector<HTMLButtonElement>(".feedback-redmine-launcher")).toBeTruthy());
+    fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>(".feedback-redmine-launcher")!);
     handle.destroy();
     handle.destroy();
     expect(mount.shadowRoot?.querySelector("[data-feedback-redmine-mount]")).toBeNull();
@@ -304,7 +327,7 @@ describe("plugin lifecycleとstorage", () => {
       if (url.endsWith("/me")) return new Response(JSON.stringify({
         principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
-      if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], nextCursor: null }), {
+      if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], totalCount: 0, nextCursor: null }), {
         headers: { "content-type": "application/json" }
       });
       return new Response(JSON.stringify({
@@ -331,8 +354,8 @@ describe("plugin lifecycleとstorage", () => {
       profileId: profile.id,
       adapter: lifecycleAdapter,
     });
-    await waitFor(() => expect(mount.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")).toBeTruthy());
-    fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")!);
+    await waitFor(() => expect(mount.shadowRoot?.querySelector(".feedback-redmine-thread-list-launcher")).toBeTruthy());
+    fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>(".feedback-redmine-thread-list-launcher")!);
     await waitFor(() => expect(setIntervalSpy).toHaveBeenCalled());
 
     mountedPlugin.destroy();

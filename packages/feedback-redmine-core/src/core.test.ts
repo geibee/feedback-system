@@ -207,6 +207,26 @@ describe("Redmine profileとcursor", () => {
     expect(decodeListCursor(encoded, expected).offset).toBe(50);
     expect(() => decodeListCursor(encoded, { ...expected, pageKey: "other.page" })).toThrow(/束縛/u);
   });
+
+  it("Workspace cursorをresource cursorと分離して束縛する", () => {
+    const expected = {
+      v: "2" as const,
+      scope: "workspace" as const,
+      profileId: "inventory-production",
+      filter: {},
+      sort: "updated_desc" as const
+    };
+    const encoded = encodeListCursor({ ...expected, offset: 50 });
+    expect(decodeListCursor(encoded, expected).offset).toBe(50);
+    expect(() => decodeListCursor(encoded, {
+      v: "1",
+      profileId: "inventory-production",
+      hostResourceKey: "resource",
+      pageKey: "orders.detail",
+      filter: {},
+      sort: "updated_desc"
+    })).toThrow(/束縛/u);
+  });
 });
 
 describe("端末内follow/read state", () => {

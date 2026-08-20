@@ -34,14 +34,25 @@ export type RedmineThreadFilter = {
   q?: string;
 };
 
-export type RedmineThreadListInput = {
+export type RedmineResourceThreadListInput = {
   profileId: string;
+  scope?: "resource";
   resourceRef: FeedbackHostResourceRefV1;
   pageKey: string;
   sort: RedmineThreadSort;
   filter?: RedmineThreadFilter;
   cursor?: string;
 };
+
+export type RedmineWorkspaceThreadListInput = {
+  profileId: string;
+  scope: "workspace";
+  sort: RedmineThreadSort;
+  filter?: RedmineThreadFilter;
+  cursor?: string;
+};
+
+export type RedmineThreadListInput = RedmineResourceThreadListInput | RedmineWorkspaceThreadListInput;
 
 export type RedmineThreadLookupInput = {
   profileId: string;
@@ -106,5 +117,6 @@ export type RedmineAttachmentContent = {
 
 export type RedmineThreadListResult = {
   threads: RedmineThreadSummaryV1[];
+  totalCount: number;
   nextCursor: string | null;
 };

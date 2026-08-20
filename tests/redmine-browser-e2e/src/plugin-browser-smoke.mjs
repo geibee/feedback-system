@@ -102,7 +102,7 @@ const server = createServer(async (request, response) => {
     principal: { participantId: browserParticipantId, displayName: "利用者", source: "participant-credential" }
   });
   if (request.method === "GET" && url.pathname === `${base}/threads`) {
-    if (url.searchParams.has("resourceKind")) return respondJson(response, { threads: created ? [threadSummary] : [], nextCursor: null });
+    return respondJson(response, { threads: created ? [threadSummary] : [], totalCount: created ? 1 : 0, nextCursor: null });
   }
   if (request.method === "POST" && url.pathname === `${base}/threads`) {
     created = true;
@@ -167,7 +167,7 @@ try {
 
   await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
   await page.waitForFunction(() => Boolean(
-    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector(".feedback-redmine-launcher")
   ));
   assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 1);
   assert(requests.some((entry) => entry.path === `/${mountAssetPath}`), "enable時にmount lazy chunkを読み込む必要があります");
@@ -181,26 +181,30 @@ try {
     const launcher = element.shadowRoot?.querySelector(".feedback-redmine-launcher");
     return launcher ? getComputedStyle(launcher).backgroundColor : "";
   });
-  assert.equal(launcherBackground, "rgb(23, 70, 162)");
+  assert.equal(launcherBackground, "rgb(15, 23, 42)");
   await page.locator("[data-feedback-redmine-host]").evaluate((element) => {
-    const launcher = element.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']");
+    const launcher = element.shadowRoot?.querySelector(".feedback-redmine-launcher");
     if (!(launcher instanceof HTMLButtonElement)) throw new Error("launcherがありません");
     launcher.click();
   });
+  await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("フィードバックする場所をクリックしてください"));
+  await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   await page.getByLabel("最初のコメント").fill("実ブラウザからの初回投稿");
-  await page.getByRole("button", { name: "場所を選択" }).click();
-  await page.mouse.click(100, 100);
   await page.getByRole("button", { name: "Feedbackを送信" }).click();
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
 
-  await page.getByRole("button", { name: "閉じる" }).click();
+  await page.getByRole("button", { name: "スレッドを閉じる" }).click();
+  await page.getByRole("button", { name: "フィードバック", exact: true }).click();
+  await page.mouse.click(100, 100);
+  await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   const retainedDraft = "feature flag無効化後も保持するdraft";
   await page.getByLabel("最初のコメント").fill(retainedDraft);
   await page.waitForFunction((draft) => Object.keys(sessionStorage).some((key) =>
     key.startsWith(`feedback.redmine.v1:${location.origin}:inventory-production:`) &&
     key.endsWith(":draft") && sessionStorage.getItem(key) === draft
   ), retainedDraft);
+  await page.getByRole("button", { name: "他の人の投稿を見る", exact: true }).click();
   await page.waitForFunction(() => (/** @type {any} */ (window)).__feedbackIntervalProbe.active() > 0);
 
   await page.waitForTimeout(100);
@@ -216,9 +220,10 @@ try {
 
   await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
   await page.waitForFunction(() => Boolean(
-    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector(".feedback-redmine-launcher")
   ));
-  await page.getByRole("button", { name: "Feedbackを開く" }).click();
+  await page.getByRole("button", { name: "フィードバック", exact: true }).click();
+  await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   assert.equal(await page.getByLabel("最初のコメント").inputValue(), retainedDraft, "re-enableでdraftを復元する必要があります");
 
@@ -226,9 +231,10 @@ try {
   await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.purgeLocalState());
   await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
   await page.waitForFunction(() => Boolean(
-    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector(".feedback-redmine-launcher")
   ));
-  await page.getByRole("button", { name: "Feedbackを開く" }).click();
+  await page.getByRole("button", { name: "フィードバック", exact: true }).click();
+  await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   assert.equal(await page.getByLabel("最初のコメント").inputValue(), "", "purge後にdraftを復元してはいけません");
   assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 1, "再enable後もmountは1つだけである必要があります");

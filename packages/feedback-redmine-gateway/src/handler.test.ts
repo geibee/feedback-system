@@ -205,6 +205,33 @@ describe("gateway resource authorization・IDOR", () => {
     expect(deps.redmineFetch).not.toHaveBeenCalled();
   });
 
+  it("workspace scopeではProfile境界だけをRedmineへ渡して総件数を返す", async () => {
+    const redmineFetch = vi.fn<RedmineFetch>(async (url) => {
+      const query = new URL(url).searchParams;
+      expect(query.get("cf_23")).toBe("inventory");
+      expect(query.get("cf_24")).toBe("production");
+      expect(query.get("cf_25")).toBe("production-review");
+      expect(query.has("cf_26")).toBe(false);
+      expect(query.has("cf_27")).toBe(false);
+      return json({ issues: [issueFixture()], total_count: 1, offset: 0, limit: 100 });
+    });
+    const response = await createFeedbackRedmineGatewayHandler(dependencies({ fetch: redmineFetch }).value)(request(
+      "/internal/feedback-redmine/v1/profiles/inventory-production/threads?scope=workspace&sort=updated_desc"
+    ));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ totalCount: 1, nextCursor: null });
+  });
+
+  it("workspace scopeへのresource条件をRedmine接続前に拒否する", async () => {
+    const deps = dependencies();
+    const response = await createFeedbackRedmineGatewayHandler(deps.value)(request(
+      "/internal/feedback-redmine/v1/profiles/inventory-production/threads" +
+      "?scope=workspace&resourceKind=record&resourceKey=order-1&pageKey=orders.detail&sort=updated_desc"
+    ));
+    expect(response.status).toBe(400);
+    expect(deps.redmineFetch).not.toHaveBeenCalled();
+  });
+
   it("requestのresource keyが保存済みkeyと異なる場合は404にする", async () => {
     const redmineFetch = vi.fn<RedmineFetch>(async (url) => {
       expect(new URL(url).pathname).toBe("/redmine/issues.json");

@@ -12,3 +12,7 @@ trusted connectorはGETの429/5xxだけを上限付きretryし、POST結果不�
 gatewayはOpenAPIどおり201/200を選択できます。401は`redmine.invalid_api_key`へ変換し、upstream bodyやAPI keyを公開しません。
 participant replyは署名付きjournal、編集はversion付きの追記journalとして保存し、`Thread.messages`へ最新版と履歴をfoldします。
 最初のコメントの編集はdescriptionとedit journalを同じRedmine PUTで更新し、終了statusでは返信だけを拒否します。
+
+thread一覧は従来のresource scopeに加え、`scope: "workspace"`でProfileに固定されたapplication、environment、
+external workspace、project、tracker全体を取得できます。resource scopeの入力とcursor v1は後方互換で維持し、
+Workspace cursor v2はscope、Profile、filter、sortへ束縛します。一覧結果は`totalCount`を返します。

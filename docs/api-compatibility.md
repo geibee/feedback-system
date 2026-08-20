@@ -16,6 +16,11 @@ version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thr
 `redmine.invalid_api_key`へ写像する。初回createは201、同一`threadId`・`intentId`・request hashの冪等回収は200を返す。
 hash不一致またはduplicate thread IDは409相当でfail-closedする。
 
+thread一覧の`scope`省略は従来どおりresource scopeであり、resourceKind、resourceKey、pageKeyを必須とする。
+追加の`scope=workspace`はこれらを指定せず、Profileに固定されたapplication、environment、external workspace、Redmine project/tracker
+全体を一覧する。一覧responseの`totalCount`は追加必須fieldである。resource cursor v1は維持し、Workspace cursor v2は異なるscopeへ
+流用できない。詳細、添付、返信、編集は引き続きresource-boundで、別画面の一覧項目はHostAdapterの遷移完了後に取得する。
+
 `Capabilities`は`canRead`、`canCreate`、`canReply`、`canEditOwn`、`stateReadOnly`を返す。`repliesReadOnly`と必須`getCsrfToken` optionは
 alpha.2で廃止した。導入評価段階のalpha.1 clientとの互換性は保証しない。message create/updateはmutationごとのUUID
 `Idempotency-Key`を必須とし、updateは`expectedVersion`競合を409で返す。
@@ -50,6 +55,8 @@ load中のdisable/destroy後に遅延mountしない。`setEnabled(false)`と`des
 principal scopeで共有端末の利用者間を分離して7日超を削除する。
 
 返信と自己編集はFeedback UIから行える。状態、担当者、優先度はRedmine UIだけで変更し、Feedback UIはそのjournalを表示する。
+Redmine UIはlegacy `@feedback/react`へ依存せず、同版のlauncher、対象選択、右クリックmenu、独立composer／一覧／drawer、pin、
+明示的な証跡表示のUXをRedmine port上で実装する。レビュー導入、投稿warn/deny、reaction、UIからの状態変更は移植対象外である。
 検証対象はRedmine 5.1.12、
 6.0.10、6.1.3、7.0.0で、Docker Official Imageのexact digestを固定する。
 

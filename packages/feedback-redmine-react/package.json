@@ -1,7 +1,7 @@
 {
   "name": "@feedback/redmine-react",
   "version": "1.0.0-alpha.2",
-  "description": "Redmineを正本とするFeedbackのread-only thread UI",
+  "description": "Redmineを正本とするFeedbackの投稿・会話UI",
   "private": true,
   "type": "module",
   "files": [
@@ -26,9 +26,11 @@
     "access": "restricted"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "styles:sync": "node scripts/sync-style-text.mjs",
+    "styles:check": "node scripts/sync-style-text.mjs --check",
+    "typecheck": "npm run styles:check && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
+    "build": "npm run styles:check && tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
     "@feedback/core": "1.0.0-alpha.2",

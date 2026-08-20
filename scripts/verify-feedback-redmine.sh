@@ -36,6 +36,7 @@ bash scripts/check-feedback-redmine-contracts.sh
 bash scripts/check-feedback-redmine-security.sh
 bash scripts/check-feedback-redmine-conformance.sh
 bash scripts/check-feedback-redmine-release.sh
+bash scripts/check-feedback-redmine-publish.sh
 bash scripts/check-feedback-redmine-container-platforms.sh
 
 log "PASS"

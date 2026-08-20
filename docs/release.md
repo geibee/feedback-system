@@ -46,12 +46,18 @@ release前にskip変数なしの`bash scripts/verify-feedback.sh`を実行し、
 - Redmine 5.1.12、6.0.10、6.1.3、7.0.0のdigest固定conformance
 
 `v<package.jsonのversion>` tagをpushすると`.github/workflows/release-feedback-redmine.yml`が正規品質ゲート、release候補生成、
-GitHub Packages・GHCR公開、GitHub Release作成をこの順で実行する。同じtag、npm version、OCI tagは上書きしない。
-公開には`release` environmentの承認規則を設定する。初回公開後にrepository ownerがGitHubのpackage設定でnpm packageと
-container packageをpublicへ設定し、匿名consumerが取得できることを確認する。以後もvisibilityをrelease reviewで確認する。
+GitHub Release draftと全assetの準備、GitHub Packages・GHCR公開、draft公開をこの順で実行する。suffix付きversionだけを
+prereleaseにし、stable versionは通常releaseにする。途中失敗後は同じintegrity/digestの公開済みartifactとdraftを再利用し、
+異なる内容が同じversion/tagに存在する場合は停止する。
 
-ローカルから公開scriptを実行する場合は、package write権限を持つ`NODE_AUTH_TOKEN`と`GITHUB_TOKEN`、`GITHUB_ACTOR`を環境から
-注入する。tokenを`.npmrc`、shell引数、repositoryへ保存しない。
+repositoryではimmutable releasesを有効にし、`release` environmentへ承認規則を設定する。GitHub PackagesとGHCRのwrite権限は
+このrepositoryのrelease workflowだけに付与し、同じversion/tagへの手動publishを許可しない。GHCRのversion tagは探索用であり、
+配備時はGitHub Releaseの`release-manifest.json`に記録された`indexDigest`を使って
+`ghcr.io/geibee/<image>@sha256:...`の形式で固定する。初回公開後にrepository ownerがGitHubのpackage設定でnpm packageと
+container packageをpublicへ設定し、匿名consumerが取得できることを確認する。以後もvisibilityとdigestをrelease reviewで確認する。
+
+障害復旧でローカルから公開scriptを実行する場合はworkflowを停止し、単一writerであることを確認してから、package write権限を持つ
+`NODE_AUTH_TOKEN`と`GITHUB_TOKEN`、`GITHUB_ACTOR`を環境から注入する。tokenを`.npmrc`、shell引数、repositoryへ保存しない。
 
 ```bash
 bash scripts/publish-feedback-redmine-release.sh \

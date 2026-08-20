@@ -52,38 +52,85 @@ cleanup() {
 }
 trap cleanup EXIT
 
-while IFS=$'\t' read -r package_name _filename; do
-  if npm view "$package_name@$version" version --registry=https://npm.pkg.github.com \
-      >"$preflight_directory/npm.out" 2>"$preflight_directory/npm.err"; then
-    fail "$package_name@$version は既に存在します"
-  fi
-  if ! rg -qi 'E404|404 Not Found|not found' "$preflight_directory/npm.err"; then
-    fail "$package_name の存在確認に失敗しました"
-  fi
-done < <(jq -r '.packages[] | [.name,.filename] | @tsv' "$input/release-manifest.json")
-
-while IFS=$'\t' read -r image_name _archive; do
-  destination="docker://ghcr.io/$owner/$image_name:$version"
-  if skopeo inspect "$destination" >"$preflight_directory/image.out" 2>"$preflight_directory/image.err"; then
-    fail "ghcr.io/$owner/$image_name:$version は既に存在します"
-  fi
-  if ! rg -qi 'manifest unknown|name unknown|not found' "$preflight_directory/image.err"; then
-    fail "$image_name の存在確認に失敗しました"
-  fi
-done < <(jq -r '.images[] | [.name,.archive] | @tsv' "$input/release-manifest.json")
+npm_plan="$preflight_directory/npm-plan.tsv"
+image_plan="$preflight_directory/image-plan.tsv"
+: >"$npm_plan"
+: >"$image_plan"
 
 while IFS=$'\t' read -r package_name filename; do
-  echo "[feedback-redmine-publish] npm $package_name@$version"
-  npm publish "$input/$filename" --registry=https://npm.pkg.github.com --access public
+  local_integrity=$(PACKAGE_FILE="$input/$filename" node -e '
+    const { createHash } = require("node:crypto");
+    const { readFileSync } = require("node:fs");
+    process.stdout.write(`sha512-${createHash("sha512").update(readFileSync(process.env.PACKAGE_FILE)).digest("base64")}`);
+  ')
+  if npm view "$package_name@$version" version --registry=https://npm.pkg.github.com \
+      >"$preflight_directory/npm.out" 2>"$preflight_directory/npm.err"; then
+    npm view "$package_name@$version" dist.integrity --json --registry=https://npm.pkg.github.com \
+      >"$preflight_directory/npm-integrity.json" 2>"$preflight_directory/npm.err" || \
+      fail "$package_name のintegrity取得に失敗しました"
+    remote_integrity=$(jq -er 'select(type == "string")' "$preflight_directory/npm-integrity.json") || \
+      fail "$package_name の公開済みintegrityが不正です"
+    [[ "$remote_integrity" == "$local_integrity" ]] || \
+      fail "$package_name@$version は異なる内容で既に存在します"
+    action=skip
+  else
+    if ! rg -qi 'E404|404 Not Found|not found' "$preflight_directory/npm.err"; then
+      fail "$package_name の存在確認に失敗しました"
+    fi
+    action=publish
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$package_name" "$filename" "$local_integrity" "$action" >>"$npm_plan"
 done < <(jq -r '.packages[] | [.name,.filename] | @tsv' "$input/release-manifest.json")
 
 while IFS=$'\t' read -r image_name archive expected_digest; do
   destination="docker://ghcr.io/$owner/$image_name:$version"
+  if skopeo inspect --format '{{.Digest}}' "$destination" >"$preflight_directory/image.out" 2>"$preflight_directory/image.err"; then
+    actual_digest=$(<"$preflight_directory/image.out")
+    [[ "$actual_digest" == "$expected_digest" ]] || \
+      fail "ghcr.io/$owner/$image_name:$version は異なるdigestで既に存在します"
+    action=skip
+  else
+    if ! rg -qi 'manifest unknown|name unknown|not found' "$preflight_directory/image.err"; then
+      fail "$image_name の存在確認に失敗しました"
+    fi
+    action=publish
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$image_name" "$archive" "$expected_digest" "$action" >>"$image_plan"
+done < <(jq -r '.images[] | [.name,.archive,.indexDigest] | @tsv' "$input/release-manifest.json")
+
+while IFS=$'\t' read -r package_name filename expected_integrity action; do
+  if [[ "$action" == skip ]]; then
+    echo "[feedback-redmine-publish] npm $package_name@$version は同一integrityのため再利用します"
+    continue
+  fi
+  echo "[feedback-redmine-publish] npm $package_name@$version"
+  npm publish "$input/$filename" --registry=https://npm.pkg.github.com --access public
+  actual_integrity=$(npm view "$package_name@$version" dist.integrity --json --registry=https://npm.pkg.github.com | \
+    jq -er 'select(type == "string")') || fail "$package_name の公開後integrityを確認できません"
+  [[ "$actual_integrity" == "$expected_integrity" ]] || fail "$package_name の公開後integrityが一致しません"
+done <"$npm_plan"
+
+while IFS=$'\t' read -r image_name archive expected_digest action; do
+  destination="docker://ghcr.io/$owner/$image_name:$version"
+  if [[ "$action" == skip ]]; then
+    echo "[feedback-redmine-publish] OCI ghcr.io/$owner/$image_name:$version は同一digestのため再利用します"
+    continue
+  fi
+  if skopeo inspect --format '{{.Digest}}' "$destination" >"$preflight_directory/image.out" 2>"$preflight_directory/image.err"; then
+    actual_digest=$(<"$preflight_directory/image.out")
+    [[ "$actual_digest" == "$expected_digest" ]] || \
+      fail "$image_name の公開直前に異なるdigestのtagが作成されました"
+    echo "[feedback-redmine-publish] OCI ghcr.io/$owner/$image_name:$version は同一digestのため再利用します"
+    continue
+  fi
+  if ! rg -qi 'manifest unknown|name unknown|not found' "$preflight_directory/image.err"; then
+    fail "$image_name の公開直前確認に失敗しました"
+  fi
   echo "[feedback-redmine-publish] OCI ghcr.io/$owner/$image_name:$version"
-  skopeo copy --all "oci-archive:$input/$archive" "$destination"
+  skopeo copy --all --preserve-digests "oci-archive:$input/$archive" "$destination"
   actual_digest=$(skopeo inspect --format '{{.Digest}}' "$destination")
   [[ "$actual_digest" == "$expected_digest" ]] || \
     fail "$image_name の公開digestが一致しません: expected=$expected_digest actual=$actual_digest"
-done < <(jq -r '.images[] | [.name,.archive,.indexDigest] | @tsv' "$input/release-manifest.json")
+done <"$image_plan"
 
 echo "[feedback-redmine-publish] PASS"

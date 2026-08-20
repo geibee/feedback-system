@@ -52,8 +52,12 @@ feature flag未指定時は有効を既定とする。`setEnabled(false)`は進�
 
 `＋ フィードバック`は対象選択modeへ入り、`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
 `contextMenu: true`の場合だけ右クリック投稿を有効化する。MapLibreでは`@feedback/maplibre`のtarget resolverとpin providerを渡す。
-スクリーンショットは位置選択後にpreviewし、取得成功時は投稿へ自動添付する。取得失敗時は理由を表示し、画像なしでも送信できる。
+スクリーンショットはProfileで明示的に無効化しない限り、pluginが既定DOM providerで取得する。Host Adapterへの
+`captureEvidence`実装は不要で、MapLibre canvasなどhost固有処理が必要な場合だけ差し替える。位置選択後にFeedbackピンを
+画像へ焼き込んでpreviewし、取得成功時は投稿へ自動添付する。取得失敗時は理由を表示し、画像なしでも送信できる。
+DOM providerを使うHostのCSPでは`img-src`に`data:`と`blob:`を許可する。
 `他の人の投稿を見る`は同じProfileのWorkspace全体を画面単位で表示し、別画面の項目はadapterの`navigate`完了後に開く。
+新規issueの説明欄には初回コメントと、同じSPA画面でthreadを開くsame-origin URLだけを保存する。
 
 ## 4. 確認する
 

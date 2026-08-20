@@ -25,6 +25,7 @@ const createInput = {
   target: null,
   release: "2026.08.19",
   locale: "ja-JP",
+  threadUrl: `https://inventory.example.invalid/orders/value?feedbackThread=${threadId}`,
   capturedAt: "2026-08-19T00:00:00Z",
   evidence: null,
   author: {
@@ -214,6 +215,9 @@ describe("Redmine trusted HTTP policy", () => {
           { id: profile.customFieldIds.submittedById, value: "00000000-0000-4000-8000-000000000007" }
         ]));
         expect(request.issue.custom_fields).toHaveLength(11);
+        expect(request.issue.description).toContain(createInput.threadUrl);
+        expect(request.issue.description).not.toContain("Feedback metadata v1");
+        expect(request.issue.description).not.toContain("Application:");
         createdIssue = {
           ...issueFixture(),
           subject: request.issue.subject,
@@ -251,6 +255,43 @@ describe("Redmine trusted HTTP policy", () => {
     });
     await expect(client(fetch).getThread({ hostResourceKey: "opaque-resource", threadId }))
       .rejects.toMatchObject({ code: "redmine.duplicate_thread_id", upstreamStatus: 409 });
+  });
+
+  it("新規issueの初回自己編集権をcontext attachmentから復元する", async () => {
+    const issue = issueFixture();
+    issue.description = "最初のコメント";
+    issue.attachments.push({
+      id: 91,
+      filename: "feedback-context-v1.json",
+      filesize: 512,
+      content_type: "application/json",
+      content_url: "https://redmine.example.invalid/redmine/attachments/download/91/feedback-context-v1.json",
+      author: { id: 7, name: "投稿者" },
+      created_on: "2026-08-19T00:00:00Z"
+    } as never);
+    const context = {
+      schemaVersion: "1",
+      kind: "feedback-context",
+      threadId,
+      intentId: createInput.intentId,
+      requestHash: "a".repeat(64),
+      author: createInput.author,
+      initialMessageSignature: "signed-initial-message"
+    };
+    const ownership = await client(async (url) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith("/issues.json")) return json({ issues: [issue], total_count: 1, offset: 0, limit: 100 });
+      if (path.endsWith("/issues/123.json")) return json({ issue });
+      if (path.includes("/attachments/download/91/")) return json(context);
+      throw new Error(`unexpected request: ${url}`);
+    }).lookupMessageOwnership({ hostResourceKey: "opaque-resource", threadId, messageId: threadId });
+    expect(ownership).toMatchObject({
+      kind: "initial",
+      participantId: createInput.author.participantId,
+      intentId: createInput.intentId,
+      signature: "signed-initial-message",
+      body: "最初のコメント"
+    });
   });
 
   it("threadに属さないattachment IDはmetadata取得前に404にする", async () => {

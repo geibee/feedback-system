@@ -12,7 +12,7 @@ const profile = {
   environmentKey: "production",
   externalWorkspaceKey: "production-review",
   perspectives: [{ code: "ux", label: "UI/UX" }],
-  capture: { enabled: false, maximumUploadBytes: 1_048_576, contentTypes: ["image/png"] },
+  capture: { enabled: true, maximumUploadBytes: 1_048_576, contentTypes: ["image/png"] },
   attachments: { maximumInlinePreviewBytes: 1_048_576, maximumDownloadBytes: 1_048_576 },
   showRedmineLink: false
 };
@@ -190,6 +190,36 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("フィードバックする場所をクリックしてください"));
   await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
+  const preview = page.getByRole("img", { name: "証跡プレビュー" });
+  try {
+    await preview.waitFor();
+  } catch {
+    const shadowText = await page.locator("[data-feedback-redmine-host]").evaluate((element) => element.shadowRoot?.textContent ?? "");
+    throw new Error(`証跡previewがtimeoutしました: errors=${JSON.stringify(errors)} shadow=${JSON.stringify(shadowText)}`);
+  }
+  const redMarkerPixels = await preview.evaluate(async (element) => {
+    if (!(element instanceof HTMLImageElement)) throw new Error("証跡previewが画像ではありません");
+    await element.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = element.naturalWidth;
+    canvas.height = element.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("証跡previewを検査できません");
+    context.drawImage(element, 0, 0);
+    const scaleX = element.naturalWidth / window.innerWidth;
+    const scaleY = element.naturalHeight / window.innerHeight;
+    const left = Math.max(0, Math.floor(82 * scaleX));
+    const top = Math.max(0, Math.floor(62 * scaleY));
+    const width = Math.max(1, Math.ceil(36 * scaleX));
+    const height = Math.max(1, Math.ceil(40 * scaleY));
+    const pixels = context.getImageData(left, top, width, height).data;
+    let count = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] > 180 && pixels[index + 1] < 100 && pixels[index + 2] < 110 && pixels[index + 3] > 200) count += 1;
+    }
+    return count;
+  });
+  assert(redMarkerPixels > 20, "スクリーンショットへFeedback位置ピンを焼き込む必要があります");
   await page.getByLabel("最初のコメント").fill("実ブラウザからの初回投稿");
   await page.getByRole("button", { name: "Feedbackを送信" }).click();
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
@@ -238,6 +268,15 @@ try {
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   assert.equal(await page.getByLabel("最初のコメント").inputValue(), "", "purge後にdraftを復元してはいけません");
   assert.equal(await page.locator("[data-feedback-redmine-host]").count(), 1, "再enable後もmountは1つだけである必要があります");
+
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(false));
+  await page.evaluate((deepLinkThreadId) => {
+    history.replaceState(null, "", `/?feedbackThread=${deepLinkThreadId}`);
+  }, thread.threadId);
+  await page.evaluate(async () => (/** @type {any} */ (window)).feedbackFixture.setEnabled(true));
+  await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
+  assert.equal(await page.getByRole("dialog", { name: "フィードバックスレッド" }).count(), 1,
+    "Redmineのthread URLを開くと該当drawerを表示する必要があります");
 
   assert.deepEqual(errors, []);
   const apiRequests = requests.filter(isApiRequest);

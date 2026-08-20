@@ -71,11 +71,11 @@ export function parseListQuery(query: URLSearchParams): {
   return { ...(scope === "resource" ? { scope } : {}), resourceRef: resource, pageKey, sort, filter, ...(cursor ? { cursor } : {}) };
 }
 
-export function parseCreateRequest(value: unknown, profileId: string): RedmineThreadCreateInput {
+export function parseCreateRequest(value: unknown, profileId: string, requestOrigin: string): RedmineThreadCreateInput {
   const item = exact(value, [
     "resourceRef", "threadId", "intentId", "comment", "perspectiveCode", "location", "target", "release", "locale",
-    "capturedAt", "evidence", "participantName"
-  ], "create request", ["participantName"]);
+    "threadUrl", "capturedAt", "evidence", "participantName"
+  ], "create request", ["threadUrl", "participantName"]);
   const location = exact(item.location, ["schemaVersion", "pageKey", "routeTemplate", "pathParameters", "queryParameters"], "location", ["queryParameters"]);
   if (location.schemaVersion !== "1") invalid("location schemaVersionが不正です");
   stringMap(location.pathParameters, "pathParameters");
@@ -103,10 +103,29 @@ export function parseCreateRequest(value: unknown, profileId: string): RedmineTh
     target,
     release: bounded(item.release, "release", 100),
     locale: bounded(item.locale, "locale", 35),
+    threadUrl: parseThreadUrl(item.threadUrl, threadId, requestOrigin),
     capturedAt: dateTime(item.capturedAt, "capturedAt"),
     evidence,
     participantName: participantName(item.participantName)
   };
+}
+
+function parseThreadUrl(value: unknown, threadId: string, requestOrigin: string): string | null {
+  if (value === undefined || value === null) return null;
+  const text = bounded(value, "threadUrl", 2_048);
+  let parsed: URL;
+  let origin: URL;
+  try {
+    parsed = new URL(text);
+    origin = new URL(requestOrigin);
+  } catch {
+    invalid("threadUrlがURLではありません");
+  }
+  if ((parsed!.protocol !== "https:" && parsed!.protocol !== "http:") || parsed!.origin !== origin!.origin ||
+    parsed!.username || parsed!.password || parsed!.searchParams.get("feedbackThread") !== threadId) {
+    invalid("threadUrlは同一originでfeedbackThreadを含む必要があります");
+  }
+  return parsed!.toString();
 }
 
 export function parseCreateParticipantRequest(value: unknown): { browserProfileId: string } {

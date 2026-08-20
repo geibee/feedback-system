@@ -31,16 +31,24 @@ export function createDomEvidenceProvider(options: DomEvidenceProviderOptions = 
     const maskedElements = installMasks(root, request.maskSelector);
     try {
       const pixelRatio = Math.min(view.devicePixelRatio || 1, options.maxPixelRatio ?? 2);
-      const blob = await (options.render ?? toBlob)(root, {
-        width: viewportWidth,
-        height: viewportHeight,
-        pixelRatio,
-        style: {
-          transform: `translate(${-scrollX}px, ${-scrollY}px)`,
-          transformOrigin: "top left"
-        },
-        filter: (node) => !(node instanceof Element) || !node.matches(request.excludeSelector)
-      });
+      let blob: Blob | null;
+      try {
+        blob = await (options.render ?? toBlob)(root, {
+          width: viewportWidth,
+          height: viewportHeight,
+          pixelRatio,
+          style: {
+            transform: `translate(${-scrollX}px, ${-scrollY}px)`,
+            transformOrigin: "top left"
+          },
+          filter: (node) => !(node instanceof Element) || !node.matches(request.excludeSelector)
+        });
+      } catch (reason) {
+        if (!(reason instanceof Error)) {
+          throw new Error("DOM証跡の画像化に失敗しました。Content-Security-Policyのimg-srcでdata:画像が許可されているか確認してください");
+        }
+        throw reason;
+      }
       if (!blob) return null;
       if (blob.size > (options.maxBytes ?? Number.MAX_SAFE_INTEGER)) {
         throw new Error("取得した証跡が許可サイズを超えています");

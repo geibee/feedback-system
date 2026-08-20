@@ -45,6 +45,18 @@ describe("DOM evidence provider", () => {
     await expect(capture(evidenceRequest())).rejects.toThrow("許可サイズを超えています");
     expect(masked.classList.contains("feedback-mask-active")).toBe(false);
   });
+
+  it("browserの画像読込eventで失敗した場合にCSPの確認方法を示す", async () => {
+    const root = document.createElement("main");
+    document.body.appendChild(root);
+    const capture = createDomEvidenceProvider({
+      root: () => root,
+      render: async () => { throw new Event("error"); }
+    });
+
+    await expect(capture(evidenceRequest())).rejects.toThrow("img-srcでdata:画像が許可されているか");
+    root.remove();
+  });
 });
 
 type DomCaptureRenderOptionsForTest = {

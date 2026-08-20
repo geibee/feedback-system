@@ -69,6 +69,7 @@ async function createFixture() {
     target: { schemaVersion: "1", kind: "screen-position", relativeX: 0.5, relativeY: 0.5 },
     release: "conformance",
     locale: "ja-JP",
+    threadUrl: `http://app.example/orders/conformance?feedbackThread=${threadId}`,
     capturedAt,
     evidence
   };
@@ -89,6 +90,29 @@ async function createFixture() {
   assert.equal(created.threadId, threadId);
   assert.equal(created.initialComment, "最初のコメント\n再構築テスト");
   assert.equal(created.attachments.length, 2);
+
+  const initialEditIntentId = crypto.randomUUID();
+  const initialEditResponse = await gateway(gatewayRequest(`${profilePath()}/threads/${threadId}/messages/${threadId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Feedback-Participant-Credential": credential,
+      "Idempotency-Key": initialEditIntentId
+    },
+    body: JSON.stringify({
+      body: "最初のコメント\n再構築テスト（編集済み）",
+      participantName: "Conformance participant",
+      expectedVersion: 1
+    })
+  }));
+  assert.equal(initialEditResponse.status, 200, await initialEditResponse.clone().text());
+  const initialEdited = parseThreadResult(await initialEditResponse.json());
+  assert.equal(initialEdited.initialComment, "最初のコメント\n再構築テスト（編集済み）");
+  const rawDescription = (await issueDescription(created.issueId)).replace(/\r\n?/gu, "\n");
+  assert.equal(rawDescription,
+    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n${input.threadUrl}`);
+  assert(!rawDescription.includes("Feedback metadata v1"));
+  assert(!rawDescription.includes("Application:"));
 
   const messageId = crypto.randomUUID();
   const replyIntentId = crypto.randomUUID();
@@ -154,7 +178,7 @@ async function verifyFixture() {
   assert.equal(detailResponse.status, 200, await detailResponse.clone().text());
   const rebuilt = parseThreadResult(await detailResponse.json());
   assert.equal(rebuilt.threadId, state.threadId);
-  assert.equal(rebuilt.initialComment, "最初のコメント\n再構築テスト");
+  assert.equal(rebuilt.initialComment, "最初のコメント\n再構築テスト（編集済み）");
   assert(rebuilt.locator);
   assert.equal(rebuilt.locator.location.pageKey, state.pageKey);
   assert.equal(rebuilt.diagnosticCount, 0);
@@ -263,6 +287,15 @@ async function updateIssue(issueId, issue) {
     body: JSON.stringify({ issue })
   });
   assert.equal(response.status, 204, await response.text());
+}
+
+/** @param {number} issueId */
+async function issueDescription(issueId) {
+  const response = await fetch(`${endpoint}/issues/${issueId}.json`, {
+    headers: { "X-Redmine-API-Key": seed.apiKey }
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  return (await response.json()).issue.description;
 }
 
 /**

@@ -160,7 +160,7 @@ async function handlePublicRoute(
       profile.clientProfile.capture.maximumUploadBytes + 262_144
     );
     const multipart = await readCreateMultipart(request, maximum);
-    const input = parseCreateRequest(multipart.request, route.profileId);
+    const input = parseCreateRequest(multipart.request, route.profileId, requestOrigin);
     assertEvidencePart(input.evidence, multipart.evidence);
     if (request.headers.get("Idempotency-Key") !== input.intentId) {
       throw new GatewayHttpError(400, "redmine.contract_invalid", "Idempotency-Keyとintent IDが一致しません");

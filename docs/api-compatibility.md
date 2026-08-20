@@ -16,6 +16,10 @@ version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thr
 `redmine.invalid_api_key`へ写像する。初回createは201、同一`threadId`・`intentId`・request hashの冪等回収は200を返す。
 hash不一致またはduplicate thread IDは409相当でfail-closedする。
 
+thread createの任意`threadUrl`は同一originかつ対象`threadId`を`feedbackThread` queryに持つURLだけを許可する。新規Redmine issueの
+descriptionは初回コメントとこのURLだけで、従来の`Feedback metadata v1`は書き込まない。旧descriptionは読取互換を維持し、
+初回自己編集の署名はcontext attachmentから復元する。
+
 thread一覧の`scope`省略は従来どおりresource scopeであり、resourceKind、resourceKey、pageKeyを必須とする。
 追加の`scope=workspace`はこれらを指定せず、Profileに固定されたapplication、environment、external workspace、Redmine project/tracker
 全体を一覧する。一覧responseの`totalCount`は追加必須fieldである。resource cursor v1は維持し、Workspace cursor v2は異なるscopeへ

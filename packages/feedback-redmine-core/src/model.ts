@@ -79,6 +79,8 @@ export type RedmineThreadCreateInput = RedmineThreadLookupInput & {
   target: FeedbackTargetV1 | null;
   release: string;
   locale: string;
+  /** Redmine issueから同じSPA画面・threadを開くsame-origin URL。 */
+  threadUrl?: string | null;
   capturedAt: string;
   evidence: RedmineEvidenceMetadata | null;
   participantName?: string | null;

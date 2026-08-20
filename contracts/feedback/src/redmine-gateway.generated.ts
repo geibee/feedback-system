@@ -420,6 +420,8 @@ export interface components {
             target: components["schemas"]["Target"] | null;
             release: string;
             locale: string;
+            /** Format: uri */
+            threadUrl?: string | null;
             /** Format: date-time */
             capturedAt: string;
             evidence: components["schemas"]["EvidenceMetadata"] | null;

@@ -122,6 +122,7 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
       target: input.target,
       release: input.release,
       locale: input.locale,
+      threadUrl: input.threadUrl ?? null,
       capturedAt: input.capturedAt,
       evidence: input.evidence,
       participantName: input.participantName ?? null

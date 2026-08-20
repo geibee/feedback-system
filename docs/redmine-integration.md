@@ -41,8 +41,12 @@ Redmineにcustom field unique制約はないため、同じthread IDが複数見
 
 ## Redmineへ保存する内容
 
-issue descriptionには人が読める初回コメントとversion付きmetadata blockを保存する。同時に`feedback-context-v1.json`へ
-location、target、release、locale、participant UUIDと自己申告表示名、request hashを保存する。スクリーンショットは
+issue descriptionには人が読める初回コメントと、SPAで同じthreadを開くsame-origin URLだけを保存する。Application、Environment、
+Workspace、Page、Host resourceなどの値はdescriptionへ重複させない。これらのcustom fieldはRedmine APIがProfile／画面／resourceを
+絞り込み、冪等回収と一覧を行うための構造化索引であり、URLからの文字列解析では代替しない。
+
+`feedback-context-v1.json`にはlocation、target、release、locale、participant UUID、自己申告表示名、request hashと
+初回自己編集用署名を保存する。旧issueのdescriptionにある`Feedback metadata v1`は読取互換のため解析するが、新規issueへは書かない。スクリーンショットは
 `feedback-{threadId}.png`または`.webp`として保存し、SHA-256、byte size、viewportをcontextへ記録する。
 
 返信は署名付きmessage markerを持つRedmine journalとして追加する。編集は元journalを上書きせず、version付きedit journalを追記し、
@@ -58,6 +62,10 @@ attachment bytesをclient cacheの正本にしない。
 3. SPAへ`@feedback/redmine-plugin`を通常のnpm依存として追加する。
 4. 単一integration moduleで`createRedmineFeedbackPluginController()`を作り、hostのfeature flagを`setEnabled()`へ接続する。
 5. participant発行、位置指定投稿、返信、自己編集、終了済み返信拒否を検証する。
+
+DOMスクリーンショットはpluginが既定で接続する。Profileの`capture.enabled`は通常`true`とし、証跡を保存しない運用だけ明示的に
+`false`にする。HostのCSPでは`img-src`に`data:`と`blob:`を許可する。MapLibreのWebGL canvasを確実に含める場合は
+`@feedback/maplibre`のproviderをHost Adapterへ指定する。
 
 pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、OIDC token、任意HTTP headerを渡せない。通信先はsame-originの
 `/internal/feedback-redmine/v1`へ固定する。feature flag未指定時は有効を既定とする。

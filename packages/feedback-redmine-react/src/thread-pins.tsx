@@ -25,7 +25,9 @@ export function ThreadPins(props: {
     };
   }, [props.positionProvider]);
   const pins = useMemo(() => props.threads.flatMap((thread) => {
-    const position = pinPosition(thread, props.positionProvider);
+    const position = thread.locator?.target
+      ? resolveFeedbackPinPosition(thread.locator.target, props.positionProvider)
+      : null;
     return position ? [{ thread, position }] : [];
     // positionVersionはhost layout変更後のDOM座標再読込を行う。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,10 +59,12 @@ export function ThreadPins(props: {
   </svg>;
 }
 
-function pinPosition(thread: RedmineThreadSummaryV1, provider?: FeedbackPinPositionProvider): { x: number; y: number } | null {
-  const target = thread.locator?.target as Record<string, unknown> | null | undefined;
-  if (!target) return null;
-  const provided = provider?.getPosition(thread.locator!.target!);
+export function resolveFeedbackPinPosition(
+  value: Parameters<FeedbackPinPositionProvider["getPosition"]>[0],
+  provider?: FeedbackPinPositionProvider
+): { x: number; y: number } | null {
+  const target = value as Record<string, unknown>;
+  const provided = provider?.getPosition(value);
   if (provided) return provided;
   if (
     target.kind === "screen-position" &&

@@ -193,6 +193,7 @@ describe("gateway transport", () => {
       target: null,
       release: "2026.08.19",
       locale: "ja-JP",
+      threadUrl: `https://app.example/orders/1?feedbackThread=${emptyThread.threadId}`,
       capturedAt: "2026-08-19T00:00:00Z",
       evidence: null
     }, null);
@@ -200,6 +201,11 @@ describe("gateway transport", () => {
     expect(new Headers(init.headers).get("X-Feedback-Participant-Credential")).toBe("signed-credential".repeat(4));
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe("00000000-0000-4000-8000-000000000002");
     expect(init.body).toBeInstanceOf(FormData);
+    const requestPart = (init.body as FormData).get("request");
+    expect(requestPart).toBeInstanceOf(Blob);
+    expect(JSON.parse(await (requestPart as Blob).text())).toMatchObject({
+      threadUrl: `https://app.example/orders/1?feedbackThread=${emptyThread.threadId}`
+    });
   });
 
   it("participantをlocalStorageで再利用し、storage削除後は新しいUUIDを採番する", async () => {

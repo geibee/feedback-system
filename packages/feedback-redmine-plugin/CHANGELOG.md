@@ -5,6 +5,7 @@
 - gateway署名participant credentialをlocalStorageへ保存し、OIDC/session/CSRF callbackに依存しない公開modeへ変更。
 - 位置選択、右クリック、MapLibre target/pin provider、返信、自己編集を追加。
 - Workspace scope一覧と総件数をgateway transportへ追加。
+- create時のsame-origin thread URLをgatewayへ送り、Redmine issueから該当画面を開けるようにした。
 
 - SPAのfeature flagからdynamic import、mount、無効化、再有効化を制御する`@feedback/redmine-plugin/loader`を追加。
 - 無効化時の通信・購読・timer・controller所有DOMの破棄と、完全撤去用の明示的なbrowser state削除を追加。

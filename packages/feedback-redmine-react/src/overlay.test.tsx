@@ -13,8 +13,13 @@ import {
 } from "@feedback/redmine-core";
 import type { FeedbackLocationV1 } from "@feedback/core";
 import { feedbackErrorMessage } from "./error-message.js";
+import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { RedmineFeedbackOverlay } from "./overlay.js";
 import { RedmineFeedbackProvider } from "./provider.js";
+
+vi.mock("./capture-marker.js", () => ({
+  addFeedbackCaptureMarker: vi.fn(async (payload) => payload)
+}));
 
 const threadId = "00000000-0000-4000-8000-000000000001";
 const currentLocation: FeedbackLocationV1 = {
@@ -315,12 +320,20 @@ describe("Redmine共通UI", () => {
     fireEvent.change(within(composer).getByLabelText("最初のコメント"), { target: { value: "画像付き指摘" } });
     fireEvent.click(within(composer).getByRole("button", { name: "Feedbackを送信" }));
     await waitFor(() => expect(createThread).toHaveBeenCalledTimes(1));
-    expect(createThread.mock.calls[0]?.[0].evidence).toMatchObject({ contentType: "image/png", byteSize: 4 });
+    const createInput = createThread.mock.calls[0]![0];
+    expect(createInput.evidence).toMatchObject({ contentType: "image/png", byteSize: 4 });
+    const threadUrl = new URL(createInput.threadUrl!);
+    expect(threadUrl.origin).toBe(window.location.origin);
+    expect(threadUrl.searchParams.get("feedbackThread")).toBe(createInput.threadId);
     expect(createThread.mock.calls[0]?.[1]).toEqual(new Uint8Array([1, 2, 3, 4]));
     expect(captureEvidence).toHaveBeenCalledWith(expect.objectContaining({
       excludeSelector: "[data-feedback-redmine-ui]",
       maskSelector: "[data-feedback-mask]"
     }));
+    expect(addFeedbackCaptureMarker).toHaveBeenCalledWith(
+      expect.objectContaining({ contentType: "image/png" }),
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })
+    );
   });
 
   it("別locationの投稿はnavigate完了とlocation一致後に詳細を取得する", async () => {

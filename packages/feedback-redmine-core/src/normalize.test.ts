@@ -32,23 +32,9 @@ describe("Redmine DTO normalization", () => {
     const participantId = "00000000-0000-4000-8000-000000000007";
     const messageId = "00000000-0000-4000-8000-000000000008";
     const issue: RedmineIssueDto = issueFixture();
-    issue.description = buildRedmineDescription("最初のコメント", {
-      threadId,
-      intentId: "00000000-0000-4000-8000-000000000002",
-      requestHash: "a".repeat(64),
-      applicationKey: "inventory",
-      environmentKey: "production",
-      externalWorkspaceKey: "production-review",
-      pageKey: "orders.detail",
-      hostResourceKey: "opaque-resource",
-      perspectiveCode: "ux",
-      submittedById: participantId,
-      submittedByName: "利用者",
-      messageId: threadId,
-      participantId,
-      messageSignature: "signature",
-      capturedAt: "2026-08-19T00:00:00Z"
-    });
+    issue.description = `最初のコメント\n\n---\nFeedback metadata v1\n` +
+      `Intent ID: 00000000-0000-4000-8000-000000000002\n` +
+      `Submitted by name: 利用者\nMessage ID: ${threadId}\nParticipant ID: ${participantId}\nMessage signature: signature`;
     issue.journals = [{
       id: 12,
       user: { id: 7, name: "Integration" },
@@ -73,6 +59,30 @@ describe("Redmine DTO normalization", () => {
     expect(thread.messages?.[0]).toMatchObject({ kind: "initial", canEdit: true });
     expect(thread.messages?.[1]).toMatchObject({ body: "返信 v2", version: 2, canEdit: true });
     expect(thread.messages?.[1]?.versions.map((version) => version.body)).toEqual(["返信 v1", "返信 v2"]);
+  });
+
+  it("新規descriptionではcontext attachmentとcustom fieldから初回投稿者を復元する", () => {
+    const participantId = "00000000-0000-4000-8000-000000000007";
+    const issue = issueFixture();
+    issue.description = buildRedmineDescription(
+      "最初のコメント",
+      `https://inventory.example.invalid/orders/1?feedbackThread=${threadId}`
+    );
+    issue.attachments.push({
+      id: 91,
+      filename: "feedback-context-v1.json",
+      filesize: 512,
+      content_type: "application/json",
+      author: { id: 7, name: "投稿者" },
+      created_on: "2026-08-19T00:00:00Z"
+    });
+    const thread = normalizeIssueDetail(issue, profile, null, participantId);
+    expect(thread.initialComment).toBe("最初のコメント");
+    expect(thread.messages?.[0]).toMatchObject({
+      id: threadId,
+      canEdit: true,
+      author: { kind: "participant", participantId, displayName: "利用者" }
+    });
   });
 
   it("inline preview上限を超える画像をdownload-onlyにする", () => {

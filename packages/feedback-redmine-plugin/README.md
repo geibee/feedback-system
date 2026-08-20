@@ -46,6 +46,8 @@ localStorage削除後は新しいparticipant UUIDを採番し、以前の自己�
 
 React 18または19とReact DOMはpeer dependencyです。SPAが使用するReact runtimeを共有し、plugin専用のReact runtimeや
 self-hosted bundleは配布しません。配布buildはJavaScript source mapを含めず、Shadow DOM内へ共通styleを閉じ込めます。
+Profileでcaptureを有効にすると、Host Adapterに`captureEvidence`がなくても既定DOM providerを自動利用します。独自providerは
+MapLibre canvasなどhost固有の前処理が必要な場合だけ指定します。保存画像には選択位置のFeedbackピンを焼き込みます。
 handleの`downloadDiagnostics()`は、直近100 operationのrequest ID、operation、profile ID、HTTP status、duration、error codeだけを
 JSONとして明示downloadします。本文、thread ID、host principal、filename、API keyは収集しません。
 導入手順とgateway SPIは`docs/redmine-integration.md`、`docs/redmine-gateway.md`を参照してください。

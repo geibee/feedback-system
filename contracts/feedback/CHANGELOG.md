@@ -3,6 +3,7 @@
 ## 2026-08-20
 
 - Redmine thread一覧へ後方互換なWorkspace scopeと`totalCount`を追加し、resource cursor v1と分離したWorkspace cursorを定義。
+- Redmine thread createへ、同一origin・対象threadへ限定した任意`threadUrl`を追加。
 
 ## 2026-08-19
 

@@ -12,6 +12,8 @@ trusted connectorはGETの429/5xxだけを上限付きretryし、POST結果不�
 gatewayはOpenAPIどおり201/200を選択できます。401は`redmine.invalid_api_key`へ変換し、upstream bodyやAPI keyを公開しません。
 participant replyは署名付きjournal、編集はversion付きの追記journalとして保存し、`Thread.messages`へ最新版と履歴をfoldします。
 最初のコメントの編集はdescriptionとedit journalを同じRedmine PUTで更新し、終了statusでは返信だけを拒否します。
+新規descriptionへは初回コメントとSPAのthread URLだけを保存し、検索用custom fieldを重複表示しません。初回自己編集署名は
+`feedback-context-v1.json`へ保存し、旧description metadataも読取互換のため引き続き解析します。
 
 thread一覧は従来のresource scopeに加え、`scope: "workspace"`でProfileに固定されたapplication、environment、
 external workspace、project、tracker全体を取得できます。resource scopeの入力とcursor v1は後方互換で維持し、

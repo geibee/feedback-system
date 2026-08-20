@@ -80,7 +80,8 @@ reference appではprofileを2ファイルへ分ける。client profileにはUI�
 
 gatewayはparticipant発行、profile/capability、current participant、thread list/create/detail、message create/update、attachmentの固定operationだけを受け付ける。
 unknown query、JSON field、multipart partを拒否する。createは`multipart/form-data`の`request` JSONと任意の`evidence`だけを受け、
-`Idempotency-Key`とbodyの`intentId`一致を必須にする。
+`Idempotency-Key`とbodyの`intentId`一致を必須にする。任意の`threadUrl`はgatewayと同一originで、対象`threadId`の
+`feedbackThread` queryを含む場合だけ受け付ける。
 
 trusted connectorはcreate前にthread IDを検索する。同じrequest hashのissueがあれば200で回収し、確認済みの新規作成は201を返す。
 POST結果が通信断で不明な場合はPOSTをblind retryせず、thread検索だけを行う。hash不一致またはduplicate thread IDは409相当で拒否する。
@@ -90,7 +91,7 @@ attachment `content_url`はRedmine base URLと同じorigin/base pathだけを許
 
 返信と編集もmutationごとにUUID `Idempotency-Key`を必須とする。返信は終了statusで拒否し、自己編集は終了後も許可する。
 edit requestの`expectedVersion`がRedmine journalからfoldした最新版と違う場合は409を返す。message所有markerはcredentialとは別に署名し、
-credentialや署名鍵をRedmine、response log、diagnosticへ保存しない。
+初回署名は`feedback-context-v1.json`、返信・編集署名はjournalへ保存する。credentialや署名鍵をRedmine、response log、diagnosticへ保存しない。
 
 ## reference app
 

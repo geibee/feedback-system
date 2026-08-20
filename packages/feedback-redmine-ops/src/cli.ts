@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runDoctor } from "./doctor.js";
 import { inspectRedmine } from "./inspect.js";
+import { writeGeneratedProfilesAtomically, writeManualChecklist } from "./inspect-output.js";
 import {
   localBackup,
   localCommand,
@@ -50,22 +52,7 @@ async function main(args: string[]): Promise<void> {
     throw new Error(`unknown local command: ${command ?? ""}`);
   }
   if (group === "inspect") {
-    const manifestPath = resolve(required(args, "--manifest"));
-    const apiKeyVariable = value(args, "--api-key-env") ?? "FEEDBACK_REDMINE_INSPECT_API_KEY";
-    const apiKey = process.env[apiKeyVariable];
-    if (!apiKey) throw new Error(`${apiKeyVariable}が未設定です`);
-    const report = await inspectRedmine({ manifestPath, apiKey });
-    const generatedDirectory = value(args, "--generated-dir");
-    if (generatedDirectory) {
-      if (!report.generated) throw new Error("不足または不一致があるためprofileを生成できません");
-      const directory = resolve(generatedDirectory);
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      await writeFile(resolve(directory, "client-profile.json"), `${JSON.stringify(report.generated.clientProfile, null, 2)}\n`, { mode: 0o600 });
-      await writeFile(resolve(directory, "server-profile.json"), `${JSON.stringify(report.generated.serverProfile, null, 2)}\n`, { mode: 0o600 });
-      await writeFile(resolve(directory, "runtime-config.json"), `${JSON.stringify(report.generated.runtimeConfig, null, 2)}\n`, { mode: 0o644 });
-    }
-    await outputJson(report, value(args, "--output"));
-    if (report.checks.some((check) => check.status !== "ok")) process.exitCode = 2;
+    process.exitCode = await runInspectCommand(args);
     return;
   }
   if (group === "doctor") {
@@ -87,6 +74,37 @@ async function main(args: string[]): Promise<void> {
     return;
   }
   throw new Error(`unknown command: ${args.join(" ")}`);
+}
+
+export async function runInspectCommand(
+  args: string[],
+  dependencies: {
+    environment?: NodeJS.ProcessEnv;
+    fetch?: typeof globalThis.fetch;
+  } = {}
+): Promise<0 | 1 | 2> {
+  const manifestPath = resolve(required(args, "--manifest"));
+  const apiKeyVariable = value(args, "--api-key-env") ?? "FEEDBACK_REDMINE_INSPECT_API_KEY";
+  const apiKey = (dependencies.environment ?? process.env)[apiKeyVariable];
+  if (!apiKey) throw new Error(`${apiKeyVariable}が未設定です`);
+  const acceptedManualCheckDigest = value(args, "--accept-manual-checks");
+  const report = await inspectRedmine({
+    manifestPath,
+    apiKey,
+    acceptedManualCheckDigest,
+    fetch: dependencies.fetch
+  });
+  const checklistPath = value(args, "--manual-checklist");
+  if (checklistPath) await writeManualChecklist(checklistPath, report);
+  const generatedDirectory = value(args, "--generated-dir");
+  if (generatedDirectory && report.generated) {
+    await writeGeneratedProfilesAtomically(generatedDirectory, report.generated);
+  }
+  await outputJson(report, value(args, "--output"));
+  if (acceptedManualCheckDigest !== undefined && acceptedManualCheckDigest !== report.manualCheckDigest) return 1;
+  if (report.checks.some((check) => check.status !== "ok") ||
+    report.manualChecks.some((check) => check.status !== "accepted")) return 2;
+  return 0;
 }
 
 function value(args: string[], name: string): string | undefined {
@@ -125,13 +143,17 @@ usage:
   feedback-redmine local backup --output <new-directory> [--state-dir <directory>]
   feedback-redmine local restore --input <directory> --yes [--state-dir <directory>]
   feedback-redmine local reset --yes [--state-dir <directory>]
-  feedback-redmine inspect --manifest <json> [--api-key-env <name>] [--generated-dir <directory>] [--output <json>]
+  feedback-redmine inspect --manifest <json> [--api-key-env <name>] [--manual-checklist <markdown>]
+    [--accept-manual-checks <sha256>] [--generated-dir <directory>] [--output <json>]
   feedback-redmine doctor --origin <origin> --profile <id> [--write-canary] [--output <json>]
   feedback-redmine provision extract --output <provision.rb>
 `);
 }
 
-main(process.argv.slice(2)).catch((error: unknown) => {
-  process.stderr.write(`[feedback-redmine] ${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+const entryPath = process.argv[1];
+if (entryPath && realpathSync(entryPath) === fileURLToPath(import.meta.url)) {
+  main(process.argv.slice(2)).catch((error: unknown) => {
+    process.stderr.write(`[feedback-redmine] ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

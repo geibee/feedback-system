@@ -1,18 +1,23 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { redmineCustomFieldSpecs, validateInstallationManifest } from "./manifest.js";
 
 export type InspectionCheck = { key: string; status: "ok" | "missing" | "mismatch"; detail: string };
+export type ManualInspectionCheck = { key: string; detail: string; status: "unverified" | "accepted" };
 export type InspectionReport = {
   schemaVersion: "1";
   redmineVersion: string | null;
   principal: { id: number; login: string; admin: boolean } | null;
   checks: InspectionCheck[];
+  manualChecks: ManualInspectionCheck[];
+  manualCheckDigest: string;
   resolvedIds: {
     projectId: number | null;
     trackerId: number | null;
     roleId: number | null;
     integrationUserId: number | null;
     defaultPriorityId: number | null;
+    openStatusId: number | null;
     closedStatusIds: number[];
     customFieldIds: Record<string, number>;
   };
@@ -26,9 +31,13 @@ export type InspectionReport = {
 export async function inspectRedmine(input: {
   manifestPath: string;
   apiKey: string;
+  acceptedManualCheckDigest?: string;
   fetch?: typeof globalThis.fetch;
 }): Promise<InspectionReport> {
   if (!input.apiKey) throw new Error("Redmine API keyがありません");
+  if (input.acceptedManualCheckDigest !== undefined && !/^[0-9a-f]{64}$/u.test(input.acceptedManualCheckDigest)) {
+    throw new Error("manual check digestは小文字hexのSHA-256で指定してください");
+  }
   const manifest = validateInstallationManifest(JSON.parse(await readFile(input.manifestPath, "utf8")));
   const fetchImplementation = input.fetch ?? globalThis.fetch;
   const request = async (path: string): Promise<Record<string, unknown> | null> => {
@@ -100,13 +109,29 @@ export async function inspectRedmine(input: {
     roleId,
     integrationUserId: integer(integrationUser?.id),
     defaultPriorityId: integer(priority?.id),
+    openStatusId: integer(openStatus?.id),
     closedStatusIds: integer(closedStatus?.id) === null ? [] : [integer(closedStatus?.id)!],
     customFieldIds
   };
-  const complete = resolvedIds.projectId !== null && resolvedIds.trackerId !== null && resolvedIds.roleId !== null &&
-    resolvedIds.integrationUserId !== null &&
+  const restComplete = resolvedIds.projectId !== null && resolvedIds.trackerId !== null && resolvedIds.roleId !== null &&
+    resolvedIds.integrationUserId !== null && resolvedIds.defaultPriorityId !== null && resolvedIds.openStatusId !== null &&
     Object.keys(customFieldIds).length === Object.keys(redmineCustomFieldSpecs).length && resolvedIds.closedStatusIds.length > 0 &&
     checks.every((item) => item.status === "ok");
+  const redmineVersion = responseVersion(current);
+  const manualCheckTemplates = createManualCheckTemplates(manifest, resolvedIds);
+  const manualCheckDigest = createManualCheckDigest({
+    manifest,
+    redmineVersion,
+    resolvedIds,
+    checks,
+    manualCheckTemplates
+  });
+  const manualChecksAccepted = input.acceptedManualCheckDigest === manualCheckDigest;
+  const manualChecks: ManualInspectionCheck[] = manualCheckTemplates.map((item) => ({
+    ...item,
+    status: manualChecksAccepted ? "accepted" : "unverified"
+  }));
+  const complete = restComplete && manualChecksAccepted;
   const clientProfile = {
     schemaVersion: "1",
     id: manifest.profileId,
@@ -121,11 +146,13 @@ export async function inspectRedmine(input: {
   };
   return {
     schemaVersion: "1",
-    redmineVersion: responseVersion(current),
+    redmineVersion,
     principal: user && integer(user.id) !== null && typeof user.login === "string"
       ? { id: integer(user.id)!, login: user.login, admin: user.admin === true }
       : null,
     checks,
+    manualChecks,
+    manualCheckDigest,
     resolvedIds,
     generated: complete ? {
       clientProfile,
@@ -151,6 +178,64 @@ export async function inspectRedmine(input: {
       }
     } : null
   };
+}
+
+type ResolvedIds = InspectionReport["resolvedIds"];
+type ManualCheckTemplate = Omit<ManualInspectionCheck, "status">;
+
+function createManualCheckTemplates(
+  manifest: ReturnType<typeof validateInstallationManifest>,
+  resolvedIds: ResolvedIds
+): ManualCheckTemplate[] {
+  const project = `project「${manifest.project.name}」(ID: ${displayId(resolvedIds.projectId)})`;
+  const tracker = `tracker「${manifest.trackerName}」(ID: ${displayId(resolvedIds.trackerId)})`;
+  const role = `role「${manifest.roleName}」(ID: ${displayId(resolvedIds.roleId)})`;
+  const customFields = Object.entries(redmineCustomFieldSpecs).map(([key, spec]) => ({
+    key: `custom-field.${key}.scope-and-filter`,
+    detail: `「${spec.name}」のfilterと検索を${spec.filter ? "有効" : "無効"}にし、${project}、${tracker}、${role}だけへ割り当て、「全プロジェクト向け」を無効にする`
+  }));
+  const transitions = [
+    { key: "workflow.open-to-open", from: manifest.openStatusName, to: manifest.openStatusName },
+    { key: "workflow.open-to-closed", from: manifest.openStatusName, to: manifest.closedStatusName },
+    { key: "workflow.closed-to-open", from: manifest.closedStatusName, to: manifest.openStatusName },
+    { key: "workflow.closed-to-closed", from: manifest.closedStatusName, to: manifest.closedStatusName }
+  ].map(({ key, from, to }) => ({
+    key,
+    detail: `${tracker}と${role}のworkflowで「${from}」から「${to}」への遷移を許可する`
+  }));
+  return [...customFields, ...transitions];
+}
+
+function createManualCheckDigest(input: {
+  manifest: ReturnType<typeof validateInstallationManifest>;
+  redmineVersion: string | null;
+  resolvedIds: ResolvedIds;
+  checks: InspectionCheck[];
+  manualCheckTemplates: ManualCheckTemplate[];
+}): string {
+  const material = {
+    schemaVersion: "1",
+    manifest: input.manifest,
+    redmine: {
+      baseUrl: input.manifest.redmineBaseUrl,
+      version: input.redmineVersion
+    },
+    resolvedIds: input.resolvedIds,
+    restChecks: input.checks,
+    manualChecks: input.manualCheckTemplates
+  };
+  return createHash("sha256").update(canonicalJson(material), "utf8").digest("hex");
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+}
+
+function displayId(value: number | null): string {
+  return value === null ? "未解決" : String(value);
 }
 
 function responseVersion(value: Record<string, unknown> | null): string | null {

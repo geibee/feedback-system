@@ -6,5 +6,5 @@ export {
   validateInstallationManifest
 } from "./manifest.js";
 export type { DoctorReport } from "./doctor.js";
-export type { InspectionCheck, InspectionReport } from "./inspect.js";
+export type { InspectionCheck, InspectionReport, ManualInspectionCheck } from "./inspect.js";
 export type { RedmineInstallationManifestV1 } from "./manifest.js";

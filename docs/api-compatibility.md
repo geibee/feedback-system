@@ -4,15 +4,25 @@
 
 Redmine正本経路は独立した`contracts/feedback/redmine-gateway.openapi.yaml`と、保持対象の`redmine-*.schema.json`を
 公開契約とする。gateway base pathは`/internal/feedback-redmine/v1`で、業務SPAと同一originに置く。
-`@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、Redmine core/UI/plugin/gatewayは同じversionを使用する。
+`@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、`@feedback/react-ui`、`@feedback/maplibre`、Redmine core/UI/plugin/gatewayは同じversionを使用する。
 
-Principalとcontext authorの`source`は`host-session`だけである。browserからRedmine URL、API key、project/tracker/custom field ID、
-投稿者を指定できない。Redmine API keyはgatewayのserver-side secretであり、problem response、metric、logへ出さない。
+Principalとcontext authorの`source`は`participant-credential`である。SDKは非公開browser profile UUIDを採番し、gatewayがそこから導出した
+公開participant UUIDとorigin/profile scopeのopaque credentialをlocalStorageへ保存する。非公開UUIDは会話応答やRedmineへ保存しない。
+browserからRedmine URL、API key、project/tracker/custom field IDを指定できない。
+Redmine API keyとparticipant署名鍵はgatewayのserver-side secretであり、problem response、metric、logへ出さない。
 
 version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thread.latestReply`、
 `Attachment.primaryEvidence`をnull許容の必須fieldとする。エラーcodeは固定集合で、Redmineの401は
 `redmine.invalid_api_key`へ写像する。初回createは201、同一`threadId`・`intentId`・request hashの冪等回収は200を返す。
 hash不一致またはduplicate thread IDは409相当でfail-closedする。
+
+`Capabilities`は`canRead`、`canCreate`、`canReply`、`canEditOwn`、`stateReadOnly`を返す。`repliesReadOnly`と必須`getCsrfToken` optionは
+alpha.2で廃止した。導入評価段階のalpha.1 clientとの互換性は保証しない。message create/updateはmutationごとのUUID
+`Idempotency-Key`を必須とし、updateは`expectedVersion`競合を409で返す。
+
+`Thread.messages`はinitial/replyを共通形へ正規化し、stable message ID、participant/Redmine author、最新版body、version履歴、
+`canEdit`を返す。Feedback UIの編集は署名付きedit journalを追記してfoldする。Redmine UIで直接編集されたjournalは最新版と
+`updated_on`を表示するが、Redmineが保持しない旧本文を推測しない。
 
 APIまたはDTOを変更するときは、同じ変更で次を更新する。
 
@@ -39,7 +49,8 @@ load中のdisable/destroy後に遅延mountしない。`setEnabled(false)`と`des
 `lastSeenJournalId`を使い、次回既読更新時に集合を保存する。pending intentは`clientDraftHash`と`prepared | uncertain`を必須とし、
 principal scopeで共有端末の利用者間を分離して7日超を削除する。
 
-返信、編集、状態変更はRedmine UIだけで行い、Feedback UIのversion 1ではread-onlyである。検証対象はRedmine 5.1.12、
+返信と自己編集はFeedback UIから行える。状態、担当者、優先度はRedmine UIだけで変更し、Feedback UIはそのjournalを表示する。
+検証対象はRedmine 5.1.12、
 6.0.10、6.1.3、7.0.0で、Docker Official Imageのexact digestを固定する。
 
 本番投入済み環境は存在しないため、削除済みbrowser extension contractや従来Feedback DBからのデータ互換性は保証対象にしない。

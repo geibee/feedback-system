@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { normalizeIssueDetail, normalizeIssueSummary, sanitizeFilename } from "./normalize.js";
 import { issueFixture, profile, threadId } from "./test-fixtures.js";
+import { buildRedmineDescription, buildRedmineMessageNote } from "./marker.js";
+import type { RedmineIssueDto } from "./redmine-dto.js";
 
 describe("Redmine DTO normalization", () => {
   it("unknown fieldを無視して一覧の最初のcommentとlocatorを作る", () => {
@@ -24,6 +26,53 @@ describe("Redmine DTO normalization", () => {
     const issue = issueFixture();
     issue.attachments[0]!.filename = `feedback-${threadId}.png`;
     expect(normalizeIssueDetail(issue, profile, null).attachments[0]?.primaryEvidence).toBe(true);
+  });
+
+  it("participant replyと追記型edit journalをversion履歴へfoldする", () => {
+    const participantId = "00000000-0000-4000-8000-000000000007";
+    const messageId = "00000000-0000-4000-8000-000000000008";
+    const issue: RedmineIssueDto = issueFixture();
+    issue.description = buildRedmineDescription("最初のコメント", {
+      threadId,
+      intentId: "00000000-0000-4000-8000-000000000002",
+      requestHash: "a".repeat(64),
+      applicationKey: "inventory",
+      environmentKey: "production",
+      externalWorkspaceKey: "production-review",
+      pageKey: "orders.detail",
+      hostResourceKey: "opaque-resource",
+      perspectiveCode: "ux",
+      submittedById: participantId,
+      submittedByName: "利用者",
+      messageId: threadId,
+      participantId,
+      messageSignature: "signature",
+      capturedAt: "2026-08-19T00:00:00Z"
+    });
+    issue.journals = [{
+      id: 12,
+      user: { id: 7, name: "Integration" },
+      notes: buildRedmineMessageNote("返信 v1", {
+        kind: "reply", messageId, participantId, participantName: "利用者", version: 1,
+        intentId: "00000000-0000-4000-8000-000000000003", signature: "signature"
+      }),
+      created_on: "2026-08-19T00:30:00Z",
+      details: []
+    }, {
+      id: 13,
+      user: { id: 7, name: "Integration" },
+      notes: buildRedmineMessageNote("返信 v2", {
+        kind: "edit", messageId, participantId, participantName: "利用者", version: 2,
+        intentId: "00000000-0000-4000-8000-000000000004", signature: "signature"
+      }),
+      created_on: "2026-08-19T00:40:00Z",
+      details: []
+    }];
+    const thread = normalizeIssueDetail(issue, profile, null, participantId);
+    expect(thread.messages).toHaveLength(2);
+    expect(thread.messages?.[0]).toMatchObject({ kind: "initial", canEdit: true });
+    expect(thread.messages?.[1]).toMatchObject({ body: "返信 v2", version: 2, canEdit: true });
+    expect(thread.messages?.[1]?.versions.map((version) => version.body)).toEqual(["返信 v1", "返信 v2"]);
   });
 
   it("inline preview上限を超える画像をdownload-onlyにする", () => {

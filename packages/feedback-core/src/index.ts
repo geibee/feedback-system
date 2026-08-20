@@ -29,6 +29,12 @@ export type {
 } from "./host-adapter.js";
 export { createInMemoryFeedbackTelemetry } from "./telemetry.js";
 export type {
+  FeedbackPinPosition,
+  FeedbackPinPositionProvider,
+  FeedbackTargetResolver,
+  FeedbackTargetResolverInput
+} from "./ui-target.js";
+export type {
   FeedbackTelemetry,
   FeedbackTelemetryDimensions,
   FeedbackTelemetryEvent,

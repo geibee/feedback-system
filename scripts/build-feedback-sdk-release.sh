@@ -48,6 +48,7 @@ packages=(
   @feedback/contracts
   @feedback/core
   @feedback/dom-capture
+  @feedback/react-ui
   @feedback/react
   @feedback/maplibre
   @feedback/admin-react

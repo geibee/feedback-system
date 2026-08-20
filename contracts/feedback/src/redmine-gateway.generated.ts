@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/profiles/{profileId}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 非公開browser profile UUIDからparticipant credentialを発行する */
+        post: operations["createRedmineParticipant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileId}": {
         parameters: {
             query?: never;
@@ -73,6 +90,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{profileId}/threads/{threadId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redmine journalへ返信を追加する */
+        post: operations["createRedmineMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profileId}/threads/{threadId}/messages/{messageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 自分の投稿を追記型edit journalで更新する */
+        patch: operations["updateRedmineMessage"];
+        trace?: never;
+    };
     "/profiles/{profileId}/threads/{threadId}/attachments/{attachmentId}": {
         parameters: {
             query?: never;
@@ -130,8 +181,8 @@ export interface components {
         Capabilities: {
             canRead: boolean;
             canCreate: boolean;
-            /** @constant */
-            repliesReadOnly: true;
+            canReply: boolean;
+            canEditOwn: boolean;
             /** @constant */
             stateReadOnly: true;
         };
@@ -140,14 +191,23 @@ export interface components {
             capabilities: components["schemas"]["Capabilities"];
         };
         Principal: {
-            subjectId: string;
+            /** Format: uuid */
+            participantId: string;
             displayName: string | null;
-            redmineUserId: number | null;
             /** @constant */
-            source: "host-session";
+            source: "participant-credential";
         };
         CurrentUserResult: {
             principal: components["schemas"]["Principal"];
+        };
+        CreateParticipantRequest: {
+            /** Format: uuid */
+            browserProfileId: string;
+        };
+        ParticipantResult: {
+            /** Format: uuid */
+            participantId: string;
+            credential: string;
         };
         NamedValue: {
             id: number;
@@ -231,6 +291,43 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string | null;
+            /** Format: uuid */
+            messageId?: string;
+            /** Format: uuid */
+            participantId?: string | null;
+            displayName?: string | null;
+            version?: number;
+            canEdit?: boolean;
+            versions?: components["schemas"]["MessageVersion"][];
+        };
+        MessageVersion: {
+            version: number;
+            body: string;
+            /** Format: date-time */
+            editedAt: string;
+        };
+        MessageAuthor: {
+            /** @enum {string} */
+            kind: "participant" | "redmine";
+            /** Format: uuid */
+            participantId: string | null;
+            displayName: string;
+        };
+        ConversationMessage: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "initial" | "reply";
+            journalId: number | null;
+            body: string;
+            author: components["schemas"]["MessageAuthor"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            editedAt: string | null;
+            version: number;
+            versions: components["schemas"]["MessageVersion"][];
+            canEdit: boolean;
         };
         Activity: {
             /** @constant */
@@ -268,6 +365,7 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            closed?: boolean;
         };
         Thread: {
             /** Format: uuid */
@@ -288,12 +386,14 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             description: string;
+            closed?: boolean;
             tracker: components["schemas"]["NamedValue"];
             timeline: (components["schemas"]["Reply"] | components["schemas"]["Activity"] | components["schemas"]["DiagnosticActivity"])[];
             attachments: components["schemas"]["Attachment"][];
             /** Format: uri */
             redmineUrl: string | null;
             diagnosticCount: number;
+            messages?: components["schemas"]["ConversationMessage"][];
         };
         ThreadListResult: {
             threads: components["schemas"]["ThreadSummary"][];
@@ -317,6 +417,18 @@ export interface components {
             /** Format: date-time */
             capturedAt: string;
             evidence: components["schemas"]["EvidenceMetadata"] | null;
+            participantName?: string | null;
+        };
+        CreateMessageRequest: {
+            /** Format: uuid */
+            messageId: string;
+            body: string;
+            participantName: string | null;
+        };
+        UpdateMessageRequest: {
+            body: string;
+            expectedVersion: number;
+            participantName: string | null;
         };
         EvidenceMetadata: {
             filename: string;
@@ -361,10 +473,13 @@ export interface components {
     parameters: {
         ProfileId: string;
         ThreadId: string;
+        MessageId: string;
         AttachmentId: number;
         Origin: string;
+        /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+        OriginRead: string;
         SecFetchSite: "same-origin";
-        CsrfToken: string;
+        ParticipantCredential: string;
         IdempotencyKey: string;
         ResourceKind: "record" | "page";
         ResourceKey: string;
@@ -386,11 +501,47 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getRedmineProfile: {
+    createRedmineParticipant: {
         parameters: {
             query?: never;
             header: {
                 Origin: components["parameters"]["Origin"];
+                "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
+            };
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateParticipantRequest"];
+            };
+        };
+        responses: {
+            /** @description 発行したparticipant credential */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    "X-Content-Type-Options": components["headers"]["NoSniff"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getRedmineProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
             };
             path: {
@@ -422,7 +573,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                Origin: components["parameters"]["Origin"];
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
             };
             path: {
@@ -465,7 +617,8 @@ export interface operations {
                 cursor?: components["parameters"]["Cursor"];
             };
             header: {
-                Origin: components["parameters"]["Origin"];
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
             };
             path: {
@@ -501,7 +654,7 @@ export interface operations {
             header: {
                 Origin: components["parameters"]["Origin"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
-                "X-Feedback-CSRF": components["parameters"]["CsrfToken"];
+                "X-Feedback-Participant-Credential": components["parameters"]["ParticipantCredential"];
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
@@ -560,7 +713,8 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
-                Origin: components["parameters"]["Origin"];
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
             };
             path: {
@@ -591,6 +745,92 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    createRedmineMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                Origin: components["parameters"]["Origin"];
+                "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
+                "X-Feedback-Participant-Credential": components["parameters"]["ParticipantCredential"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+                threadId: components["parameters"]["ThreadId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 冪等回収後のthread */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResult"];
+                };
+            };
+            /** @description 返信後のthread */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    updateRedmineMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                Origin: components["parameters"]["Origin"];
+                "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
+                "X-Feedback-Participant-Credential": components["parameters"]["ParticipantCredential"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+                threadId: components["parameters"]["ThreadId"];
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 編集後のthread */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     getRedmineAttachment: {
         parameters: {
             query: {
@@ -598,7 +838,8 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
-                Origin: components["parameters"]["Origin"];
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
                 "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
             };
             path: {

@@ -4,12 +4,16 @@ import type {
   FeedbackRedmineHostAdapter,
   RedmineFeedbackPort
 } from "@feedback/redmine-core";
+import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@feedback/core";
 
 export type RedmineFeedbackRuntime = {
   port: RedmineFeedbackPort;
   clientState: ClientStatePort;
   adapter: FeedbackRedmineHostAdapter;
   profileId: string;
+  contextMenu?: boolean;
+  targetResolver?: FeedbackTargetResolver<Element>;
+  pinPositionProvider?: FeedbackPinPositionProvider;
 };
 
 const RuntimeContext = createContext<RedmineFeedbackRuntime | null>(null);

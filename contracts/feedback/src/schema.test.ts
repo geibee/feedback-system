@@ -296,10 +296,9 @@ describe("Feedback Redmine JSON Schema", () => {
         relativeY: 0.5
       },
       author: {
-        source: "host-session",
-        subjectId: "opaque-host-subject",
-        displayName: "利用者",
-        redmineUserId: null
+        source: "participant-credential",
+        participantId: "00000000-0000-4000-8000-000000000007",
+        displayName: "利用者"
       },
       capturedAt: "2026-08-19T00:00:00Z",
       primaryEvidence: null
@@ -309,21 +308,24 @@ describe("Feedback Redmine JSON Schema", () => {
     expect(validate({ ...context, requestHash: "ABC" })).toBe(false);
     expect(validate({
       ...context,
-      author: { ...context.author, source: "unsupported", redmineUserId: 7 }
+      author: { ...context.author, source: "unsupported", subjectId: "host-user" }
     })).toBe(false);
   });
 
-  it("gateway OpenAPIは6つの共通operationを重複なく公開する", () => {
+  it("gateway OpenAPIは9つの共通operationを重複なく公開する", () => {
     const source = readFileSync(new URL("../redmine-gateway.openapi.yaml", import.meta.url), "utf8");
     const operations = [...source.matchAll(/x-feedback-operation: ([^\n]+)/g)].map((match) => match[1]);
     expect(operations).toEqual([
+      "redmine.participant.create.v1",
       "redmine.profile.get.v1",
       "redmine.current-user.get.v1",
       "redmine.thread.list.v1",
       "redmine.thread.create.v1",
       "redmine.thread.get.v1",
+      "redmine.message.create.v1",
+      "redmine.message.update.v1",
       "redmine.attachment.get.v1"
     ]);
-    expect(new Set(operations).size).toBe(6);
+    expect(new Set(operations).size).toBe(9);
   });
 });

@@ -13,6 +13,7 @@ import {
   RedmineFeedbackError,
   sha256Hex,
   type RedmineClientProfileV1,
+  type RedmineCapabilitiesV1,
   type RedmineEvidenceMetadata,
   type RedmineFollowStateV1,
   type RedminePendingIntentV1,
@@ -21,7 +22,8 @@ import {
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
 } from "@feedback/redmine-core";
-import type { FeedbackEvidencePayload } from "@feedback/core";
+import type { FeedbackEvidencePayload, FeedbackTargetV1 } from "@feedback/core";
+import { resolveDomFeedbackTarget } from "@feedback/react-ui";
 import { useRedmineFeedbackRuntime } from "./provider.js";
 import { useVisiblePolling } from "./storage.js";
 import { ThreadDrawer } from "./thread-drawer.js";
@@ -45,7 +47,8 @@ export const RedmineFeedbackOverlay = forwardRef<
   const runtime = useRedmineFeedbackRuntime();
   const controller = useMemo(() => new AbortController(), []);
   const [profile, setProfile] = useState<RedmineClientProfileV1 | null>(null);
-  const [principal, setPrincipal] = useState<{ subjectId: string; redmineUserId: number | null } | null>(null);
+  const [capabilities, setCapabilities] = useState<RedmineCapabilitiesV1 | null>(null);
+  const [principal, setPrincipal] = useState<{ participantId: string } | null>(null);
   const [principalScopeHash, setPrincipalScopeHash] = useState("");
   const [threads, setThreads] = useState<RedmineThreadSummaryV1[]>([]);
   const threadsRef = useRef<RedmineThreadSummaryV1[]>([]);
@@ -60,17 +63,14 @@ export const RedmineFeedbackOverlay = forwardRef<
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [participantName, setParticipantName] = useState("");
   const [perspectiveCode, setPerspectiveCode] = useState("");
   const [capture, setCapture] = useState<{ payload: FeedbackEvidencePayload; url: string } | null>(null);
   const [captureConsent, setCaptureConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
-  const submissionTarget = useMemo(() => ({
-    schemaVersion: "1" as const,
-    kind: "screen-position" as const,
-    relativeX: 0.5,
-    relativeY: 0.5
-  }), []);
+  const [submissionTarget, setSubmissionTarget] = useState<FeedbackTargetV1 | null>(null);
+  const [pickingTarget, setPickingTarget] = useState(false);
 
   useEffect(() => () => controller.abort(), [controller]);
   useEffect(() => () => {
@@ -85,14 +85,16 @@ export const RedmineFeedbackOverlay = forwardRef<
     ]).then(async ([result, current]) => {
       if (!active) return;
       assertProfileMatchesHost(result.profile, runtime.adapter.getContext());
-      const scopeHash = await sha256Hex(new TextEncoder().encode(`${runtime.profileId}\n${current.subjectId}`));
+      const scopeHash = await sha256Hex(new TextEncoder().encode(`${runtime.profileId}\n${current.participantId}`));
       const draft = await runtime.clientState.getDraft(runtime.profileId, scopeHash);
       if (!active) return;
       setProfile(result.profile);
+      setCapabilities(result.capabilities);
       setPerspectiveCode(result.profile.perspectives[0]?.code ?? "");
       setPrincipal(current);
       setPrincipalScopeHash(scopeHash);
       setComment(draft ?? "");
+      setParticipantName(readParticipantName(runtime.profileId));
     }).catch((reason: unknown) => {
       if (!active || controller.signal.aborted) return;
       setError(feedbackErrorMessage(reason, "接続"));
@@ -115,13 +117,16 @@ export const RedmineFeedbackOverlay = forwardRef<
           resourceRef: runtime.adapter.getResourceRef(),
           threadId: state.threadId
         }, controller.signal);
-        count += countUnreadReplies(
-          detail.timeline.flatMap((item) => item.kind === "reply"
-            ? [{ id: item.journalId, notes: item.body, authorId: item.author.id }]
-            : []),
-          state,
-          principal.redmineUserId
-        );
+        count += detail.messages
+          ? detail.messages.filter((message) => message.kind === "reply" && message.journalId !== null &&
+            !(state.seenJournalIds ?? []).includes(message.journalId) && message.author.participantId !== principal.participantId).length
+          : countUnreadReplies(
+            detail.timeline.flatMap((item) => item.kind === "reply"
+              ? [{ id: item.journalId, notes: item.body, authorId: item.author.id }]
+              : []),
+            state,
+            null
+          );
       } catch {
         // 個別threadの失敗で一覧表示を壊さない。
       }
@@ -236,23 +241,32 @@ export const RedmineFeedbackOverlay = forwardRef<
     }
   }, [refreshSelected, selectedThreadId]);
   useEffect(() => runtime.adapter.subscribe?.(() => void refresh()), [refresh, runtime.adapter]);
-  useVisiblePolling(panelOpen && !selectedThreadId, 60_000, refresh);
-  useVisiblePolling(Boolean(selectedThreadId), 30_000, refreshSelected);
+  useVisiblePolling(panelOpen && !selectedThreadId, 15_000, refresh);
+  useVisiblePolling(Boolean(selectedThreadId), 15_000, refreshSelected);
 
   const openThread = useCallback(async (threadId: string) => {
     setPanelOpen(true);
     setSelectedThreadId(threadId);
   }, []);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const fromQuery = url.searchParams.get("feedbackThread");
+    const fromHash = /(?:^|[&#])feedbackThread=([0-9a-f-]{36})(?:&|$)/iu.exec(url.hash.slice(1))?.[1] ?? null;
+    const threadId = fromQuery ?? fromHash;
+    if (threadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(threadId)) {
+      void openThread(threadId);
+    }
+  }, [openThread]);
   useImperativeHandle(ref, () => ({ refresh, openThread }), [openThread, refresh]);
 
-  const captureEvidence = async () => {
+  const captureEvidence = async (target: FeedbackTargetV1) => {
     if (!profile?.capture.enabled || !runtime.adapter.captureEvidence) return;
     const location = runtime.adapter.getLocation();
     if (!location) return;
     const payload = await runtime.adapter.captureEvidence({
       context: runtime.adapter.getContext(),
       location,
-      target: submissionTarget,
+      target,
       excludeSelector: "[data-feedback-redmine-ui]",
       maskSelector: "[data-feedback-mask]"
     });
@@ -265,16 +279,50 @@ export const RedmineFeedbackOverlay = forwardRef<
     setCaptureConsent(false);
   };
 
+  const selectTarget = useCallback((clientX: number, clientY: number, action: "pick" | "context-menu") => {
+    const element = document.elementFromPoint?.(clientX, clientY) ?? null;
+    if (element?.closest("[data-feedback-redmine-ui]")) return;
+    const target = runtime.targetResolver?.({ action, element, clientX, clientY }) ??
+      resolveDomFeedbackTarget({ element, clientX, clientY });
+    setSubmissionTarget(target);
+    setPickingTarget(false);
+    setPanelOpen(true);
+    setCapture(null);
+    setCaptureConsent(false);
+    if (target) void captureEvidence(target).catch(() => setError("スクリーンショットを取得できませんでした。画像なしで投稿できます。"));
+  }, [profile, runtime]);
+
+  useEffect(() => {
+    const click = (event: MouseEvent) => {
+      if (!pickingTarget) return;
+      event.preventDefault();
+      event.stopPropagation();
+      selectTarget(event.clientX, event.clientY, "pick");
+    };
+    const contextMenu = (event: MouseEvent) => {
+      if (!runtime.contextMenu || (event.target as Element | null)?.closest?.("[data-feedback-redmine-ui]")) return;
+      event.preventDefault();
+      selectTarget(event.clientX, event.clientY, "context-menu");
+    };
+    document.addEventListener("click", click, true);
+    document.addEventListener("contextmenu", contextMenu, true);
+    return () => {
+      document.removeEventListener("click", click, true);
+      document.removeEventListener("contextmenu", contextMenu, true);
+    };
+  }, [pickingTarget, runtime.contextMenu, selectTarget]);
+
   const submit = async () => {
     if (!profile || !principalScopeHash || !comment.trim() || comment.trim().length > 20_000 || !perspectiveCode || submissionInFlight.current) return;
-    if (capture && !captureConsent) return;
+    if (!submissionTarget) return;
     const location = runtime.adapter.getLocation();
     if (!location) return;
     setSubmitting(true);
     submissionInFlight.current = true;
     let pendingIntent: RedminePendingIntentV1 | null = null;
     try {
-      const evidenceSha256 = capture ? await sha256Hex(capture.payload.bytes) : null;
+      const attachedCapture = captureConsent ? capture : null;
+      const evidenceSha256 = attachedCapture ? await sha256Hex(attachedCapture.payload.bytes) : null;
       const localHash = await sha256Hex(new TextEncoder().encode(canonicalJson({
         comment: comment.trim(),
         perspectiveCode,
@@ -294,15 +342,15 @@ export const RedmineFeedbackOverlay = forwardRef<
         state: "prepared"
       };
       await runtime.clientState.setPendingIntent(runtime.profileId, principalScopeHash, pendingIntent);
-      const evidence: RedmineEvidenceMetadata | null = capture ? {
-        filename: `feedback-${threadId}.${capture.payload.contentType === "image/png" ? "png" : "webp"}`,
-        contentType: capture.payload.contentType,
-        byteSize: capture.payload.bytes.byteLength,
+      const evidence: RedmineEvidenceMetadata | null = attachedCapture ? {
+        filename: `feedback-${threadId}.${attachedCapture.payload.contentType === "image/png" ? "png" : "webp"}`,
+        contentType: attachedCapture.payload.contentType,
+        byteSize: attachedCapture.payload.bytes.byteLength,
         sha256: evidenceSha256!,
-        viewportWidth: capture.payload.viewportWidth,
-        viewportHeight: capture.payload.viewportHeight,
-        pixelRatio: capture.payload.pixelRatio,
-        capturedAt: capture.payload.capturedAt
+        viewportWidth: attachedCapture.payload.viewportWidth,
+        viewportHeight: attachedCapture.payload.viewportHeight,
+        pixelRatio: attachedCapture.payload.pixelRatio,
+        capturedAt: attachedCapture.payload.capturedAt
       } : null;
       const context = runtime.adapter.getContext();
       const created = await runtime.port.createThread({
@@ -317,12 +365,14 @@ export const RedmineFeedbackOverlay = forwardRef<
         release: context.release,
         locale: context.locale ?? (document.documentElement.lang || "ja-JP"),
         capturedAt: new Date().toISOString(),
-        evidence
-      }, capture?.payload.bytes ?? null, controller.signal);
+        evidence,
+        participantName: participantName.trim() || null
+      }, attachedCapture?.payload.bytes ?? null, controller.signal);
       await runtime.clientState.setPendingIntent(runtime.profileId, principalScopeHash, null);
       await runtime.clientState.setDraft(runtime.profileId, principalScopeHash, null);
       await runtime.clientState.setFollowState(readState(created, runtime.profileId, principalScopeHash, true));
       setComment("");
+      writeParticipantName(runtime.profileId, participantName);
       if (capture) URL.revokeObjectURL(capture.url);
       setCapture(null);
       setCaptureConsent(false);
@@ -350,7 +400,7 @@ export const RedmineFeedbackOverlay = forwardRef<
     await refreshUnread(threads);
   };
 
-  return <div className="feedback-redmine-root" data-feedback-redmine-ui="true">
+  return <div className={`feedback-redmine-root${pickingTarget ? " is-picking" : ""}`} data-feedback-redmine-ui="true">
     <button
       className="feedback-redmine-launcher"
       type="button"
@@ -359,11 +409,23 @@ export const RedmineFeedbackOverlay = forwardRef<
     >
       Feedback {unread > 0 && <span className="feedback-redmine-badge">{unread > 99 ? "99+" : unread}</span>}
     </button>
-    <ThreadPins threads={threads} onOpen={(threadId) => void openThread(threadId)} />
+    <ThreadPins threads={threads} positionProvider={runtime.pinPositionProvider} onOpen={(threadId) => void openThread(threadId)} />
     {panelOpen && profile && <div className="feedback-redmine-panel">
-      <header><h1>{profile.displayName}</h1><p>Feedbackから送信できるのは最初の投稿だけです。</p></header>
+      <header><h1>{profile.displayName}</h1><p>投稿と返信はこの画面だけで完結します。</p></header>
       {error && <p role="alert">{error}</p>}
       <section aria-label="新しいFeedback" className="feedback-redmine-create">
+        <button type="button" onClick={() => setPickingTarget(true)}>
+          {pickingTarget ? "フィードバックする場所をクリックしてください" : submissionTarget ? "場所を選び直す" : "場所を選択"}
+        </button>
+        {submissionTarget && <p className="feedback-redmine-target">選択位置: {targetLabel(submissionTarget)}</p>}
+        <label>投稿者名
+          <input
+            maxLength={100}
+            value={participantName}
+            onChange={(event) => setParticipantName(event.target.value)}
+            onBlur={() => writeParticipantName(runtime.profileId, participantName)}
+          />
+        </label>
         <label>観点
           <select value={perspectiveCode} onChange={(event) => setPerspectiveCode(event.target.value)}>
             {profile.perspectives.map((perspective) => <option key={perspective.code} value={perspective.code}>{perspective.label}</option>)}
@@ -382,13 +444,13 @@ export const RedmineFeedbackOverlay = forwardRef<
           />
         </label>
         {profile.capture.enabled && runtime.adapter.captureEvidence &&
-          <button type="button" onClick={() => void captureEvidence()}>スクリーンショットを確認</button>}
+          <button type="button" disabled={!submissionTarget} onClick={() => submissionTarget && void captureEvidence(submissionTarget)}>スクリーンショットを再取得</button>}
         {capture && <div className="feedback-redmine-capture-preview">
           <img src={capture.url} alt="送信前スクリーンショット" />
           <label><input type="checkbox" checked={captureConsent} onChange={(event) => setCaptureConsent(event.target.checked)} />この画像をRedmineへ送信する</label>
         </div>}
-        <button type="button" disabled={submitting || !comment.trim() || (Boolean(capture) && !captureConsent)} onClick={() => void submit()}>
-          {submitting ? "投稿中…" : "最初の投稿をRedmineへ送信"}
+        <button type="button" disabled={submitting || !comment.trim() || !submissionTarget} onClick={() => void submit()}>
+          {submitting ? "投稿中…" : "Feedbackを送信"}
         </button>
       </section>
       <ThreadList
@@ -415,6 +477,38 @@ export const RedmineFeedbackOverlay = forwardRef<
         setFollowed(false);
       }}
       onFollowChange={(next) => void toggleFollow(next)}
+      canReply={capabilities?.canReply === true}
+      canEditOwn={capabilities?.canEditOwn === true}
+      participantName={participantName}
+      onReply={async (body) => {
+        const updated = await runtime.port.createMessage({
+          profileId: runtime.profileId,
+          resourceRef: runtime.adapter.getResourceRef(),
+          threadId: selectedThreadId,
+          messageId: crypto.randomUUID(),
+          intentId: crypto.randomUUID(),
+          body,
+          participantName: participantName.trim() || null
+        }, controller.signal);
+        writeParticipantName(runtime.profileId, participantName);
+        setSelectedThread(updated);
+        await refresh();
+      }}
+      onEdit={async (messageId, body, expectedVersion) => {
+        const updated = await runtime.port.updateMessage({
+          profileId: runtime.profileId,
+          resourceRef: runtime.adapter.getResourceRef(),
+          threadId: selectedThreadId,
+          messageId,
+          intentId: crypto.randomUUID(),
+          body,
+          expectedVersion,
+          participantName: participantName.trim() || null
+        }, controller.signal);
+        writeParticipantName(runtime.profileId, participantName);
+        setSelectedThread(updated);
+        await refresh();
+      }}
       onAttachment={(attachmentId) => runtime.port.getAttachment({
         profileId: runtime.profileId,
         resourceRef: runtime.adapter.getResourceRef(),
@@ -438,7 +532,8 @@ function assertProfileMatchesHost(
 
 function threadVersion(thread: RedmineThreadV1 | null): string {
   if (!thread) return "";
-  return `${thread.updatedAt}:${thread.timeline.map((item) => `${item.journalId}:${item.kind === "reply" ? item.updatedAt : ""}`).join(",")}`;
+  return `${thread.updatedAt}:${thread.messages?.map((message) => `${message.id}:${message.version}`).join(",") ??
+    thread.timeline.map((item) => `${item.journalId}:${item.kind === "reply" ? item.updatedAt : ""}`).join(",")}`;
 }
 
 function readState(
@@ -461,4 +556,29 @@ function readState(
     lastSeenIssueUpdatedOn: thread.updatedAt,
     updatedAt: new Date().toISOString()
   };
+}
+
+function targetLabel(target: FeedbackTargetV1): string {
+  if (target.kind === "ui-element") return `要素 ${target.elementKey}`;
+  if (target.kind === "map-feature") return `地図地物 ${target.featureKey}`;
+  if (target.kind === "map-position") return "地図上の位置";
+  return "画面上の位置";
+}
+
+function participantNameKey(profileId: string): string {
+  return `feedback.redmine.participant-name.v1:${profileId}`;
+}
+
+function readParticipantName(profileId: string): string {
+  try { return localStorage.getItem(participantNameKey(profileId))?.slice(0, 100) ?? ""; } catch { return ""; }
+}
+
+function writeParticipantName(profileId: string, value: string): void {
+  try {
+    const normalized = value.trim().slice(0, 100);
+    if (normalized) localStorage.setItem(participantNameKey(profileId), normalized);
+    else localStorage.removeItem(participantNameKey(profileId));
+  } catch {
+    // self-reported nameはstorageを利用できない場合でも投稿payloadへ含める。
+  }
 }

@@ -3,10 +3,9 @@ import type { RedmineEvidenceMetadata } from "./model.js";
 import { RedmineFeedbackError, contractError } from "./errors.js";
 
 export type TrustedFeedbackAuthor = {
-  source: "host-session";
-  subjectId: string;
+  source: "participant-credential";
+  participantId: string;
   displayName: string | null;
-  redmineUserId: number | null;
 };
 
 export type RedmineFeedbackContextV1 = {
@@ -52,7 +51,7 @@ export async function calculateRequestHash(input: RequestHashInput): Promise<str
     perspectiveCode: input.perspectiveCode,
     location: input.location,
     target: input.target,
-    authorSubjectId: input.author.subjectId,
+    authorParticipantId: input.author.participantId,
     authorSource: input.author.source,
     comment: input.comment,
     evidenceSha256: input.evidenceSha256

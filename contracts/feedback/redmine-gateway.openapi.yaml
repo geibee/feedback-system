@@ -3,7 +3,9 @@ info:
   title: Feedback Redmine Gateway API
   version: 1.0.0
   description: |
-    業務アプリケーションの既存セッションで利用する、同一origin限定のstateless Redmine gateway契約。
+    任意のWebアプリケーションへ組み込める、同一origin限定のstateless Redmine gateway契約。
+    読み取りと新規投稿は公開し、返信と自己編集の所有確認にはbrowser profile単位のparticipant credentialを使う。
+    OriginとFetch Metadataの検査はCSRF緩和であり、利用者認証を意味しない。
     実装は固定operationだけを公開し、Redmine API key、任意URL、任意headerをbrowserへ公開しない。
 servers:
   - url: /internal/feedback-redmine/v1
@@ -11,6 +13,34 @@ servers:
 tags:
   - name: Redmine feedback
 paths:
+  /profiles/{profileId}/participants:
+    post:
+      operationId: createRedmineParticipant
+      x-feedback-operation: redmine.participant.create.v1
+      tags: [Redmine feedback]
+      summary: 非公開browser profile UUIDからparticipant credentialを発行する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateParticipantRequest' }
+      responses:
+        '201':
+          description: 発行したparticipant credential
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParticipantResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}:
     get:
       operationId: getRedmineProfile
@@ -19,7 +49,7 @@ paths:
       summary: 公開profileとcapabilityを取得する
       parameters:
         - $ref: '#/components/parameters/ProfileId'
-        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
       responses:
         '200':
@@ -43,7 +73,7 @@ paths:
       summary: 認証済みprincipalを取得する
       parameters:
         - $ref: '#/components/parameters/ProfileId'
-        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
       responses:
         '200':
@@ -67,7 +97,7 @@ paths:
       summary: 認可済みresourceのthreadを一覧する
       parameters:
         - $ref: '#/components/parameters/ProfileId'
-        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
         - $ref: '#/components/parameters/ResourceKind'
         - $ref: '#/components/parameters/ResourceKey'
@@ -104,7 +134,7 @@ paths:
         - $ref: '#/components/parameters/ProfileId'
         - $ref: '#/components/parameters/Origin'
         - $ref: '#/components/parameters/SecFetchSite'
-        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/ParticipantCredential'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
@@ -161,7 +191,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProfileId'
         - $ref: '#/components/parameters/ThreadId'
-        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
         - $ref: '#/components/parameters/ResourceKind'
         - $ref: '#/components/parameters/ResourceKey'
@@ -181,6 +211,72 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
         '429': { $ref: '#/components/responses/Problem' }
         '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/threads/{threadId}/messages:
+    post:
+      operationId: createRedmineMessage
+      x-feedback-operation: redmine.message.create.v1
+      tags: [Redmine feedback]
+      summary: Redmine journalへ返信を追加する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/ParticipantCredential'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMessageRequest' }
+      responses:
+        '201':
+          description: 返信後のthread
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '200':
+          description: 冪等回収後のthread
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/threads/{threadId}/messages/{messageId}:
+    patch:
+      operationId: updateRedmineMessage
+      x-feedback-operation: redmine.message.update.v1
+      tags: [Redmine feedback]
+      summary: 自分の投稿を追記型edit journalで更新する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/MessageId'
+        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/SecFetchSite'
+        - $ref: '#/components/parameters/ParticipantCredential'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMessageRequest' }
+      responses:
+        '200':
+          description: 編集後のthread
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/threads/{threadId}/attachments/{attachmentId}:
     get:
       operationId: getRedmineAttachment
@@ -191,7 +287,7 @@ paths:
         - $ref: '#/components/parameters/ProfileId'
         - $ref: '#/components/parameters/ThreadId'
         - $ref: '#/components/parameters/AttachmentId'
-        - $ref: '#/components/parameters/Origin'
+        - $ref: '#/components/parameters/OriginRead'
         - $ref: '#/components/parameters/SecFetchSite'
         - $ref: '#/components/parameters/ResourceKind'
         - $ref: '#/components/parameters/ResourceKey'
@@ -239,6 +335,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     AttachmentId:
       name: attachmentId
       in: path
@@ -249,16 +350,22 @@ components:
       in: header
       required: true
       schema: { type: string, format: uri, maxLength: 253 }
+    OriginRead:
+      name: Origin
+      in: header
+      required: false
+      description: browserがGETへ付与した場合だけsame-origin一致を検証する
+      schema: { type: string, format: uri, maxLength: 253 }
     SecFetchSite:
       name: Sec-Fetch-Site
       in: header
       required: true
       schema: { type: string, const: same-origin }
-    CsrfToken:
-      name: X-Feedback-CSRF
+    ParticipantCredential:
+      name: X-Feedback-Participant-Credential
       in: header
       required: true
-      schema: { type: string, minLength: 1, maxLength: 1024 }
+      schema: { type: string, minLength: 32, maxLength: 4096 }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -383,11 +490,12 @@ components:
     Capabilities:
       type: object
       additionalProperties: false
-      required: [canRead, canCreate, repliesReadOnly, stateReadOnly]
+      required: [canRead, canCreate, canReply, canEditOwn, stateReadOnly]
       properties:
         canRead: { type: boolean }
         canCreate: { type: boolean }
-        repliesReadOnly: { type: boolean, const: true }
+        canReply: { type: boolean }
+        canEditOwn: { type: boolean }
         stateReadOnly: { type: boolean, const: true }
     ProfileResult:
       type: object
@@ -399,18 +507,30 @@ components:
     Principal:
       type: object
       additionalProperties: false
-      required: [subjectId, displayName, redmineUserId, source]
+      required: [participantId, displayName, source]
       properties:
-        subjectId: { type: string, minLength: 1, maxLength: 200 }
+        participantId: { type: string, format: uuid }
         displayName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
-        redmineUserId: { type: [integer, 'null'], minimum: 1 }
-        source: { type: string, const: host-session }
+        source: { type: string, const: participant-credential }
     CurrentUserResult:
       type: object
       additionalProperties: false
       required: [principal]
       properties:
         principal: { $ref: '#/components/schemas/Principal' }
+    CreateParticipantRequest:
+      type: object
+      additionalProperties: false
+      required: [browserProfileId]
+      properties:
+        browserProfileId: { type: string, format: uuid }
+    ParticipantResult:
+      type: object
+      additionalProperties: false
+      required: [participantId, credential]
+      properties:
+        participantId: { type: string, format: uuid }
+        credential: { type: string, minLength: 32, maxLength: 4096 }
     NamedValue:
       type: object
       additionalProperties: false
@@ -514,6 +634,47 @@ components:
         author: { $ref: '#/components/schemas/NamedValue' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: [string, 'null'], format: date-time }
+        messageId: { type: string, format: uuid }
+        participantId: { type: [string, 'null'], format: uuid }
+        displayName: { type: [string, 'null'], maxLength: 200 }
+        version: { type: integer, minimum: 1 }
+        canEdit: { type: boolean }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/MessageVersion' }
+    MessageVersion:
+      type: object
+      additionalProperties: false
+      required: [version, body, editedAt]
+      properties:
+        version: { type: integer, minimum: 1 }
+        body: { type: string, maxLength: 20000 }
+        editedAt: { type: string, format: date-time }
+    MessageAuthor:
+      type: object
+      additionalProperties: false
+      required: [kind, participantId, displayName]
+      properties:
+        kind: { type: string, enum: [participant, redmine] }
+        participantId: { type: [string, 'null'], format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 255 }
+    ConversationMessage:
+      type: object
+      additionalProperties: false
+      required: [id, kind, journalId, body, author, createdAt, editedAt, version, versions, canEdit]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [initial, reply] }
+        journalId: { type: [integer, 'null'], minimum: 1 }
+        body: { type: string, maxLength: 20000 }
+        author: { $ref: '#/components/schemas/MessageAuthor' }
+        createdAt: { type: string, format: date-time }
+        editedAt: { type: [string, 'null'], format: date-time }
+        version: { type: integer, minimum: 1 }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/MessageVersion' }
+        canEdit: { type: boolean }
     Activity:
       type: object
       additionalProperties: false
@@ -570,6 +731,7 @@ components:
         hasAttachments: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        closed: { type: boolean }
     Thread:
       type: object
       additionalProperties: false
@@ -613,6 +775,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         description: { type: string, maxLength: 65535 }
+        closed: { type: boolean }
         tracker: { $ref: '#/components/schemas/NamedValue' }
         timeline:
           type: array
@@ -626,6 +789,9 @@ components:
           items: { $ref: '#/components/schemas/Attachment' }
         redmineUrl: { type: [string, 'null'], format: uri }
         diagnosticCount: { type: integer, minimum: 0 }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/ConversationMessage' }
     ThreadListResult:
       type: object
       additionalProperties: false
@@ -673,6 +839,23 @@ components:
           oneOf:
             - $ref: '#/components/schemas/EvidenceMetadata'
             - { type: 'null' }
+        participantName: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+    CreateMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [messageId, body, participantName]
+      properties:
+        messageId: { type: string, format: uuid }
+        body: { type: string, minLength: 1, maxLength: 20000 }
+        participantName: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+    UpdateMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [body, expectedVersion, participantName]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 20000 }
+        expectedVersion: { type: integer, minimum: 1 }
+        participantName: { type: [string, 'null'], minLength: 1, maxLength: 100 }
     EvidenceMetadata:
       type: object
       additionalProperties: false

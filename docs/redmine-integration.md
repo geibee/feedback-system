@@ -5,9 +5,9 @@
 Redmine正本方式は、Feedbackのissue、返信、状態、証跡をRedmine issue・journal・attachment・custom fieldだけへ保存する。
 Feedback専用PostgreSQL、object storage、同期worker、server-side cacheは使用しない。
 
-利用経路はSPAへbuild時に同梱する`@feedback/redmine-plugin`と、既存session認証配下のsame-origin gatewayだけである。
-ブラウザ拡張機能や個人Redmine API keyを利用者へ配布しない。Feedback UIから書き込むのは初回コメントと任意の
-スクリーンショットだけで、返信、編集、担当、優先度、状態変更はRedmine UIで行う。
+利用経路はSPAへbuild時に同梱する`@feedback/redmine-plugin`とsame-origin gatewayだけである。
+ブラウザ拡張機能、OIDC JWT、host session、個人Redmine API keyをSDKへ渡さない。Feedback利用者はUIから投稿、返信、
+自己編集を行い、開発者はRedmineから返信、担当、優先度、状態変更を行う。両経路の内容はRedmineを正本として同じthreadへ反映する。
 
 ## Redmineを準備する
 
@@ -15,7 +15,7 @@ Feedback専用PostgreSQL、object storage、同期worker、server-side cacheは�
 2. Feedback専用projectとtrackerを用意する。
 3. 下表の11 issue custom fieldsを作り、対象project/trackerへ割り当てる。
 4. Redmineの最大attachment sizeをprofileの`capture.maximumUploadBytes`以上にする。
-5. 専用integration userをproject memberにし、issue閲覧・追加・attachment追加に必要な最小権限だけを許可する。
+5. 専用integration userをproject memberにし、issue閲覧・追加、注記追加、issue編集、attachment追加に必要な最小権限だけを許可する。
 6. integration userのAPI keyをsecret managerへ保存する。
 
 integration userをadministratorや他projectのmemberにしない。private issueを使う場合はprivate issueの追加・閲覧権限を与える。
@@ -36,27 +36,30 @@ API keyをSPA bundle、HTML、client runtime config、browser storage、server p
 | `submittedByName` | Feedback Submitted By | text 1行 | 不要 | 許可時だけの表示名 |
 
 field IDは環境固有のnumeric IDをserver profileへ明示し、表示名から推測しない。11個のIDはprofile内で重複不可である。
-`threadId`はUUID v4、`requestHash`はlowercase SHA-256、`hostResourceKey`はraw業務IDではなく認可後のopaque値を保存する。
+`threadId`はUUID v4、`requestHash`はlowercase SHA-256、`hostResourceKey`はhostが選んだresource keyを保存する。
 Redmineにcustom field unique制約はないため、同じthread IDが複数見つかった場合はgatewayがfail-closedする。
 
 ## Redmineへ保存する内容
 
 issue descriptionには人が読める初回コメントとversion付きmetadata blockを保存する。同時に`feedback-context-v1.json`へ
-location、target、release、locale、host-session由来のauthor、request hashを保存する。スクリーンショットは
+location、target、release、locale、participant UUIDと自己申告表示名、request hashを保存する。スクリーンショットは
 `feedback-{threadId}.png`または`.webp`として保存し、SHA-256、byte size、viewportをcontextへ記録する。
 
-thread表示は毎回Redmine RESTからissue detail、全journal、attachment metadataを読み直す。端末へ永続化できるのは
-follow/read stateとpending intentだけで、本文、journal、attachment bytesをclient cacheの正本にしない。
+返信は署名付きmessage markerを持つRedmine journalとして追加する。編集は元journalを上書きせず、version付きedit journalを追記し、
+UIで最新版へfoldする。最初のコメントだけはRedmine descriptionの要約も最新版にし、同じPUTでedit journalを追加する。
+thread表示は毎回Redmine RESTからissue detail、全journal、attachment metadataを読み直す。Redmine開発者の通常journalやfield変更も
+表示する。端末へ永続化できるのはparticipant credential、自己申告名、follow/read state、draft、pending intentだけで、本文、journal、
+attachment bytesをclient cacheの正本にしない。
 
 ## gatewayとSPAを接続する
 
-1. [`redmine-gateway.md`](redmine-gateway.md)に従いgatewayを既存認証middleware配下へmountする。
+1. [`redmine-gateway.md`](redmine-gateway.md)に従いgatewayをsame-originへmountする。
 2. server profileとintegration user API keyをsecret managerから設定する。
 3. SPAへ`@feedback/redmine-plugin`を通常のnpm依存として追加する。
 4. 単一integration moduleで`createRedmineFeedbackPluginController()`を作り、hostのfeature flagを`setEnabled()`へ接続する。
-5. profile read/create認可とresource認可を別々に検証する。
+5. participant発行、位置指定投稿、返信、自己編集、終了済み返信拒否を検証する。
 
-pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、任意HTTP headerを渡せない。通信先はsame-originの
+pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、OIDC token、任意HTTP headerを渡せない。通信先はsame-originの
 `/internal/feedback-redmine/v1`へ固定する。feature flag未指定時は有効を既定とする。
 
 `setEnabled(false)`は通信、polling、購読、React rootとcontroller所有mountを破棄し、再有効化できる。draft、follow、

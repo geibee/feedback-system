@@ -1,18 +1,21 @@
 {
   "name": "@feedback/redmine-gateway-reference",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "stateless Feedback Redmine gatewayのNode.js組込例",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json && esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js"
   },
   "dependencies": {
-    "@feedback/redmine-gateway": "1.0.0-alpha.1",
-    "@feedback/redmine-core": "1.0.0-alpha.1"
+    "@feedback/redmine-gateway": "1.0.0-alpha.2",
+    "@feedback/redmine-core": "1.0.0-alpha.2"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

@@ -20,6 +20,10 @@ export type {
   TrustedCreateInput,
   TrustedCreateResult,
   TrustedListInput,
+  TrustedMessageCreateInput,
+  TrustedMessageUpdateInput,
+  TrustedMessageOwnership,
+  TrustedMutationResult,
   TrustedThreadInput
 } from "./redmine-client.js";
 export type {

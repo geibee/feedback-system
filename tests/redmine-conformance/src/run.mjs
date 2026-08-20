@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import {
-  canonicalJson,
   parseThreadListResult,
   parseThreadResult,
   sha256Hex
@@ -24,14 +23,6 @@ else if (command === "verify") await verifyFixture();
 else throw new Error(`unknown command: ${command}`);
 
 async function createFixture() {
-  let currentUserAttempts = 0;
-  /** @type {import("@feedback/redmine-core/trusted").RedmineFetch} */
-  const retryingFetch = async (url, init) => {
-    if (new URL(url).pathname.endsWith("/users/current.json") && currentUserAttempts++ < 2) {
-      return new Response(null, { status: 503 });
-    }
-    return globalThis.fetch(url, init);
-  };
   const threadId = crypto.randomUUID();
   const intentId = crypto.randomUUID();
   const screenshot = Uint8Array.from(Buffer.from(
@@ -41,7 +32,7 @@ async function createFixture() {
   const capturedAt = new Date().toISOString();
   /** @type {import("@feedback/redmine-core").FeedbackHostResourceRefV1} */
   const resourceRef = { schemaVersion: "1", kind: "record", key: "conformance-resource" };
-  const hostResourceKey = await sha256Hex(new TextEncoder().encode(canonicalJson(resourceRef)));
+  const hostResourceKey = resourceRef.key;
   /** @type {NonNullable<import("@feedback/redmine-core").RedmineThreadCreateInput["evidence"]>} */
   const evidence = {
     filename: `feedback-${threadId}.png`,
@@ -53,10 +44,12 @@ async function createFixture() {
     pixelRatio: 1,
     capturedAt
   };
-  const gateway = gatewayHandler(hostResourceKey, retryingFetch);
-  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`));
+  const gateway = gatewayHandler();
+  const credential = await issueCredential(gateway);
+  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`, {
+    headers: { "X-Feedback-Participant-Credential": credential }
+  }));
   assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
-  assert.equal(currentUserAttempts, 3);
 
   /** @type {import("@feedback/redmine-core").RedmineThreadCreateInput} */
   const input = {
@@ -86,7 +79,7 @@ async function createFixture() {
   const createResponse = await gateway(gatewayRequest(`${profilePath()}/threads`, {
     method: "POST",
     headers: {
-      "X-Feedback-CSRF": "conformance-csrf",
+      "X-Feedback-Participant-Credential": credential,
       "Idempotency-Key": intentId
     },
     body: form
@@ -97,6 +90,38 @@ async function createFixture() {
   assert.equal(created.initialComment, "最初のコメント\n再構築テスト");
   assert.equal(created.attachments.length, 2);
 
+  const messageId = crypto.randomUUID();
+  const replyIntentId = crypto.randomUUID();
+  const replyResponse = await gateway(gatewayRequest(`${profilePath()}/threads/${threadId}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Feedback-Participant-Credential": credential,
+      "Idempotency-Key": replyIntentId
+    },
+    body: JSON.stringify({ messageId, body: "Feedback UI reply original", participantName: "Conformance participant" })
+  }));
+  assert.equal(replyResponse.status, 201, await replyResponse.clone().text());
+
+  const editIntentId = crypto.randomUUID();
+  const editResponse = await gateway(gatewayRequest(`${profilePath()}/threads/${threadId}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Feedback-Participant-Credential": credential,
+      "Idempotency-Key": editIntentId
+    },
+    body: JSON.stringify({ body: "Feedback UI reply edited", participantName: "Conformance participant", expectedVersion: 1 })
+  }));
+  assert.equal(editResponse.status, 200, await editResponse.clone().text());
+  const edited = parseThreadResult(await editResponse.json());
+  const editedMessage = edited.messages?.find((message) => message.id === messageId);
+  assert.equal(editedMessage?.body, "Feedback UI reply edited");
+  assert.deepEqual(editedMessage?.versions.map((version) => version.body), [
+    "Feedback UI reply original",
+    "Feedback UI reply edited"
+  ]);
+
   await updateIssue(created.issueId, { notes: "Redmine reply one" });
   await updateIssue(created.issueId, { status_id: seed.closedStatusId });
   await updateIssue(created.issueId, { notes: "notes and priority", priority_id: seed.highPriorityId });
@@ -104,6 +129,7 @@ async function createFixture() {
   writeFileSync(statePath, JSON.stringify({
     threadId,
     issueId: created.issueId,
+    messageId,
     hostResourceKey,
     resourceRef,
     pageKey: input.location.pageKey,
@@ -115,11 +141,15 @@ async function createFixture() {
 
 async function verifyFixture() {
   const state = JSON.parse(readFileSync(statePath, "utf8"));
-  const gateway = gatewayHandler(state.hostResourceKey);
-  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`));
+  const gateway = gatewayHandler();
+  const credential = await issueCredential(gateway);
+  const currentUserResponse = await gateway(gatewayRequest(`${profilePath()}/me`, {
+    headers: { "X-Feedback-Participant-Credential": credential }
+  }));
   assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
   const detailResponse = await gateway(gatewayRequest(
-    `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=untrusted-client-value`
+    `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=${state.resourceRef.key}`,
+    { headers: { "X-Feedback-Participant-Credential": credential } }
   ));
   assert.equal(detailResponse.status, 200, await detailResponse.clone().text());
   const rebuilt = parseThreadResult(await detailResponse.json());
@@ -134,6 +164,9 @@ async function verifyFixture() {
   assert(replies.some((item) => item.body === "notes and priority"));
   assert(replies.some((item) => item.body === "edited reply current"));
   assert(!replies.some((item) => item.body === "edited reply original" || !item.body.trim()));
+  const feedbackReply = rebuilt.messages?.find((message) => message.id === state.messageId);
+  assert.equal(feedbackReply?.body, "Feedback UI reply edited");
+  assert.equal(feedbackReply?.version, 2);
   assert(activities.some((item) => item.field === "status"));
   assert(activities.some((item) => item.field === "priority"));
   assert(activities.some((item) => item.field === "subject"));
@@ -143,7 +176,7 @@ async function verifyFixture() {
   assert(primary);
   const attachmentResponse = await gateway(gatewayRequest(
     `${profilePath()}/threads/${state.threadId}/attachments/${primary.id}` +
-      "?resourceKind=record&resourceKey=untrusted-client-value"
+      `?resourceKind=record&resourceKey=${state.resourceRef.key}`
   ));
   assert.equal(attachmentResponse.status, 200, await attachmentResponse.clone().text());
   const downloaded = new Uint8Array(await attachmentResponse.arrayBuffer());
@@ -166,8 +199,7 @@ async function verifyFixture() {
     assert.equal(listed.threads[0]?.threadId, state.threadId);
   }
 
-  const deniedGateway = gatewayHandler(state.hostResourceKey, globalThis.fetch, false);
-  const deniedResponse = await deniedGateway(gatewayRequest(
+  const deniedResponse = await gateway(gatewayRequest(
     `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=known-thread-from-other-resource`
   ));
   assert.equal(deniedResponse.status, 404);
@@ -179,29 +211,29 @@ function profilePath() {
 }
 
 /**
- * @param {string} hostResourceKey
  * @param {import("@feedback/redmine-core/trusted").RedmineFetch} [redmineFetch]
- * @param {boolean} [allowStoredResource]
  */
-function gatewayHandler(hostResourceKey, redmineFetch = globalThis.fetch, allowStoredResource = true) {
+function gatewayHandler(redmineFetch = globalThis.fetch) {
   return createFeedbackRedmineGatewayHandler({
-    host: {
-      authenticate: async () => ({
-        subjectId: "conformance-host-user",
-        displayName: "Conformance Host User",
-        redmineUserId: seed.userId
-      }),
-      authorizeProfile: async () => true,
-      authorizeResource: async () => ({ resourceKey: hostResourceKey }),
-      authorizeStoredResource: async ({ storedResourceKey }) =>
-        allowStoredResource && storedResourceKey === hostResourceKey,
-      verifyCsrf: async () => true
-    },
+    participantSigningKey: "redmine-conformance-participant-signing-key-v1",
     loadProfile: async () => ({ ...profile, authorizationMode: "resource-scoped", secretRef: "conformance-key" }),
     loadSecret: async () => seed.apiKey,
     fetch: redmineFetch,
     allowHttpDevelopment: true
   });
+}
+
+/**
+ * @param {ReturnType<typeof createFeedbackRedmineGatewayHandler>} gateway
+ */
+async function issueCredential(gateway) {
+  const response = await gateway(gatewayRequest(`${profilePath()}/participants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ browserProfileId: "00000000-0000-4000-8000-000000000007" })
+  }));
+  assert.equal(response.status, 201, await response.clone().text());
+  return (await response.json()).credential;
 }
 
 /**
@@ -258,6 +290,7 @@ function connectorProfile(baseUrl, fixture) {
     isPrivate: true,
     defaultPriorityId: fixture.normalPriorityId,
     customFieldIds: fixture.customFieldIds,
-    showRedmineLink: false
+    showRedmineLink: false,
+    closedStatusIds: [fixture.closedStatusId]
   };
 }

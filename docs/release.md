@@ -15,6 +15,8 @@ bash scripts/build-feedback-redmine-release.sh \
 - `@feedback/contracts`
 - `@feedback/core`
 - `@feedback/dom-capture`
+- `@feedback/react-ui`
+- `@feedback/maplibre`
 - `@feedback/redmine-core`
 - `@feedback/redmine-react`
 - `@feedback/redmine-plugin`
@@ -25,7 +27,7 @@ release builderはstaging copyだけから`private`を除去し、内部`@feedba
 変更せず、publishやOCI pushも行わない。`release-manifest.json`の`publishOrder`順に承認済みnpm互換registryへ投入する。
 
 ブラウザ拡張ZIP、React runtime入りself-hosted bundle、reference gateway imageは標準releaseへ含めない。React 18/19は
-consumer SPAのpeer dependencyを使う。`apps/feedback-redmine-gateway-reference`はdemo session adapterを含むローカル確認用sourceで、
+consumer SPAのpeer dependencyを使う。`apps/feedback-redmine-gateway-reference`は公開participant modeのローカル確認用sourceで、
 本番artifactではない。
 
 release前にskip変数なしの`bash scripts/verify-feedback.sh`を実行し、次をすべて通す。
@@ -48,7 +50,7 @@ bash scripts/build-feedback-sdk-release.sh \
   --version 1.0.0-rc.1
 ```
 
-`@feedback/contracts`、`@feedback/core`、`@feedback/react`、`@feedback/maplibre`、`@feedback/admin-react`のtarball、
+`@feedback/contracts`、`@feedback/core`、`@feedback/react-ui`、`@feedback/react`、`@feedback/maplibre`、`@feedback/admin-react`のtarball、
 `release-manifest.json`、`SHA256SUMS`を生成する。
 
 ## Legacy Go Service・CLI

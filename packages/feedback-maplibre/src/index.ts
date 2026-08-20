@@ -1,6 +1,6 @@
 import type { MapGeoJSONFeature } from "maplibre-gl";
 import type { FeedbackTargetV1, FeedbackThreadV1 } from "@feedback/contracts";
-import type { FeedbackEvidenceProvider } from "@feedback/core";
+import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@feedback/core";
 
 export const maplibreCanvasSelector = "canvas.maplibregl-canvas";
 export const captureReadyCanvasContextAttributes = { preserveDrawingBuffer: true } as const;
@@ -208,10 +208,7 @@ export type FeedbackMapLibrePinPositionMap = {
   off(event: "move" | "resize" | "styledata" | "remove", listener: () => void): unknown;
 };
 
-export type FeedbackMapLibrePinPositionProvider = {
-  getPosition(target: FeedbackTargetV1): { x: number; y: number } | null;
-  subscribe(listener: () => void): () => void;
-};
+export type FeedbackMapLibrePinPositionProvider = FeedbackPinPositionProvider;
 
 /** 保存済み経緯度をviewport座標へ投影し、地図の表示変更をOverlay pinへ通知する。 */
 export function createMapLibreFeedbackPinPositionProvider(

@@ -16,20 +16,20 @@ describe("reference gateway config", () => {
     const config = loadReferenceGatewayConfig({
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "integration-test-key",
-      FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET: "signed-session-test-secret",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "participant-signing-test-secret-at-least-32-bytes",
       PORT: "9090"
     });
 
     expect(config.port).toBe(9090);
     expect(config.profiles.get("inventory-production")?.clientProfile.displayName).toBe("Inventory / Production");
     expect(config.secrets.get("FEEDBACK_REDMINE_GATEWAY_API_KEY")).toBe("integration-test-key");
-    expect(config.sessionSecret).toBe("signed-session-test-secret");
+    expect(config.participantSigningKey).toBe("participant-signing-test-secret-at-least-32-bytes");
   });
 
   it.each([
-    ["profile file", { FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET: "session" }],
-    ["API key", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET: "session" }],
-    ["session secret", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key" }]
+    ["profile file", { FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
+    ["API key", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
+    ["participant signing key", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key" }]
   ])("%s未設定時にfail-fastする", (_name, environment) => {
     expect(() => loadReferenceGatewayConfig(environment)).toThrow(/必須/u);
   });
@@ -38,14 +38,14 @@ describe("reference gateway config", () => {
     expect(() => loadReferenceGatewayConfig({
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "server.json",
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
-      FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET: "session"
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
     })).toThrow(/absolute path/u);
 
     const directory = createProfileFiles({ arbitrary: true });
     expect(() => loadReferenceGatewayConfig({
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
-      FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET: "session"
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
     })).toThrow(/unknown property/u);
   });
 });
@@ -87,6 +87,7 @@ function createProfileFiles(extra: Record<string, unknown> = {}): string {
     },
     authorizationMode: "resource-scoped",
     showRedmineLink: false,
+    closedStatusIds: [5],
     secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY",
     ...extra
   }));

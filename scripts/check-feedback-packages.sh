@@ -20,6 +20,7 @@ packages=(
   @feedback/contracts
   @feedback/core
   @feedback/dom-capture
+  @feedback/react-ui
   @feedback/react
   @feedback/maplibre
   @feedback/admin-react
@@ -65,6 +66,7 @@ node -e '
   const contracts = read("contracts/feedback/package.json");
   const core = read("packages/feedback-core/package.json");
   const capture = read("packages/feedback-dom-capture/package.json");
+  const reactUi = read("packages/feedback-react-ui/package.json");
   const react = read("packages/feedback-react/package.json");
   const maplibre = read("packages/feedback-maplibre/package.json");
   const admin = read("packages/feedback-admin-react/package.json");
@@ -73,13 +75,13 @@ node -e '
     ...Object.keys(value.peerDependencies || {}),
     ...Object.keys(value.optionalDependencies || {})
   ]);
-  for (const value of [contracts, core, capture]) {
+  for (const value of [contracts, core, capture, reactUi]) {
     const names = dependencyNames(value);
     if (["react", "react-dom", "maplibre-gl", "@feedback/react", "@feedback/maplibre", "@feedback/admin-react"].some((name) => names.has(name))) process.exit(1);
   }
   if (dependencyNames(react).has("maplibre-gl") || dependencyNames(react).has("@feedback/maplibre")) process.exit(1);
   if (Object.keys(maplibre.peerDependencies || {}).join(",") !== "maplibre-gl") process.exit(1);
-  if (![contracts, core, capture, react, maplibre, admin].every((value) => value.private === true && value.version === "1.0.0-alpha.1")) process.exit(1);
+  if (![contracts, core, capture, reactUi, react, maplibre, admin].every((value) => value.private === true && value.version === "1.0.0-alpha.2")) process.exit(1);
 ' || {
   echo "[feedback-package] FAIL: optional dependencyまたはversion/private metadata境界が不正です" >&2
   exit 1
@@ -102,7 +104,7 @@ for index in "${!react_versions[@]}"; do
       "typescript@${typescript_versions[$index]}" vite@5.4.21 @vitejs/plugin-react@4.7.0 \
       vitest@4.1.9 jsdom@29.1.1 @testing-library/react@16.3.2 react-router-dom@6.30.1
     npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
-      "${tarballs[contracts]}" "${tarballs[core]}" "${tarballs["dom-capture"]}" "${tarballs[react]}"
+      "${tarballs[contracts]}" "${tarballs[core]}" "${tarballs["dom-capture"]}" "${tarballs["react-ui"]}" "${tarballs[react]}"
     test ! -d node_modules/@feedback/maplibre
     test ! -d node_modules/@feedback/admin-react
     test ! -d node_modules/maplibre-gl
@@ -160,7 +162,8 @@ cp -R tests/fixtures/feedback-sdk-vite "$stable_fixture"
     typescript@5.9.3 vite@5.4.21 @vitejs/plugin-react@4.7.0 vitest@4.1.9 jsdom@29.1.1 \
     @testing-library/react@16.3.2 react-router-dom@6.30.1 maplibre-gl@5.24.0
   npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
-    "${stable_tarballs[contracts]}" "${stable_tarballs[core]}" "${stable_tarballs["dom-capture"]}" "${stable_tarballs[react]}" \
+    "${stable_tarballs[contracts]}" "${stable_tarballs[core]}" "${stable_tarballs["dom-capture"]}" \
+    "${stable_tarballs["react-ui"]}" "${stable_tarballs[react]}" \
     "${stable_tarballs[maplibre]}" "${stable_tarballs[admin-react]}"
   npm run typecheck
   npm run typecheck:maplibre

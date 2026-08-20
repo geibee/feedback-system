@@ -1,11 +1,17 @@
 {
   "name": "@feedback/redmine-react",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "Redmineを正本とするFeedbackのread-only thread UI",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md", "CHANGELOG.md"],
-  "sideEffects": ["./dist/styles.css"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,15 +22,19 @@
     },
     "./styles.css": "./dist/styles.css"
   },
-  "publishConfig": { "access": "restricted" },
+  "publishConfig": {
+    "access": "restricted"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@feedback/dom-capture": "1.0.0-alpha.1",
-    "@feedback/redmine-core": "1.0.0-alpha.1"
+    "@feedback/core": "1.0.0-alpha.2",
+    "@feedback/react-ui": "1.0.0-alpha.2",
+    "@feedback/dom-capture": "1.0.0-alpha.2",
+    "@feedback/redmine-core": "1.0.0-alpha.2"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

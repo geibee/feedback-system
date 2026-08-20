@@ -54,16 +54,15 @@ const target = {
 };
 
 describe("Redmine core deterministic model", () => {
-  it("gateway principalはhost session由来だけを受ける", () => {
+  it("gateway principalはparticipant credential由来だけを受ける", () => {
     const principal = {
-      subjectId: "subject-1",
+      participantId: "00000000-0000-4000-8000-000000000001",
       displayName: "利用者",
-      redmineUserId: null,
-      source: "host-session"
+      source: "participant-credential"
     };
     expect(parseCurrentUserResult({ principal })).toEqual(principal);
     expect(() => parseCurrentUserResult({
-      principal: { ...principal, source: "unsupported", redmineUserId: 7 }
+      principal: { ...principal, source: "unsupported" }
     })).toThrow(/principal source/u);
   });
 
@@ -89,7 +88,7 @@ describe("Redmine core deterministic model", () => {
       pageKey: "orders.detail",
       hostResourceKey: "opaque-resource",
       perspectiveCode: "ux",
-      submittedById: "subject-1",
+      submittedById: "00000000-0000-4000-8000-000000000007",
       capturedAt: "2026-08-19T00:00:00Z"
     };
     const description = buildRedmineDescription("最初のコメント", metadata);
@@ -114,7 +113,11 @@ describe("Redmine core deterministic model", () => {
       perspectiveCode: "ux",
       location,
       target,
-      author: { source: "host-session" as const, subjectId: "subject-1", displayName: "Name", redmineUserId: null },
+      author: {
+        source: "participant-credential" as const,
+        participantId: "00000000-0000-4000-8000-000000000007",
+        displayName: "Name"
+      },
       comment: "comment",
       evidenceSha256: null
     };
@@ -140,7 +143,11 @@ describe("Redmine core deterministic model", () => {
       perspectiveCode: "ux",
       location,
       target,
-      author: { source: "host-session", subjectId: "subject-1", displayName: null, redmineUserId: null },
+      author: {
+        source: "participant-credential",
+        participantId: "00000000-0000-4000-8000-000000000007",
+        displayName: null
+      },
       capturedAt: "2026-08-19T00:00:00Z",
       primaryEvidence: null
     });

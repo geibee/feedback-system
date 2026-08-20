@@ -7,6 +7,8 @@ cd "$ROOT"
 
 packages=(
   @feedback/dom-capture
+  @feedback/react-ui
+  @feedback/maplibre
   @feedback/redmine-core
   @feedback/redmine-react
   @feedback/redmine-plugin

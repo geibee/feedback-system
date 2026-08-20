@@ -5,12 +5,17 @@ import type {
 } from "@feedback/contracts";
 import { parseFeedbackTarget } from "@feedback/core";
 import { contractError } from "./errors.js";
-import { initialCommentFromDescription } from "./marker.js";
+import {
+  initialCommentFromDescription,
+  parseFeedbackMetadata,
+  parseRedmineMessageNote
+} from "./marker.js";
 import type { RedmineConnectorProfile } from "./profile.js";
 import type { RedmineIssueDto } from "./redmine-dto.js";
 
 type NamedValue = { id: number; name: string };
 type TimelineItem = RedmineThreadV1["timeline"][number];
+type ConversationMessage = NonNullable<RedmineThreadV1["messages"]>[number];
 
 export function normalizeIssueSummary(
   input: unknown,
@@ -48,14 +53,16 @@ export function normalizeIssueSummary(
     locator,
     hasAttachments: attachments.length > 0,
     createdAt,
-    updatedAt
+    updatedAt,
+    closed: (profile.closedStatusIds ?? []).includes(status.id)
   };
 }
 
 export function normalizeIssueDetail(
   input: unknown,
   profile: RedmineConnectorProfile,
-  redmineUrl: string | null
+  redmineUrl: string | null,
+  currentParticipantId: string | null = null
 ): RedmineThreadV1 {
   const issue = record(input, "issue") as RedmineIssueDto;
   const summary = normalizeIssueSummary(issue, profile);
@@ -70,11 +77,53 @@ export function normalizeIssueDetail(
       };
     });
   const timeline: TimelineItem[] = [];
+  const description = string(issue.description, "issue.description", 65_535, true);
+  const initialMetadata = parseFeedbackMetadata(description);
+  const initialParticipantId = validUuid(initialMetadata?.participantId) ? initialMetadata!.participantId! : null;
+  const initialMessageId = validUuid(initialMetadata?.messageId) ? initialMetadata!.messageId! : summary.threadId;
+  const initialDisplayName = initialMetadata?.submittedByName?.trim() || summary.author.name;
+  const messages: ConversationMessage[] = [{
+    id: initialMessageId,
+    kind: "initial",
+    journalId: null,
+    body: summary.initialComment,
+    author: {
+      kind: initialParticipantId ? "participant" : "redmine",
+      participantId: initialParticipantId,
+      displayName: initialDisplayName
+    },
+    createdAt: summary.createdAt,
+    editedAt: null,
+    version: 1,
+    versions: [{ version: 1, body: summary.initialComment, editedAt: summary.createdAt }],
+    canEdit: initialParticipantId !== null && initialParticipantId === currentParticipantId
+  }];
   let diagnosticCount = 0;
   const journals = issue.journals === undefined ? [] : array(issue.journals, "issue.journals");
   for (const rawJournal of journals) {
     try {
-      timeline.push(...normalizeJournal(rawJournal));
+      const normalized = normalizeJournal(rawJournal, currentParticipantId);
+      timeline.push(...normalized.timeline);
+      if (normalized.edit) {
+        const message = messages.find((candidate) => candidate.id === normalized.edit!.messageId);
+        if (message && normalized.edit.version === message.version + 1) {
+          message.body = normalized.edit.body;
+          message.version = normalized.edit.version;
+          message.editedAt = normalized.edit.editedAt;
+          message.versions.push({
+            version: normalized.edit.version,
+            body: normalized.edit.body,
+            editedAt: normalized.edit.editedAt
+          });
+          const reply = timeline.find((candidate) => candidate.kind === "reply" && candidate.messageId === message.id);
+          if (reply?.kind === "reply") {
+            reply.body = normalized.edit.body;
+            reply.updatedAt = normalized.edit.editedAt;
+            reply.version = normalized.edit.version;
+            reply.versions = message.versions;
+          }
+        }
+      } else if (normalized.message) messages.push(normalized.message);
     } catch {
       diagnosticCount += 1;
       const journal = rawJournal && typeof rawJournal === "object" ? rawJournal as Record<string, unknown> : {};
@@ -86,16 +135,21 @@ export function normalizeIssueDetail(
     }
   }
   timeline.sort((left, right) => (left.journalId ?? Number.MAX_SAFE_INTEGER) - (right.journalId ?? Number.MAX_SAFE_INTEGER));
+  if (messages[0]?.editedAt === null) {
+    const descriptionUpdate = [...timeline].reverse().find((item) => item.kind === "activity" && item.field === "description");
+    if (descriptionUpdate?.kind === "activity") messages[0].editedAt = descriptionUpdate.createdAt;
+  }
   const latestReply = [...timeline].reverse().find((item) => item.kind === "reply");
   return {
     ...summary,
     latestReply: latestReply?.kind === "reply" ? latestReply.body : null,
-    description: string(issue.description, "issue.description", 65_535, true),
+    description,
     tracker,
     timeline,
     attachments,
     redmineUrl,
-    diagnosticCount
+    diagnosticCount,
+    messages
   };
 }
 
@@ -103,7 +157,11 @@ export function customFieldValue(input: unknown, id: number): string | null {
   return optionalField(customFieldMap(input), id);
 }
 
-function normalizeJournal(input: unknown): TimelineItem[] {
+function normalizeJournal(input: unknown, currentParticipantId: string | null): {
+  timeline: TimelineItem[];
+  message: ConversationMessage | null;
+  edit: { messageId: string; body: string; version: number; editedAt: string } | null;
+} {
   const journal = record(input, "journal");
   const id = positiveInteger(journal.id, "journal.id");
   const author = named(journal.user, "journal.user");
@@ -112,9 +170,54 @@ function normalizeJournal(input: unknown): TimelineItem[] {
     ? null
     : dateTime(journal.updated_on, "journal.updated_on");
   const result: TimelineItem[] = [];
+  let message: ConversationMessage | null = null;
+  let edit: { messageId: string; body: string; version: number; editedAt: string } | null = null;
   if (typeof journal.notes !== "string") throw contractError("journal.notesがstringではありません");
   if (journal.notes.trim()) {
-    result.push({ kind: "reply", journalId: id, body: journal.notes, author, createdAt, updatedAt });
+    const marked = parseRedmineMessageNote(journal.notes);
+    if (marked?.metadata.kind === "edit") {
+      edit = {
+        messageId: marked.metadata.messageId,
+        body: marked.body,
+        version: marked.metadata.version,
+        editedAt: updatedAt ?? createdAt
+      };
+    } else {
+      const messageId = marked?.metadata.messageId ?? journalMessageId(id);
+      const participantId = marked?.metadata.participantId ?? null;
+      const body = marked?.body ?? journal.notes;
+      const displayName = marked?.metadata.participantName?.trim() || author.name;
+      result.push({
+        kind: "reply",
+        journalId: id,
+        body,
+        author,
+        createdAt,
+        updatedAt,
+        messageId,
+        participantId,
+        displayName,
+        version: 1,
+        canEdit: participantId !== null && participantId === currentParticipantId,
+        versions: [{ version: 1, body, editedAt: createdAt }]
+      });
+      message = {
+        id: messageId,
+        kind: "reply",
+        journalId: id,
+        body,
+        author: {
+          kind: participantId ? "participant" : "redmine",
+          participantId,
+          displayName
+        },
+        createdAt,
+        editedAt: updatedAt,
+        version: 1,
+        versions: [{ version: 1, body, editedAt: createdAt }],
+        canEdit: participantId !== null && participantId === currentParticipantId
+      };
+    }
   }
   for (const inputDetail of journal.details === undefined ? [] : array(journal.details, "journal.details")) {
     const detail = record(inputDetail, "journal detail");
@@ -130,7 +233,15 @@ function normalizeJournal(input: unknown): TimelineItem[] {
       createdAt
     });
   }
-  return result;
+  return { timeline: result, message, edit };
+}
+
+function journalMessageId(journalId: number): string {
+  return `00000000-0000-4000-8000-${journalId.toString(16).padStart(12, "0").slice(-12)}`;
+}
+
+function validUuid(value: string | undefined): boolean {
+  return typeof value === "string" && uuidPattern.test(value);
 }
 
 function activityField(detail: Record<string, unknown>): Extract<TimelineItem, { kind: "activity" }>["field"] | null {

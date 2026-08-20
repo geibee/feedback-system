@@ -13,7 +13,7 @@ Redmine gatewayはlegacy Feedback Serviceへ混在させず、`@feedback/contrac
 gateway HTTP契約とcontext attachmentはversion `1`で、unknown propertyを拒否します。
 正規化済みresponseは`schemas/redmine-model.schema.json`、Redmineへ保存するcontext attachmentは
 `schemas/redmine-feedback-context.schema.json`を正本にします。principal sourceはsame-origin gatewayが注入する
-`host-session`だけを許可します。
+`participant-credential`だけを許可し、browser profile UUIDを参加者IDとして保存します。
 直接OIDC JWTはOpenAPIの `bearerAuth` に従い、固定語彙の `feedback_permissions`文字列配列を必須とします。
 CI/CDでresourceを同期するinstallation manifestのschemaも`schemas/installation-manifest.schema.json`に含みます。
 `npm run generate`はlegacy `src/generated.ts`とRedmine専用`src/redmine-gateway.generated.ts`を生成します。

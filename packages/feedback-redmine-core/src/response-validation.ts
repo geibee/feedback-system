@@ -10,19 +10,19 @@ import { validateClientProfile } from "./profile.js";
 
 export function parseProfileResult(value: unknown): RedmineProfileResult {
   const result = exact(value, ["profile", "capabilities"], "profile result");
-  const capabilities = exact(result.capabilities, ["canRead", "canCreate", "repliesReadOnly", "stateReadOnly"], "capabilities");
+  const capabilities = exact(result.capabilities, ["canRead", "canCreate", "canReply", "canEditOwn", "stateReadOnly"], "capabilities");
   if (typeof capabilities.canRead !== "boolean" || typeof capabilities.canCreate !== "boolean" ||
-    capabilities.repliesReadOnly !== true || capabilities.stateReadOnly !== true) throw invalid("capabilities");
+    typeof capabilities.canReply !== "boolean" || typeof capabilities.canEditOwn !== "boolean" ||
+    capabilities.stateReadOnly !== true) throw invalid("capabilities");
   return { profile: validateClientProfile(result.profile), capabilities: capabilities as RedmineProfileResult["capabilities"] };
 }
 
 export function parseCurrentUserResult(value: unknown): RedmineCurrentPrincipalV1 {
   const result = exact(value, ["principal"], "current user result");
-  const principal = exact(result.principal, ["subjectId", "displayName", "redmineUserId", "source"], "principal");
-  text(principal.subjectId, "subjectId", 200);
+  const principal = exact(result.principal, ["participantId", "displayName", "source"], "principal");
+  if (!uuidPattern.test(String(principal.participantId))) throw invalid("participantId");
   if (principal.displayName !== null) text(principal.displayName, "displayName", 200);
-  if (principal.redmineUserId !== null) integer(principal.redmineUserId, "redmineUserId", 1);
-  if (principal.source !== "host-session") throw invalid("principal source");
+  if (principal.source !== "participant-credential") throw invalid("principal source");
   return principal as RedmineCurrentPrincipalV1;
 }
 
@@ -37,12 +37,16 @@ export function parseThreadListResult(value: unknown): RedmineThreadListResult {
 
 export function parseThreadResult(value: unknown): RedmineThreadV1 {
   const result = exact(value, ["thread"], "thread result");
-  const thread = exact(result.thread, [...summaryKeys, ...detailKeys], "thread");
+  const thread = exact(result.thread, [...summaryKeys, ...detailKeys], "thread", ["messages", "closed"]);
   validateSummary(thread);
   text(thread.description, "description", 65_535, true);
   named(thread.tracker, "tracker");
   if (!Array.isArray(thread.timeline) || !Array.isArray(thread.attachments)) throw invalid("timeline/attachments");
   thread.timeline.forEach(timeline);
+  if (thread.messages !== undefined) {
+    if (!Array.isArray(thread.messages)) throw invalid("messages");
+    thread.messages.forEach(conversationMessage);
+  }
   thread.attachments.forEach(attachment);
   if (thread.redmineUrl !== null) {
     text(thread.redmineUrl, "redmineUrl", 2_048);
@@ -53,16 +57,16 @@ export function parseThreadResult(value: unknown): RedmineThreadV1 {
 }
 
 export function parseThreadSummary(value: unknown): RedmineThreadSummaryV1 {
-  const thread = exact(value, summaryKeys, "thread summary");
+  const thread = exact(value, summaryKeys, "thread summary", ["closed"]);
   validateSummary(thread);
   return thread as unknown as RedmineThreadSummaryV1;
 }
 
 const summaryKeys = [
   "threadId", "issueId", "subject", "initialComment", "latestReply", "status", "priority", "assignee", "author",
-  "perspectiveCode", "locator", "hasAttachments", "createdAt", "updatedAt"
+  "perspectiveCode", "locator", "hasAttachments", "createdAt", "updatedAt", "closed"
 ] as const;
-const detailKeys = ["description", "tracker", "timeline", "attachments", "redmineUrl", "diagnosticCount"] as const;
+const detailKeys = ["description", "tracker", "timeline", "attachments", "redmineUrl", "diagnosticCount", "messages"] as const;
 
 function validateSummary(thread: Record<string, unknown>): void {
   if (!uuidPattern.test(String(thread.threadId))) throw invalid("threadId");
@@ -79,6 +83,7 @@ function validateSummary(thread: Record<string, unknown>): void {
   if (typeof thread.hasAttachments !== "boolean") throw invalid("hasAttachments");
   dateTime(thread.createdAt, "createdAt");
   dateTime(thread.updatedAt, "updatedAt");
+  if (thread.closed !== undefined && typeof thread.closed !== "boolean") throw invalid("closed");
 }
 
 function locator(value: unknown): void {
@@ -121,9 +126,11 @@ function target(value: unknown): FeedbackTargetV1 {
 function timeline(value: unknown): void {
   const item = object(value, "timeline item");
   if (item.kind === "reply") {
-    const reply = exact(item, ["kind", "journalId", "body", "author", "createdAt", "updatedAt"], "reply");
+    const optional = ["messageId", "participantId", "displayName", "version", "canEdit", "versions"] as const;
+    const reply = exact(item, ["kind", "journalId", "body", "author", "createdAt", "updatedAt", ...optional], "reply", optional);
     integer(reply.journalId, "journalId", 1); text(reply.body, "body", 65_535, true); named(reply.author, "author");
     dateTime(reply.createdAt, "createdAt"); if (reply.updatedAt !== null) dateTime(reply.updatedAt, "updatedAt");
+    if (reply.messageId !== undefined && !uuidPattern.test(String(reply.messageId))) throw invalid("messageId");
   } else if (item.kind === "activity") {
     const activity = exact(item, ["kind", "journalId", "field", "oldValue", "newValue", "author", "createdAt"], "activity");
     integer(activity.journalId, "journalId", 1);
@@ -136,6 +143,25 @@ function timeline(value: unknown): void {
     if (diagnostic.journalId !== null) integer(diagnostic.journalId, "journalId", 1);
     text(diagnostic.message, "diagnostic message", 200);
   } else throw invalid("timeline kind");
+}
+
+function conversationMessage(value: unknown): void {
+  const item = exact(value, ["id", "kind", "journalId", "body", "author", "createdAt", "editedAt", "version", "versions", "canEdit"], "message");
+  if (!uuidPattern.test(String(item.id)) || (item.kind !== "initial" && item.kind !== "reply")) throw invalid("message identity");
+  if (item.journalId !== null) integer(item.journalId, "journalId", 1);
+  text(item.body, "message body", 20_000, true);
+  const author = exact(item.author, ["kind", "participantId", "displayName"], "message author");
+  if (author.kind !== "participant" && author.kind !== "redmine") throw invalid("message author kind");
+  if (author.participantId !== null && !uuidPattern.test(String(author.participantId))) throw invalid("message participantId");
+  text(author.displayName, "message displayName", 255);
+  dateTime(item.createdAt, "message createdAt");
+  if (item.editedAt !== null) dateTime(item.editedAt, "message editedAt");
+  integer(item.version, "message version", 1);
+  if (!Array.isArray(item.versions) || typeof item.canEdit !== "boolean") throw invalid("message versions/canEdit");
+  item.versions.forEach((entry) => {
+    const version = exact(entry, ["version", "body", "editedAt"], "message version");
+    integer(version.version, "version", 1); text(version.body, "version body", 20_000, true); dateTime(version.editedAt, "version editedAt");
+  });
 }
 
 function attachment(value: unknown): void {

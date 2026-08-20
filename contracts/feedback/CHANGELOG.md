@@ -2,9 +2,10 @@
 
 ## 2026-08-19
 
+- Redmine公開participant credential、返信・自己編集、会話message、閉鎖状態の契約を追加し、旧host-session/CSRF契約を削除。
 - 本番導入前の契約整理としてChrome / Edge拡張機能用profile・message・client state・operation schemaを削除し、
   Redmine gatewayとSPAのHTTP契約へ一本化。
-- Redmine principalとcontext authorのsourceをsame-origin gatewayが注入する`host-session`だけに限定。
+- Redmine principalとcontext authorのsourceをsame-origin gatewayが注入する`participant-credential`だけに限定。
 - Redmineを業務データ正本とするgateway OpenAPI、client profile、host resource、context attachment契約を追加。
 - Redmine専用生成TypeScript型をlegacy Feedback Service生成型から分離して追加。
 - Redmine profile/current user/thread/list/attachment responseをunknown property拒否のstrict schemaとして追加。

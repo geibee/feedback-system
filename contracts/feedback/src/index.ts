@@ -25,7 +25,11 @@ export type RedmineCurrentPrincipalV1 = redmineComponents["schemas"]["Principal"
 export type RedmineThreadSummaryV1 = redmineComponents["schemas"]["ThreadSummary"];
 export type RedmineThreadV1 = redmineComponents["schemas"]["Thread"];
 export type RedmineAttachmentV1 = redmineComponents["schemas"]["Attachment"];
+export type RedmineConversationMessageV1 = redmineComponents["schemas"]["ConversationMessage"];
+export type RedmineParticipantResultV1 = redmineComponents["schemas"]["ParticipantResult"];
 export type RedmineCreateThreadRequestV1 = redmineComponents["schemas"]["CreateThreadRequest"];
+export type RedmineCreateMessageRequestV1 = redmineComponents["schemas"]["CreateMessageRequest"];
+export type RedmineUpdateMessageRequestV1 = redmineComponents["schemas"]["UpdateMessageRequest"];
 export type RedmineProblemV1 = redmineComponents["schemas"]["Problem"];
 
 export type { components, operations, paths } from "./generated.js";

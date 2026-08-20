@@ -30,11 +30,12 @@
     "capabilities": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["canRead", "canCreate", "repliesReadOnly", "stateReadOnly"],
+      "required": ["canRead", "canCreate", "canReply", "canEditOwn", "stateReadOnly"],
       "properties": {
         "canRead": { "type": "boolean" },
         "canCreate": { "type": "boolean" },
-        "repliesReadOnly": { "const": true },
+        "canReply": { "type": "boolean" },
+        "canEditOwn": { "type": "boolean" },
         "stateReadOnly": { "const": true }
       }
     },
@@ -50,12 +51,11 @@
     "principal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["subjectId", "displayName", "redmineUserId", "source"],
+      "required": ["participantId", "displayName", "source"],
       "properties": {
-        "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "participantId": { "type": "string", "format": "uuid" },
         "displayName": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }] },
-        "redmineUserId": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
-        "source": { "const": "host-session" }
+        "source": { "const": "participant-credential" }
       }
     },
     "currentUserResult": {
@@ -89,7 +89,50 @@
         "body": { "type": "string", "maxLength": 65535 },
         "author": { "$ref": "#/$defs/namedValue" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+        "updatedAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] },
+        "messageId": { "type": "string", "format": "uuid" },
+        "participantId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "displayName": { "oneOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+        "version": { "type": "integer", "minimum": 1 },
+        "canEdit": { "type": "boolean" },
+        "versions": { "type": "array", "items": { "$ref": "#/$defs/messageVersion" } }
+      }
+    },
+    "messageVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "body", "editedAt"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "body": { "type": "string", "maxLength": 20000 },
+        "editedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "messageAuthor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "participantId", "displayName"],
+      "properties": {
+        "kind": { "enum": ["participant", "redmine"] },
+        "participantId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 255 }
+      }
+    },
+    "conversationMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "journalId", "body", "author", "createdAt", "editedAt", "version", "versions", "canEdit"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "enum": ["initial", "reply"] },
+        "journalId": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "body": { "type": "string", "maxLength": 20000 },
+        "author": { "$ref": "#/$defs/messageAuthor" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "editedAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] },
+        "version": { "type": "integer", "minimum": 1 },
+        "versions": { "type": "array", "items": { "$ref": "#/$defs/messageVersion" } },
+        "canEdit": { "type": "boolean" }
       }
     },
     "activity": {
@@ -134,7 +177,8 @@
         "locator": { "oneOf": [{ "$ref": "#/$defs/locator" }, { "type": "null" }] },
         "hasAttachments": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "closed": { "type": "boolean" }
       }
     },
     "thread": {
@@ -157,6 +201,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" },
         "description": { "type": "string", "maxLength": 65535 },
+        "closed": { "type": "boolean" },
         "tracker": { "$ref": "#/$defs/namedValue" },
         "timeline": {
           "type": "array",
@@ -164,7 +209,8 @@
         },
         "attachments": { "type": "array", "items": { "$ref": "#/$defs/attachment" } },
         "redmineUrl": { "oneOf": [{ "type": "string", "format": "uri" }, { "type": "null" }] },
-        "diagnosticCount": { "type": "integer", "minimum": 0 }
+        "diagnosticCount": { "type": "integer", "minimum": 0 },
+        "messages": { "type": "array", "items": { "$ref": "#/$defs/conversationMessage" } }
       }
     },
     "threadListResult": {

@@ -1,6 +1,6 @@
 {
   "name": "feedback-system",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "private": true,
   "engines": {
     "node": ">=22 <25"
@@ -12,6 +12,7 @@
     "contracts/feedback",
     "packages/feedback-core",
     "packages/feedback-dom-capture",
+    "packages/feedback-react-ui",
     "packages/feedback-react",
     "packages/feedback-maplibre",
     "packages/feedback-admin-react",
@@ -26,8 +27,8 @@
   ],
   "scripts": {
     "build": "npm run build:redmine",
-    "build:shared": "npm --workspace @feedback/contracts run build && npm --workspace @feedback/core run build && npm --workspace @feedback/dom-capture run build",
-    "build:redmine:packages": "npm --workspace @feedback/redmine-core run build && npm --workspace @feedback/redmine-react run build && npm --workspace @feedback/redmine-plugin run build && npm --workspace @feedback/redmine-gateway run build",
+    "build:shared": "npm --workspace @feedback/contracts run build && npm --workspace @feedback/core run build && npm --workspace @feedback/dom-capture run build && npm --workspace @feedback/react-ui run build",
+    "build:redmine:packages": "npm --workspace @feedback/maplibre run build && npm --workspace @feedback/redmine-core run build && npm --workspace @feedback/redmine-react run build && npm --workspace @feedback/redmine-plugin run build && npm --workspace @feedback/redmine-gateway run build",
     "build:legacy:packages": "npm --workspace @feedback/react run build && npm --workspace @feedback/maplibre run build && npm --workspace @feedback/admin-react run build",
     "build:legacy:apps": "npm --workspace @feedback/admin-console run build && npm --workspace @feedback/token-broker-reference run build && npm --workspace @feedback/conformance-consumer run build",
     "build:redmine": "npm run build:shared && npm run build:redmine:packages",

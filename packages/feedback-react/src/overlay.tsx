@@ -9,8 +9,20 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { components } from "@feedback/contracts";
-import type { FeedbackTargetV1 } from "@feedback/contracts";
-import type { FeedbackEvidencePayload } from "@feedback/core";
+import type {
+  FeedbackEvidencePayload,
+  FeedbackPinPosition as CoreFeedbackPinPosition,
+  FeedbackPinPositionProvider as CoreFeedbackPinPositionProvider,
+  FeedbackTargetResolver as CoreFeedbackTargetResolver,
+  FeedbackTargetResolverInput as CoreFeedbackTargetResolverInput
+} from "@feedback/core";
+import {
+  feedbackElementKeyAttribute,
+  feedbackExcludeAttribute,
+  feedbackMapAttribute,
+  feedbackMaskAttribute,
+  resolveDomFeedbackTarget
+} from "@feedback/react-ui";
 import { createDomEvidenceProvider } from "./capture.js";
 import { useFeedback } from "./index.js";
 
@@ -54,10 +66,7 @@ function reactionLabel(reaction: Schemas["FeedbackReactionKey"]): string {
   }
 }
 
-export const feedbackElementKeyAttribute = "data-feedback-key";
-export const feedbackExcludeAttribute = "data-feedback-exclude";
-export const feedbackMaskAttribute = "data-feedback-mask";
-export const feedbackMapAttribute = "data-feedback-map";
+export { feedbackElementKeyAttribute, feedbackExcludeAttribute, feedbackMapAttribute, feedbackMaskAttribute } from "@feedback/react-ui";
 
 export type FeedbackOverlayProps = {
   deepLinkThreadId?: string | null;
@@ -72,21 +81,10 @@ export type FeedbackOverlayProps = {
   reviewManagementUrl?: string;
 };
 
-export type FeedbackTargetResolverInput = {
-  action: "pick" | "context-menu";
-  element: Element | null;
-  clientX: number;
-  clientY: number;
-};
-
-export type FeedbackTargetResolver = (input: FeedbackTargetResolverInput) => Target | null;
-
-export type FeedbackPinPosition = { x: number; y: number };
-
-export type FeedbackPinPositionProvider = {
-  getPosition(target: FeedbackTargetV1): FeedbackPinPosition | null;
-  subscribe(listener: () => void): () => void;
-};
+export type FeedbackTargetResolverInput = CoreFeedbackTargetResolverInput<Element>;
+export type FeedbackTargetResolver = CoreFeedbackTargetResolver<Element>;
+export type FeedbackPinPosition = CoreFeedbackPinPosition;
+export type FeedbackPinPositionProvider = CoreFeedbackPinPositionProvider;
 
 /** v1 transport だけを使う汎用 Overlay。ホストの router/API/TanStack Query へ依存しない。 */
 export function FeedbackOverlay({
@@ -1328,25 +1326,13 @@ function useEvidencePreview(evidence: FeedbackEvidencePayload | null): string | 
 }
 
 function targetAtEvent(element: Element | null, event: MouseEvent): Target {
-  const owner = element?.closest<HTMLElement>(`[${feedbackElementKeyAttribute}]`) ?? null;
-  if (!owner) return screenTarget(event);
-  const rect = owner.getBoundingClientRect();
-  return {
-    schemaVersion: "1",
-    kind: "ui-element",
-    elementKey: owner.getAttribute(feedbackElementKeyAttribute)?.trim() ?? "",
-    relativeX: clamp((event.clientX - rect.left) / Math.max(rect.width, 1)),
-    relativeY: clamp((event.clientY - rect.top) / Math.max(rect.height, 1))
-  };
-}
-
-function screenTarget(event: MouseEvent): Target {
-  return {
-    schemaVersion: "1",
-    kind: "screen-position",
-    relativeX: clamp(event.clientX / Math.max(document.documentElement.clientWidth, 1)),
-    relativeY: clamp(event.clientY / Math.max(document.documentElement.clientHeight, 1))
-  };
+  return resolveDomFeedbackTarget({
+    element,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    viewportWidth: document.documentElement.clientWidth,
+    viewportHeight: document.documentElement.clientHeight
+  }) as Target;
 }
 
 function findFeedbackElement(key: string): HTMLElement | null {
@@ -1422,10 +1408,6 @@ function idempotencyKey(): string {
 
 function versionEtag(version: number): string {
   return `"v${version}"`;
-}
-
-function clamp(value: number): number {
-  return Math.max(0, Math.min(1, value));
 }
 
 function formatRelative(value: number): string {

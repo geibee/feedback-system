@@ -1,20 +1,17 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import {
-  createFeedbackRedmineGatewayHandler,
-  type FeedbackRedmineGatewayHost
+  createFeedbackRedmineGatewayHandler
 } from "@feedback/redmine-gateway";
 import type { RedmineFetch } from "@feedback/redmine-core/trusted";
 import { loadReferenceGatewayConfig, type ReferenceGatewayConfig } from "./config.js";
-import { createSignedDemoSessionAdapter } from "./session-adapter.js";
 
 export function createReferenceGatewayServer(
   config: ReferenceGatewayConfig,
-  host: FeedbackRedmineGatewayHost,
   redmineFetch: RedmineFetch = globalThis.fetch
 ) {
   const handler = createFeedbackRedmineGatewayHandler({
-    host,
+    participantSigningKey: config.participantSigningKey,
     loadProfile: async (profileId) => config.profiles.get(profileId) ?? null,
     loadSecret: async (secretRef) => config.secrets.get(secretRef) ?? null,
     fetch: redmineFetch
@@ -72,7 +69,7 @@ async function writeResponse(response: Response, outgoing: ServerResponse): Prom
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const config = loadReferenceGatewayConfig();
-  const server = createReferenceGatewayServer(config, createSignedDemoSessionAdapter(config.sessionSecret));
+  const server = createReferenceGatewayServer(config);
   server.listen(config.port, "0.0.0.0", () => {
     process.stdout.write(`Feedback Redmine gateway reference listening on ${config.port}\n`);
   });

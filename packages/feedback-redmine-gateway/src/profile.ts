@@ -6,7 +6,7 @@ export type GatewayServerProfile = RedmineConnectorProfile & {
 };
 
 export type GatewayDependencies = {
-  host: import("./auth.js").FeedbackRedmineGatewayHost;
+  participantSigningKey: string | Uint8Array;
   loadProfile(profileId: string): Promise<GatewayServerProfile | null>;
   loadSecret(secretRef: string): Promise<string | null>;
   fetch: RedmineFetch;

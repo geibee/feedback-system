@@ -18,7 +18,7 @@ button { cursor: pointer; }
   box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
 }
 .feedback-redmine-badge { margin-left: 6px; border-radius: 999px; background: #d93025; padding: 2px 7px; }
-.feedback-redmine-pin { position: fixed; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 999px; background: #d93025; color: white; width: 24px; height: 24px; padding: 0; box-shadow: 0 2px 8px rgb(0 0 0 / 35%); }
+.feedback-redmine-pin { position: fixed; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 999px; background: #d93025; color: white; min-width: 28px; height: 28px; padding: 0 5px; box-shadow: 0 2px 8px rgb(0 0 0 / 35%); font-size: 11px; font-weight: 700; }
 .feedback-redmine-panel {
   position: absolute;
   right: 0;
@@ -36,6 +36,7 @@ button { cursor: pointer; }
 .feedback-redmine-create, .feedback-redmine-toolbar { display: grid; gap: 10px; margin: 16px 0; }
 .feedback-redmine-create label, .feedback-redmine-toolbar label { display: grid; gap: 4px; }
 .feedback-redmine-create textarea { min-height: 90px; resize: vertical; }
+.feedback-redmine-target { margin: 0; color: #385070; font-size: 13px; }
 .feedback-redmine-create input, .feedback-redmine-create select, .feedback-redmine-create textarea,
 .feedback-redmine-toolbar input, .feedback-redmine-toolbar select { border: 1px solid #9ba9bd; border-radius: 6px; padding: 7px; }
 .feedback-redmine-capture-preview img { display: block; max-width: 100%; max-height: 240px; border: 1px solid #ccd5e3; }
@@ -58,7 +59,21 @@ button { cursor: pointer; }
 .feedback-redmine-drawer dl div { display: flex; gap: 12px; }
 .feedback-redmine-drawer dt { font-weight: 700; min-width: 80px; }
 .feedback-redmine-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.feedback-redmine-messages { list-style: none; margin: 16px 0; padding: 0; }
+.feedback-redmine-messages > li { border-top: 1px solid #e2e7ef; padding: 14px 0; }
+.feedback-redmine-messages article { display: grid; gap: 7px; }
+.feedback-redmine-messages time, .feedback-redmine-messages small { color: #526178; font-size: 12px; }
+.feedback-redmine-edit, .feedback-redmine-reply label { display: grid; gap: 8px; }
+.feedback-redmine-edit textarea, .feedback-redmine-reply textarea { min-height: 90px; resize: vertical; border: 1px solid #9ba9bd; border-radius: 6px; padding: 7px; }
+.feedback-redmine-reply { display: grid; gap: 10px; margin: 18px 0; }
+.feedback-redmine-activities:empty { display: none; }
 .feedback-redmine-timeline li { border-top: 1px solid #e2e7ef; padding: 12px 0; }
 .feedback-redmine-timeline time { margin-left: 8px; color: #526178; font-size: 12px; }
 .feedback-redmine-drawer img { max-width: 100%; max-height: 400px; }
 .feedback-redmine-readonly { border-radius: 6px; background: #f3f6fa; padding: 10px; }
+
+@media (max-width: 640px) {
+  .feedback-redmine-root { inset: auto 12px 12px auto; }
+  .feedback-redmine-panel { position: fixed; inset: auto 0 0 0; width: 100vw; max-height: 82vh; border-radius: 18px 18px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .feedback-redmine-drawer { inset: auto 0 0 0; width: 100vw; height: 88vh; border: 0; border-radius: 18px 18px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+}

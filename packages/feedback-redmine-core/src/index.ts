@@ -2,8 +2,11 @@ export { RedmineFeedbackError, contractError, isRedmineErrorCode, redmineErrorCo
 export { buildRedmineSubject } from "./subject.js";
 export {
   buildRedmineDescription,
+  buildRedmineMessageNote,
   initialCommentFromDescription,
-  parseFeedbackMetadata
+  parseFeedbackMetadata,
+  parseRedmineMessageNote,
+  replaceInitialCommentInDescription
 } from "./marker.js";
 export {
   buildLocator,
@@ -35,6 +38,9 @@ export type {
   RedmineAttachmentContent,
   RedmineAttachmentInput,
   RedmineEvidenceMetadata,
+  RedmineMessageCreateInput,
+  RedmineMessageUpdateInput,
+  RedmineParticipantV1,
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadListInput,

@@ -63,7 +63,7 @@ const lazyAssetPaths = (entry.dynamicImports ?? []).map((key) => {
 });
 const mountAssetPath = Object.values(manifest).find((chunk) => chunk.isDynamicEntry && chunk.name === "mount")?.file;
 if (!mountAssetPath) throw new Error("plugin mountのlazy chunkがmanifestにありません");
-/** @type {Array<{method: string; path: string; origin: string | null; fetchSite: string | null; csrf: string | null; idempotencyKey: string | null; contentType: string | null; bodyBytes: number}>} */
+/** @type {Array<{method: string; path: string; origin: string | null; fetchSite: string | null; participant: string | null; idempotencyKey: string | null; contentType: string | null; bodyBytes: number}>} */
 const requests = [];
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -73,7 +73,7 @@ const server = createServer(async (request, response) => {
     path: url.pathname,
     origin: request.headers.origin ?? null,
     fetchSite: request.headers["sec-fetch-site"] ?? null,
-    csrf: headerValue(request.headers["x-feedback-csrf"]),
+    participant: headerValue(request.headers["x-feedback-participant-credential"]),
     idempotencyKey: headerValue(request.headers["idempotency-key"]),
     contentType: request.headers["content-type"] ?? null,
     bodyBytes: body.byteLength
@@ -89,12 +89,17 @@ const server = createServer(async (request, response) => {
     return;
   }
   const base = "/internal/feedback-redmine/v1/profiles/inventory-production";
+  if (request.method === "POST" && url.pathname === `${base}/participants`) {
+    const input = JSON.parse(body.toString("utf8"));
+    browserParticipantId = `${input.browserProfileId.slice(0, 14)}5${input.browserProfileId.slice(15)}`;
+    return respondJson(response, { participantId: browserParticipantId, credential: `credential-${input.browserProfileId}` }, 201);
+  }
   if (request.method === "GET" && url.pathname === base) return respondJson(response, {
     profile,
-    capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+    capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
   });
   if (request.method === "GET" && url.pathname === `${base}/me`) return respondJson(response, {
-    principal: { subjectId: "subject-1", displayName: "利用者", redmineUserId: 7, source: "host-session" }
+    principal: { participantId: browserParticipantId, displayName: "利用者", source: "participant-credential" }
   });
   if (request.method === "GET" && url.pathname === `${base}/threads`) {
     if (url.searchParams.has("resourceKind")) return respondJson(response, { threads: created ? [threadSummary] : [], nextCursor: null });
@@ -118,6 +123,7 @@ const server = createServer(async (request, response) => {
 });
 
 let created = false;
+let browserParticipantId = "00000000-0000-4000-8000-000000000007";
 await new Promise((resolvePromise, reject) => {
   server.once("error", reject);
   server.listen(0, "127.0.0.1", () => resolvePromise(undefined));
@@ -183,7 +189,9 @@ try {
   });
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
   await page.getByLabel("最初のコメント").fill("実ブラウザからの初回投稿");
-  await page.getByRole("button", { name: "最初の投稿をRedmineへ送信" }).click();
+  await page.getByRole("button", { name: "場所を選択" }).click();
+  await page.mouse.click(100, 100);
+  await page.getByRole("button", { name: "Feedbackを送信" }).click();
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
 
   await page.getByRole("button", { name: "閉じる" }).click();
@@ -234,7 +242,7 @@ try {
   assert(create);
   assert.equal(create.origin, origin);
   assert.equal(create.fetchSite, "same-origin");
-  assert.equal(create.csrf, "browser-smoke-csrf");
+  assert.match(create.participant ?? "", /^credential-[0-9a-f-]{36}$/u);
   assert.match(create.idempotencyKey ?? "", /^[0-9a-f-]{36}$/u);
   assert.match(create.contentType ?? "", /^multipart\/form-data; boundary=/u);
   assert(create.bodyBytes > 0);

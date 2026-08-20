@@ -1,10 +1,14 @@
 {
   "name": "@feedback/redmine-plugin",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "業務アプリへ埋め込むDBレスRedmine Feedback JavaScript plugin",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,15 +22,18 @@
       "import": "./dist/loader.js"
     }
   },
-  "publishConfig": { "access": "restricted" },
+  "publishConfig": {
+    "access": "restricted"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@feedback/redmine-core": "1.0.0-alpha.1",
-    "@feedback/redmine-react": "1.0.0-alpha.1"
+    "@feedback/core": "1.0.0-alpha.2",
+    "@feedback/redmine-core": "1.0.0-alpha.2",
+    "@feedback/redmine-react": "1.0.0-alpha.2"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

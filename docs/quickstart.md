@@ -1,8 +1,8 @@
 # Redmine正本SPA Quickstart
 
 新規導入の標準構成は、Feedback pluginをSPA bundleへ同梱し、同一originのstateless gatewayからRedmineへ接続する方式である。
-Feedback専用PostgreSQL、object storage、OIDC Provider、browser拡張機能は必要ない。返信、編集、担当、優先度、状態変更は
-Redmine UIで行い、Feedback UIは初回投稿、証跡添付、スレッド参照を担当する。
+Feedback専用PostgreSQL、object storage、OIDC Provider、browser拡張機能は必要ない。利用者はFeedback UIから位置指定投稿、
+返信、自己編集を行い、開発者はRedmineから返信、担当、優先度、状態を更新する。双方の更新は同じRedmine issue/journalから表示される。
 
 ## 1. Redmineを準備する
 
@@ -12,12 +12,12 @@ secret managerに保存し、SPA、HTML、runtime config、browser storageへ渡
 
 ## 2. gatewayを組み込む
 
-`@feedback/redmine-gateway`をホストbackendの既存session middleware後段へmountし、
-`/internal/feedback-redmine/v1`をSPAと同じoriginで公開する。`FeedbackRedmineGatewayHost`へ既存の認証、profile認可、
-resource認可、保存済みresourceの再認可、CSRF検証を接続する。詳細は[`redmine-gateway.md`](redmine-gateway.md)を参照する。
+`@feedback/redmine-gateway`を`/internal/feedback-redmine/v1`としてSPAと同じoriginで公開する。Redmine API keyに加え、
+32 bytes以上のparticipant署名鍵をsecret managerから`participantSigningKey`へ注入する。SDKはOIDC JWTやhost sessionをgatewayへ
+送らない。初回にgatewayが署名したparticipant credentialを取得し、同じorigin・browser profileのlocalStorageへ保存する。
 
-`apps/feedback-redmine-gateway-reference`はローカル確認用であり、demo session adapterは業務resourceを認可しない。
-本番へそのまま配備せず、必ずホスト固有のadapterへ置き換える。
+公開participant modeでは読み取り、新規投稿、返信を同一origin利用者へ公開する。Origin/Fetch Metadata検査は認証ではなく、
+participant credentialも自己編集の所有確認だけを目的とする。gateway自体の公開範囲を狭める場合は外側へアクセス制御を追加する。
 
 ## 3. SPAへ同梱する
 
@@ -30,8 +30,9 @@ import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/
 export const feedback = createRedmineFeedbackPluginController({
   profileId: "inventory-production",
   adapter,
-  getCsrfToken: () =>
-    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
+  contextMenu: true,
+  targetResolver: mapTargetResolver,
+  pinPositionProvider: mapPinPositionProvider,
   onUnavailable: (error) => console.error("Feedbackを利用できません", error)
 });
 
@@ -48,6 +49,10 @@ export function disposeFeedback(): void {
 
 feature flag未指定時は有効を既定とする。`setEnabled(false)`は進行中request、polling、購読、React rootとcontroller所有DOMを
 破棄するが、draft、follow、pending intentは保持する。再度`true`にするとdynamic importから再mountする。
+
+通常クリックの「場所を選択」は`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
+`contextMenu: true`の場合だけ右クリック投稿を有効化する。MapLibreでは`@feedback/maplibre`のtarget resolverとpin providerを渡す。
+スクリーンショットは位置選択後にpreviewするが、添付checkboxは既定OFFであり、画像なしでも送信できる。
 
 ## 4. 確認する
 
@@ -66,6 +71,7 @@ digest固定conformanceを含み、未実行を成功として扱わない。
 - 一時停止: feature flagをfalseにし、`setEnabled(false)`を呼ぶ。SPAの再buildは不要で、ローカル状態は保持する。
 - 完全撤去: 先に`await feedback.purgeLocalState()`で現在origin・profileの端末状態だけを削除し、integration moduleの呼出し、
   `@feedback/redmine-plugin`依存、gateway mountを削除する。
+- `purgeLocalState()`はparticipant credentialも削除する。再有効化後は新しいUUIDとなり、以前の投稿を自己編集できない。
 - Redmineのissue、journal、attachment、custom fieldsはpluginの無効化・撤去では削除しない。
 
 本番稼働済みの旧Feedback runtimeは存在しない前提のため、DB migration、dual-write、read-only移行期間、rollback用データ変換は

@@ -58,19 +58,13 @@
     "author": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source", "subjectId", "displayName", "redmineUserId"],
+      "required": ["source", "participantId", "displayName"],
       "properties": {
-        "source": { "const": "host-session" },
-        "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "source": { "const": "participant-credential" },
+        "participantId": { "type": "string", "format": "uuid" },
         "displayName": {
           "oneOf": [
             { "type": "string", "minLength": 1, "maxLength": 200 },
-            { "type": "null" }
-          ]
-        },
-        "redmineUserId": {
-          "oneOf": [
-            { "type": "integer", "minimum": 1 },
             { "type": "null" }
           ]
         }

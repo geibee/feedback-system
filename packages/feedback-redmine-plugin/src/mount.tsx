@@ -52,7 +52,6 @@ export function createRedmineFeedbackPlugin(
     const transport = new GatewayRedmineFeedbackTransport({
       profileId: options.profileId,
       gatewayBasePath: options.gatewayBasePath,
-      getCsrfToken: options.getCsrfToken,
       diagnostics
     });
     clientState = createBrowserClientState({
@@ -63,7 +62,10 @@ export function createRedmineFeedbackPlugin(
       port: transport,
       clientState,
       adapter: options.adapter,
-      profileId: options.profileId
+      profileId: options.profileId,
+      contextMenu: options.contextMenu ?? false,
+      targetResolver: options.targetResolver,
+      pinPositionProvider: options.pinPositionProvider
     }}>
       <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
     </RedmineFeedbackProvider>);

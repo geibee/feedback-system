@@ -10,3 +10,5 @@ DOM、React、Chrome API、Node.js組み込みmodule、filesystem、process環�
 trusted connectorはGETの429/5xxだけを上限付きretryし、POST結果不明時はthread検索だけで回収します。
 `createThreadWithDisposition()`は確認済み新規作成を`created`、既存または結果不明の回収を`recovered`として返すため、
 gatewayはOpenAPIどおり201/200を選択できます。401は`redmine.invalid_api_key`へ変換し、upstream bodyやAPI keyを公開しません。
+participant replyは署名付きjournal、編集はversion付きの追記journalとして保存し、`Thread.messages`へ最新版と履歴をfoldします。
+最初のコメントの編集はdescriptionとedit journalを同じRedmine PUTで更新し、終了statusでは返信だけを拒否します。

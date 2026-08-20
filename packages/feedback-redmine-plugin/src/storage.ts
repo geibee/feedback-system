@@ -35,6 +35,12 @@ export function purgeBrowserClientState(options: PurgeBrowserClientStateOptions)
       firstError ??= error;
     }
   }
+  try {
+    local.removeItem(`feedback.redmine.participant.v1:${origin}:${options.profileId}`);
+    local.removeItem(`feedback.redmine.participant-name.v1:${options.profileId}`);
+  } catch (error) {
+    firstError ??= error;
+  }
   if (firstError !== undefined) throw firstError;
 }
 

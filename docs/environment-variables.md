@@ -1,6 +1,6 @@
 # 環境変数
 
-新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。profile ID、host adapter、CSRF callback、feature flagは
+新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。profile ID、host adapter、feature flagは
 SPAの明示的なintegration moduleから渡し、Redmine接続情報やsecretをbrowserへ渡さない。
 
 ## Redmine gateway（標準）
@@ -13,14 +13,15 @@ SPAの明示的なintegration moduleから渡し、Redmine接続情報やsecret�
 ```text
 FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
 FEEDBACK_REDMINE_GATEWAY_API_KEY
-FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET
+FEEDBACK_PARTICIPANT_SIGNING_KEY
 ```
 
-profile fileはread-only server profile JSONへのabsolute pathである。API keyはFeedback専用integration user用、session secretは
-demo session署名用で、いずれも必須かつ既定値を持たない。API keyと署名鍵をprofile file、image、SPAへ記載しない。
+profile fileはread-only server profile JSONへのabsolute pathである。API keyはFeedback専用integration user用、participant signing keyは
+browser profile用credentialとRedmine message markerのHMAC署名用で、いずれも必須かつ既定値を持たない。署名鍵は32 bytes以上とし、
+API keyとともにprofile file、image、SPAへ記載しない。鍵を変更すると既存localStorage credentialは無効になり、新participant採番が必要になる。
 
-referenceのdemo session adapterは業務resourceを認可しないため本番利用禁止である。本番では既存session・resource authorization・
-CSRF実装を`FeedbackRedmineGatewayHost`へ注入する。
+library組込時も環境変数名そのものは契約ではない。配備環境のsecret managerから`participantSigningKey`へ値を注入し、
+Redmine API keyとparticipant signing keyをlog、metric、problem responseへ含めない。
 
 Redmine Docker適合性試験だけが次を使用し、本番runtimeへ設定しない。
 

@@ -1,10 +1,14 @@
 {
   "name": "@feedback/dom-capture",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "Feedback共通のDOMスクリーンショット取得provider",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,14 +18,16 @@
       "import": "./dist/index.js"
     }
   },
-  "publishConfig": { "access": "restricted" },
+  "publishConfig": {
+    "access": "restricted"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@feedback/core": "1.0.0-alpha.1",
+    "@feedback/core": "1.0.0-alpha.2",
     "html-to-image": "1.11.13"
   },
   "devDependencies": {

@@ -28,6 +28,7 @@ export type RedmineConnectorProfile = {
   defaultPriorityId: number | null;
   customFieldIds: RedmineCustomFieldIds;
   showRedmineLink: boolean;
+  closedStatusIds?: number[];
 };
 
 const profileIdPattern = /^[a-z0-9][a-z0-9._-]{0,99}$/;
@@ -115,6 +116,10 @@ export function validateConnectorProfile(
   if (typeof value.isPrivate !== "boolean" || typeof value.showRedmineLink !== "boolean") {
     throw contractError("isPrivate/showRedmineLinkはbooleanである必要があります");
   }
+  if (value.closedStatusIds !== undefined && (
+    !Array.isArray(value.closedStatusIds) || value.closedStatusIds.some((id) => !Number.isInteger(id) || id < 1) ||
+    new Set(value.closedStatusIds).size !== value.closedStatusIds.length
+  )) throw contractError("closedStatusIdsが不正です");
   const ids = redmineCustomFieldKeys.map((key) => {
     const id = value.customFieldIds[key];
     integerRange(id, `customFieldIds.${key}`, 1, Number.MAX_SAFE_INTEGER);

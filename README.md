@@ -1,9 +1,9 @@
 # Feedback System
 
 React SPAへ画面内フィードバックを追加し、Redmine issue・journal・attachment・custom fieldを唯一の業務データ正本として使う
-pluginとsame-origin gatewayです。Feedback専用DBやobject storageを新設せず、ホストアプリの既存sessionとresource認可を利用します。
+pluginとsame-origin gatewayです。Feedback専用DBやobject storageを新設せず、利用者をRedmineへログインさせずにUI内で会話を完結させます。
 
-> 現在のバージョンは`1.0.0-alpha.1`です。npm packageはregistry公開前のため、repository workspaceまたは
+> 現在のバージョンは`1.0.0-alpha.2`です。npm packageはregistry公開前のため、repository workspaceまたは
 > release builderが生成するtarballから利用します。
 
 ## 標準構成
@@ -15,7 +15,7 @@ React SPA
        ▼
 same-origin /internal/feedback-redmine/v1
   └─ @feedback/redmine-gateway
-       │  session認証・resource認可・CSRF
+       │  Origin/Fetch Metadata・participant credential
        │  server-side integration API key
        ▼
 Redmine
@@ -24,8 +24,8 @@ Redmine
   └─ context / evidence attachment
 ```
 
-Feedback UIは初回投稿、任意のスクリーンショット、スレッド参照を提供します。返信、編集、担当、優先度、状態変更は
-Redmine UIで行います。gatewayはstatelessで、DB、queue、cache、filesystem upload、object storageを持ちません。
+Feedback UIは任意位置の投稿、任意のスクリーンショット、返信、自己編集、編集履歴、未読、Redmine更新の自動反映を提供します。
+担当、優先度、状態変更は開発者がRedmineで行います。gatewayはstatelessで、DB、queue、cache、filesystem upload、object storageを持ちません。
 
 ブラウザ拡張機能は配布しません。pluginをSPA buildへ同梱し、hostのfeature flagからいつでも有効化・無効化できる境界を
 標準にします。
@@ -40,8 +40,9 @@ import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/
 const feedback = createRedmineFeedbackPluginController({
   profileId: "inventory-production",
   adapter,
-  getCsrfToken: () =>
-    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
+  contextMenu: true,
+  targetResolver: mapTargetResolver,
+  pinPositionProvider: mapPinPositionProvider,
   onUnavailable: (error) => console.error("Feedbackを利用できません", error)
 });
 
@@ -69,20 +70,20 @@ browserへ渡す公開optionはありません。
 - Node.js 22以上25未満とnpm
 - REST APIを有効化したRedmine 5.1.12以上
 - React 18または19のSPA
-- 既存session認証とresource認可を提供できるホストbackend
+- 32 bytes以上のparticipant署名鍵をsecretとして注入できるsame-origin backend
 
 1. Redmineに専用project、tracker、integration user、11 custom fieldsを作る。
-2. `@feedback/redmine-gateway`を既存認証middleware後段へsame-originでmountする。
+2. `@feedback/redmine-gateway`をsame-originでmountし、participant署名鍵を注入する。
 3. integration userのAPI keyをserver-side secretだけから注入する。
 4. SPAに`@feedback/redmine-plugin`を同梱し、loader controllerをfeature flagへ接続する。
-5. 初回投稿、参照、無効化、再有効化をstagingで確認する。
+5. 位置指定投稿、返信、自己編集、Redmine側返信の反映、無効化、再有効化をstagingで確認する。
 
 詳しい手順は[`docs/quickstart.md`](docs/quickstart.md)、Redmine準備は
 [`docs/redmine-integration.md`](docs/redmine-integration.md)、gateway SPIは
 [`docs/redmine-gateway.md`](docs/redmine-gateway.md)を参照してください。
 
-`apps/feedback-redmine-gateway-reference`はローカル確認用です。demo session adapterは業務resourceを認可しないため、
-本番では必ずホスト固有の認証・認可・CSRF adapterへ置き換えます。
+`apps/feedback-redmine-gateway-reference`は公開participant modeの最小構成です。同一origin検査はCSRF緩和であり、実在人物の
+認証ではありません。公開範囲を限定する必要がある環境ではgatewayの外側に別のアクセス制御を置きます。
 
 ## 開発と検証
 
@@ -105,7 +106,7 @@ bash scripts/build-feedback-redmine-release.sh \
   --version 1.0.0-rc.1
 ```
 
-Redmine releaseには`@feedback/contracts`、共有core/DOM capture、Redmine core/UI/plugin/gatewayのtarball、manifest、SHA-256を含みます。
+Redmine releaseには`@feedback/contracts`、共有core/DOM capture/React UI、MapLibre、Redmine core/UI/plugin/gatewayのtarball、manifest、SHA-256を含みます。
 ブラウザ拡張ZIP、React runtime入りbundle、reference gateway imageは含みません。詳細は[`docs/release.md`](docs/release.md)を
 参照してください。
 
@@ -113,7 +114,7 @@ Redmine releaseには`@feedback/contracts`、共有core/DOM capture、Redmine co
 
 - Gateway OpenAPI: [`contracts/feedback/redmine-gateway.openapi.yaml`](contracts/feedback/redmine-gateway.openapi.yaml)
 - JSON Schema: [`contracts/feedback/schemas`](contracts/feedback/schemas)
-- npm packages: `@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、`@feedback/redmine-core`、
+- npm packages: `@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、`@feedback/react-ui`、`@feedback/maplibre`、`@feedback/redmine-core`、
   `@feedback/redmine-react`、`@feedback/redmine-plugin`、`@feedback/redmine-gateway`
 - Redmine保存契約: issue custom fields、description metadata、`feedback-context-v1.json`
 

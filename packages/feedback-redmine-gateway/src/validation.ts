@@ -1,6 +1,8 @@
 import type {
   FeedbackHostResourceRefV1,
   RedmineEvidenceMetadata,
+  RedmineMessageCreateInput,
+  RedmineMessageUpdateInput,
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadSort
@@ -51,8 +53,8 @@ export function parseListQuery(query: URLSearchParams): {
 export function parseCreateRequest(value: unknown, profileId: string): RedmineThreadCreateInput {
   const item = exact(value, [
     "resourceRef", "threadId", "intentId", "comment", "perspectiveCode", "location", "target", "release", "locale",
-    "capturedAt", "evidence"
-  ], "create request");
+    "capturedAt", "evidence", "participantName"
+  ], "create request", ["participantName"]);
   const location = exact(item.location, ["schemaVersion", "pageKey", "routeTemplate", "pathParameters", "queryParameters"], "location", ["queryParameters"]);
   if (location.schemaVersion !== "1") invalid("location schemaVersionが不正です");
   stringMap(location.pathParameters, "pathParameters");
@@ -81,7 +83,51 @@ export function parseCreateRequest(value: unknown, profileId: string): RedmineTh
     release: bounded(item.release, "release", 100),
     locale: bounded(item.locale, "locale", 35),
     capturedAt: dateTime(item.capturedAt, "capturedAt"),
-    evidence
+    evidence,
+    participantName: participantName(item.participantName)
+  };
+}
+
+export function parseCreateParticipantRequest(value: unknown): { browserProfileId: string } {
+  const item = exact(value, ["browserProfileId"], "participant request");
+  return { browserProfileId: uuid(item.browserProfileId, "browserProfileId") };
+}
+
+export function parseCreateMessageRequest(
+  value: unknown,
+  profileId: string,
+  threadId: string,
+  intentId: string
+): RedmineMessageCreateInput {
+  const item = exact(value, ["messageId", "body", "participantName"], "message request");
+  return {
+    profileId,
+    threadId,
+    intentId,
+    resourceRef: { schemaVersion: "1", kind: "page", key: "validated-by-handler" },
+    messageId: uuid(item.messageId, "messageId"),
+    body: bounded(item.body, "body", 20_000),
+    participantName: participantName(item.participantName)
+  };
+}
+
+export function parseUpdateMessageRequest(
+  value: unknown,
+  profileId: string,
+  threadId: string,
+  messageId: string,
+  intentId: string
+): RedmineMessageUpdateInput {
+  const item = exact(value, ["body", "expectedVersion", "participantName"], "message update request");
+  return {
+    profileId,
+    threadId,
+    messageId,
+    intentId,
+    resourceRef: { schemaVersion: "1", kind: "page", key: "validated-by-handler" },
+    body: bounded(item.body, "body", 20_000),
+    expectedVersion: integer(item.expectedVersion, "expectedVersion", 1, Number.MAX_SAFE_INTEGER),
+    participantName: participantName(item.participantName)
   };
 }
 
@@ -225,6 +271,11 @@ function dateTime(value: unknown, name: string): string {
   const result = bounded(value, name, 100);
   if (!Number.isFinite(Date.parse(result))) invalid(`${name}がdate-timeではありません`);
   return result;
+}
+
+function participantName(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  return bounded(value, "participantName", 100);
 }
 
 function stringMap(value: unknown, name: string): void {

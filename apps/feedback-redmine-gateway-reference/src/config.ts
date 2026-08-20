@@ -7,7 +7,7 @@ export type ReferenceGatewayConfig = {
   port: number;
   profiles: Map<string, GatewayServerProfile>;
   secrets: Map<string, string>;
-  sessionSecret: string;
+  participantSigningKey: string;
 };
 
 export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = process.env): ReferenceGatewayConfig {
@@ -15,11 +15,14 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
   if (!path) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEは必須です");
   if (!isAbsolute(path)) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEはabsolute pathである必要があります");
   const apiKey = requiredSecret(environment, "FEEDBACK_REDMINE_GATEWAY_API_KEY");
-  const sessionSecret = requiredSecret(environment, "FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET");
+  const participantSigningKey = requiredSecret(environment, "FEEDBACK_PARTICIPANT_SIGNING_KEY");
+  if (new TextEncoder().encode(participantSigningKey).byteLength < 32) {
+    throw new Error("FEEDBACK_PARTICIPANT_SIGNING_KEYは32 bytes以上必要です");
+  }
   const document = parseJsonFile(path, "gateway profile file");
   const value = exactObject(document, [
     "profileId", "clientProfileRef", "redmineBaseUrl", "projectId", "trackerId", "isPrivate", "defaultPriorityId",
-    "customFieldIds", "authorizationMode", "showRedmineLink", "secretRef"
+    "customFieldIds", "authorizationMode", "showRedmineLink", "secretRef", "closedStatusIds"
   ], "gateway profile");
   if (typeof value.clientProfileRef !== "string" || !value.clientProfileRef) {
     throw new Error("clientProfileRefが不正です");
@@ -40,7 +43,8 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
     isPrivate: value.isPrivate,
     defaultPriorityId: value.defaultPriorityId,
     customFieldIds: value.customFieldIds,
-    showRedmineLink: value.showRedmineLink
+    showRedmineLink: value.showRedmineLink,
+    closedStatusIds: value.closedStatusIds
   } as GatewayServerProfile;
   const connector = validateConnectorProfile(candidate, {
     allowHttpDevelopment: environment.NODE_ENV === "development"
@@ -55,7 +59,7 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
   secrets.set("FEEDBACK_REDMINE_GATEWAY_API_KEY", apiKey);
   const port = Number(environment.PORT ?? "8080");
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error("PORTが不正です");
-  return { port, profiles, secrets, sessionSecret };
+  return { port, profiles, secrets, participantSigningKey };
 }
 
 function requiredSecret(environment: NodeJS.ProcessEnv, name: string): string {

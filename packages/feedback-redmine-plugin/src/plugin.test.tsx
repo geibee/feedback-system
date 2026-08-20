@@ -61,8 +61,13 @@ const emptyThread = {
   diagnosticCount: 0
 } satisfies RedmineThreadV1;
 
+function publicParticipantId(browserProfileId: string): string {
+  return `${browserProfileId.slice(0, 14)}5${browserProfileId.slice(15)}`;
+}
+
 afterEach(() => {
   document.body.replaceChildren();
+  localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -81,7 +86,7 @@ describe("plugin validation", () => {
 
   it("公開optionへAPI keyやRedmine URLを混入できない", () => {
     const mount = document.createElement("div");
-    const base = { mount, profileId: profile.id, adapter, getCsrfToken: () => "csrf" };
+    const base = { mount, profileId: profile.id, adapter };
     expect(validatePluginOptions(base).gatewayBasePath).toBe("/internal/feedback-redmine/v1");
     expect(() => validatePluginOptions({ ...base, apiKey: "secret" } as never)).toThrow(/unknown property/u);
     expect(() => validatePluginOptions({ ...base, redmineBaseUrl: "https://redmine.invalid" } as never)).toThrow(/unknown property/u);
@@ -92,12 +97,11 @@ describe("gateway transport", () => {
   it("GETをsame-origin/no-storeへ固定し任意URLを受け付けない", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       profile,
-      capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+      capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
     }), { headers: { "content-type": "application/json" } }));
     const transport = new GatewayRedmineFeedbackTransport({
       profileId: profile.id,
       gatewayBasePath: "/internal/feedback-redmine/v1",
-      getCsrfToken: () => "csrf",
       fetch
     });
     await transport.getCapabilities(profile.id);
@@ -113,11 +117,10 @@ describe("gateway transport", () => {
     const transport = new GatewayRedmineFeedbackTransport({
       profileId: profile.id,
       gatewayBasePath: "/internal/feedback-redmine/v1",
-      getCsrfToken: () => "csrf",
       diagnostics,
       fetch: vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
         profile,
-        capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+        capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
       }), { status: 200, headers: { "content-type": "application/json" } }))
     });
     await transport.getCapabilities(profile.id);
@@ -137,15 +140,23 @@ describe("gateway transport", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:diagnostic");
   });
 
-  it("createへCSRFとIdempotency-Keyを必須設定する", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ thread: emptyThread }), {
-      status: 201,
-      headers: { "content-type": "application/json" }
-    }));
+  it("createへparticipant credentialとIdempotency-Keyを設定する", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      if (String(input).endsWith("/participants")) {
+        const browserProfileId = (JSON.parse(String(init?.body)) as { browserProfileId: string }).browserProfileId;
+        return new Response(JSON.stringify({ participantId: publicParticipantId(browserProfileId), credential: "signed-credential".repeat(4) }), {
+          status: 201,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ thread: emptyThread }), {
+        status: 201,
+        headers: { "content-type": "application/json" }
+      });
+    });
     const transport = new GatewayRedmineFeedbackTransport({
       profileId: profile.id,
       gatewayBasePath: "/internal/feedback-redmine/v1",
-      getCsrfToken: () => "csrf-token",
       fetch
     });
     await transport.createThread({
@@ -162,10 +173,44 @@ describe("gateway transport", () => {
       capturedAt: "2026-08-19T00:00:00Z",
       evidence: null
     }, null);
-    const init = fetch.mock.calls[0]?.[1] as RequestInit;
-    expect(new Headers(init.headers).get("X-Feedback-CSRF")).toBe("csrf-token");
+    const init = fetch.mock.calls[1]?.[1] as RequestInit;
+    expect(new Headers(init.headers).get("X-Feedback-Participant-Credential")).toBe("signed-credential".repeat(4));
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe("00000000-0000-4000-8000-000000000002");
     expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it("participantをlocalStorageで再利用し、storage削除後は新しいUUIDを採番する", async () => {
+    const issued: string[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_input, init) => {
+      const browserProfileId = (JSON.parse(String(init?.body)) as { browserProfileId: string }).browserProfileId;
+      issued.push(browserProfileId);
+      return new Response(JSON.stringify({ participantId: publicParticipantId(browserProfileId), credential: `credential-${browserProfileId}` }), {
+        status: 201,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    const first = new GatewayRedmineFeedbackTransport({
+      profileId: profile.id,
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      fetch
+    });
+    const initial = await first.getOrCreateParticipant(profile.id);
+    const reused = await new GatewayRedmineFeedbackTransport({
+      profileId: profile.id,
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      fetch
+    }).getOrCreateParticipant(profile.id);
+    expect(reused.participantId).toBe(initial.participantId);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    localStorage.clear();
+    const replaced = await new GatewayRedmineFeedbackTransport({
+      profileId: profile.id,
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      fetch
+    }).getOrCreateParticipant(profile.id);
+    expect(replaced.participantId).not.toBe(initial.participantId);
+    expect(issued).toHaveLength(2);
   });
 
   it("attachmentを上限内で読込み、filenameとSHA-256を検証する", async () => {
@@ -179,7 +224,6 @@ describe("gateway transport", () => {
     const transport = new GatewayRedmineFeedbackTransport({
       profileId: profile.id,
       gatewayBasePath: "/internal/feedback-redmine/v1",
-      getCsrfToken: () => "csrf",
       fetch
     });
     const result = await transport.getAttachment({
@@ -208,18 +252,22 @@ describe("plugin lifecycleとstorage", () => {
   it("Shadow DOMへmountし二重mountを拒否、destroyを冪等にする", async () => {
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>(async (input) => {
       const url = String(input);
+      if (url.endsWith("/participants")) return new Response(JSON.stringify({
+        participantId: "00000000-0000-4000-8000-000000000007",
+        credential: "signed-credential".repeat(4)
+      }), { status: 201, headers: { "content-type": "application/json" } });
       if (url.endsWith("/me")) return new Response(JSON.stringify({
-        principal: { subjectId: "subject-1", displayName: "利用者", redmineUserId: 7, source: "host-session" }
+        principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify({
         profile,
-        capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+        capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
       }), { headers: { "content-type": "application/json" } });
     }));
     const mount = document.createElement("div");
     document.body.append(mount);
-    const handle = createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter, getCsrfToken: () => "csrf" });
-    expect(() => createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter, getCsrfToken: () => "csrf" })).toThrow(/二重mount/u);
+    const handle = createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter });
+    expect(() => createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter })).toThrow(/二重mount/u);
     await waitFor(() => expect(mount.shadowRoot?.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")).toBeTruthy());
     fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")!);
     handle.destroy();
@@ -249,15 +297,19 @@ describe("plugin lifecycleとstorage", () => {
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>(async (input, init) => {
       if (init?.signal instanceof AbortSignal) signals.push(init.signal);
       const url = String(input);
+      if (url.endsWith("/participants")) return new Response(JSON.stringify({
+        participantId: "00000000-0000-4000-8000-000000000007",
+        credential: "signed-credential".repeat(4)
+      }), { status: 201, headers: { "content-type": "application/json" } });
       if (url.endsWith("/me")) return new Response(JSON.stringify({
-        principal: { subjectId: "subject-1", displayName: "利用者", redmineUserId: 7, source: "host-session" }
+        principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
       if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], nextCursor: null }), {
         headers: { "content-type": "application/json" }
       });
       return new Response(JSON.stringify({
         profile,
-        capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+        capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
       }), { headers: { "content-type": "application/json" } });
     }));
     let activeSubscriptions = 0;
@@ -278,7 +330,6 @@ describe("plugin lifecycleとstorage", () => {
       mount,
       profileId: profile.id,
       adapter: lifecycleAdapter,
-      getCsrfToken: () => "csrf"
     });
     await waitFor(() => expect(mount.shadowRoot?.querySelector("button[aria-label='Feedbackを開く']")).toBeTruthy());
     fireEvent.click(mount.shadowRoot!.querySelector<HTMLButtonElement>("button[aria-label='Feedbackを開く']")!);

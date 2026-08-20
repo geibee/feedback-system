@@ -24,7 +24,6 @@ const adapter: FeedbackRedmineHostAdapter = {
 const baseOptions: RedmineFeedbackPluginControllerOptions = {
   profileId: "inventory-production",
   adapter,
-  getCsrfToken: () => "csrf"
 };
 
 function handle(): RedmineFeedbackPluginHandle {

@@ -11,7 +11,9 @@ import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/
 const feedback = createRedmineFeedbackPluginController({
   profileId: "inventory-production",
   adapter,
-  getCsrfToken: () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
+  contextMenu: true,
+  targetResolver,
+  pinPositionProvider,
   onUnavailable: (error) => console.error("Feedbackを利用できません", error)
 });
 
@@ -31,12 +33,16 @@ const dispose = () => {
 host所有要素を`mount`へ指定した場合は、plugin内容だけを破棄してhost要素を残します。`purgeLocalState()`は
 完全撤去時などに現在origin・profileのdraft、follow、pending intentを明示削除する操作で、通常の
 `setEnabled(false)`や`destroy()`は保存内容を削除しません。
+participant credentialも完全撤去時だけ削除され、再発行後は以前の自己編集権を復元できません。
 
 手動でライフサイクルを管理する場合は、従来どおりpackage rootの`createRedmineFeedbackPlugin()`へmount先、
-profile ID、host adapter、CSRF token callbackを渡せます。
+profile ID、host adapterを渡せます。`contextMenu: true`を明示した場合だけ右クリック投稿を有効化します。
 
 Redmine API key、Redmine URL、project/tracker/custom field IDは公開optionに存在しません。通信先は同一originの
 relative gateway pathだけで、`credentials`と`mode`を`same-origin`へ固定します。
+初回に非公開browser profile UUIDを採番し、gatewayが別に導出した公開participant UUIDと署名済みcredentialをorigin/profile別の
+localStorageへ保存します。OIDC JWTやhost session tokenをrequest bodyへ渡しません。非公開UUIDはRedmineや会話応答へ出しません。
+localStorage削除後は新しいparticipant UUIDを採番し、以前の自己編集権は復元しません。
 
 React 18または19とReact DOMはpeer dependencyです。SPAが使用するReact runtimeを共有し、plugin専用のReact runtimeや
 self-hosted bundleは配布しません。配布buildはJavaScript source mapを含めず、Shadow DOM内へ共通styleを閉じ込めます。

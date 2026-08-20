@@ -126,19 +126,24 @@ function setup(
   const createThread = vi.fn<RedmineFeedbackPort["createThread"]>().mockResolvedValue(threadDetail);
   if (options.createError) createThread.mockRejectedValue(options.createError);
   const port: RedmineFeedbackPort = {
+    getOrCreateParticipant: vi.fn().mockResolvedValue({
+      participantId: "00000000-0000-4000-8000-000000000007",
+      credential: "credential".repeat(8)
+    }),
     getCapabilities: vi.fn().mockResolvedValue({
       profile: clientProfile,
-      capabilities: { canRead: true, canCreate: true, repliesReadOnly: true, stateReadOnly: true }
+      capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
     }),
     getCurrentUser: vi.fn().mockResolvedValue({
-      subjectId: "subject-1",
+      participantId: "00000000-0000-4000-8000-000000000007",
       displayName: "利用者",
-      redmineUserId: 7,
-      source: "host-session"
+      source: "participant-credential"
     }),
     listThreads,
     getThread,
     createThread,
+    createMessage: vi.fn().mockResolvedValue(threadDetail),
+    updateMessage: vi.fn().mockResolvedValue(threadDetail),
     getAttachment: vi.fn().mockResolvedValue({
       bytes: new Uint8Array([1, 2, 3, 4]),
       filename: "evidence.png",
@@ -211,7 +216,7 @@ describe("Redmine共通UI", () => {
     expect(screen.queryByRole("button", { name: "さらに読み込む" })).toBeNull();
   });
 
-  it("全reply/activity/attachmentをread-only drawerへ表示する", async () => {
+  it("全reply/activity/attachmentをdrawerへ表示して返信できる", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Feedbackを開く" }));
     fireEvent.click(await screen.findByRole("button", { name: /新規.*最初のコメント.*最新の返信/su }));
@@ -219,7 +224,7 @@ describe("Redmine共通UI", () => {
     expect(screen.getByText(/statusを変更/u)).toBeTruthy();
     expect(screen.getByText(/evidence\.png/u)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Redmineで開く" })).toHaveProperty("rel", "noopener noreferrer");
-    expect(screen.queryByRole("textbox", { name: /返信/u })).toBeNull();
+    expect(screen.getByRole("textbox", { name: /返信/u })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /resolve|reopen|reaction|triage/iu })).toBeNull();
   });
 
@@ -234,18 +239,20 @@ describe("Redmine共通UI", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:test");
   });
 
-  it("Feedback UIから最初の投稿だけを作成する", async () => {
+  it("Feedback UIから位置付き投稿を作成する", async () => {
     const { createThread } = setup();
     fireEvent.click(screen.getByRole("button", { name: "Feedbackを開く" }));
     const textarea = await screen.findByLabelText("最初のコメント");
     fireEvent.change(textarea, { target: { value: "新しい指摘" } });
-    fireEvent.click(screen.getByRole("button", { name: "最初の投稿をRedmineへ送信" }));
+    fireEvent.click(screen.getByRole("button", { name: "場所を選択" }));
+    fireEvent.click(document.body, { clientX: 100, clientY: 100 });
+    fireEvent.click(screen.getByRole("button", { name: "Feedbackを送信" }));
     await waitFor(() => expect(createThread).toHaveBeenCalledTimes(1));
     expect(createThread.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       comment: "新しい指摘",
       perspectiveCode: "ux"
     }));
-    expect(screen.queryByText("返信を送信")).toBeNull();
+    expect(createThread.mock.calls[0]?.[0].target).toMatchObject({ kind: "screen-position" });
   });
 
   it("投稿結果不明ではpending intentをuncertainのまま保持する", async () => {
@@ -254,9 +261,11 @@ describe("Redmine共通UI", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Feedbackを開く" }));
     fireEvent.change(await screen.findByLabelText("最初のコメント"), { target: { value: "結果不明の投稿" } });
-    fireEvent.click(screen.getByRole("button", { name: "最初の投稿をRedmineへ送信" }));
+    fireEvent.click(screen.getByRole("button", { name: "場所を選択" }));
+    fireEvent.click(document.body, { clientX: 100, clientY: 100 });
+    fireEvent.click(screen.getByRole("button", { name: "Feedbackを送信" }));
     expect(await screen.findByText(/作成された可能性/u)).toBeTruthy();
-    const scopeHash = await sha256Hex(new TextEncoder().encode(`${profile.id}\nsubject-1`));
+    const scopeHash = await sha256Hex(new TextEncoder().encode(`${profile.id}\n00000000-0000-4000-8000-000000000007`));
     expect(await clientState.getPendingIntent(profile.id, scopeHash)).toMatchObject({
       clientDraftHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
       state: "uncertain"
@@ -276,14 +285,15 @@ describe("Redmine共通UI", () => {
     const { createThread } = setup(detail, { clientProfile: captureProfile, hostAdapter: { ...adapter, captureEvidence } });
     fireEvent.click(screen.getByRole("button", { name: "Feedbackを開く" }));
     fireEvent.change(await screen.findByLabelText("最初のコメント"), { target: { value: "画像付き指摘" } });
-    fireEvent.click(screen.getByRole("button", { name: "スクリーンショットを確認" }));
+    fireEvent.click(screen.getByRole("button", { name: "場所を選択" }));
+    fireEvent.click(document.body, { clientX: 100, clientY: 100 });
     expect(await screen.findByRole("img", { name: "送信前スクリーンショット" })).toHaveProperty("src", "blob:test");
     expect(captureEvidence).toHaveBeenCalledWith(expect.objectContaining({
       excludeSelector: "[data-feedback-redmine-ui]",
       maskSelector: "[data-feedback-mask]"
     }));
-    const submit = screen.getByRole("button", { name: "最初の投稿をRedmineへ送信" }) as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
+    const submit = screen.getByRole("button", { name: "Feedbackを送信" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
     fireEvent.click(screen.getByLabelText("この画像をRedmineへ送信する"));
     await waitFor(() => expect(submit.disabled).toBe(false));
     fireEvent.click(submit);

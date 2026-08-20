@@ -1,6 +1,6 @@
 {
   "name": "@feedback/admin-console",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,8 +10,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@feedback/admin-react": "1.0.0-alpha.1",
-    "@feedback/core": "1.0.0-alpha.1",
+    "@feedback/admin-react": "1.0.0-alpha.2",
+    "@feedback/core": "1.0.0-alpha.2",
     "oidc-client-ts": "3.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

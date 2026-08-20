@@ -28,9 +28,11 @@ export function useVisiblePolling(
     };
     start();
     document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("focus", visibility);
     return () => {
       stop();
       document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("focus", visibility);
     };
   }, [enabled, intervalMilliseconds]);
 }

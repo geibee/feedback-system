@@ -53,20 +53,21 @@ const profile = {
     threadId: 1, requestHash: 2, applicationKey: 3, environmentKey: 4, externalWorkspaceKey: 5, pageKey: 6,
     hostResourceKey: 7, perspectiveCode: 8, locator: 9, submittedById: 10, submittedByName: 11
   },
-  authorizationMode: "resource-scoped", showRedmineLink: false, secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY"
+  authorizationMode: "resource-scoped", showRedmineLink: false, secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY",
+  closedStatusIds: []
 };
 fs.writeFileSync(path.join(directory, "client.json"), `${JSON.stringify(client)}\n`);
 fs.writeFileSync(path.join(directory, "profile.json"), `${JSON.stringify(profile)}\n`);
 NODE
 
 gateway_api_key=$(openssl rand -hex 32)
-gateway_session_secret=$(openssl rand -hex 64)
+gateway_participant_secret=$(openssl rand -hex 64)
 docker run -d --name "$gateway_container" --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1::8080 \
   -v "$gateway_tmp:/config:ro" \
   -e FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE=/config/profile.json \
   -e FEEDBACK_REDMINE_GATEWAY_API_KEY="$gateway_api_key" \
-  -e FEEDBACK_REDMINE_GATEWAY_SESSION_SECRET="$gateway_session_secret" \
+  -e FEEDBACK_PARTICIPANT_SIGNING_KEY="$gateway_participant_secret" \
   "$gateway_image" >/dev/null
 
 gateway_port=$(docker port "$gateway_container" 8080/tcp | sed -E 's/.*:([0-9]+)$/\1/')
@@ -76,12 +77,12 @@ for _attempt in $(seq 1 40); do
   status=$(curl -sS -o /dev/null -w '%{http_code}' \
     -H "Origin: http://127.0.0.1:$gateway_port" -H 'Sec-Fetch-Site: same-origin' \
     "http://127.0.0.1:$gateway_port/internal/feedback-redmine/v1/profiles/container-smoke" || true)
-  if [[ "$status" == "401" ]]; then ready=1; break; fi
+  if [[ "$status" == "200" ]]; then ready=1; break; fi
   sleep 0.25
 done
 if [[ "$ready" != "1" ]]; then
   docker logs "$gateway_container" >&2 || true
-  fail "gateway imageのread-only起動probeが401になりません: HTTP $status"
+  fail "gateway imageのread-only起動probeが200になりません: HTTP $status"
 fi
 
 echo "[feedback-redmine-security] PASS"

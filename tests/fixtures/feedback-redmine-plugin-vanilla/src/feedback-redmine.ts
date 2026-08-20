@@ -34,7 +34,6 @@ export function createVanillaAdapter(): RedmineFeedbackPluginControllerOptions["
 const controller = createRedmineFeedbackPluginController({
   profileId: "inventory-production",
   adapter: createVanillaAdapter(),
-  getCsrfToken: () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
   onUnavailable: (error) => console.error("Feedback Redmineを利用できません", error)
 });
 

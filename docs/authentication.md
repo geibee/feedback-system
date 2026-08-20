@@ -1,7 +1,7 @@
 # 認証
 
 > **Legacy Feedback Service:** この文書はPostgreSQL版Feedback ServiceのOIDC/token exchange向けです。
-> Redmine正本SPAはホストの既存sessionをsame-origin gatewayで検証します。
+> Redmine正本SPAの公開participant modeはOIDC/session認証を使いません。gateway署名credentialは自己編集のbrowser profile所有確認だけに使います。
 
 Feedback Serviceは、Feedback audienceを持つBearer JWTの直接OIDC検証と、契約済みtoken exchange JWT検証を
 独立したtrust boundaryとして正式にサポートする。配備時は少なくとも一方を設定し、両方を併用する場合はissuerを

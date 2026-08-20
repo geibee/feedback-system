@@ -4,6 +4,9 @@ import type {
   RedmineCapabilitiesV1,
   RedmineClientProfileV1,
   RedmineCurrentPrincipalV1,
+  RedmineMessageCreateInput,
+  RedmineMessageUpdateInput,
+  RedmineParticipantV1,
   RedmineThreadCreateInput,
   RedmineThreadListInput,
   RedmineThreadListResult,
@@ -17,6 +20,7 @@ export type RedmineProfileResult = {
 };
 
 export interface RedmineFeedbackPort {
+  getOrCreateParticipant(profileId: string, signal?: AbortSignalLike): Promise<RedmineParticipantV1>;
   getCapabilities(profileId: string, signal?: AbortSignalLike): Promise<RedmineProfileResult>;
   getCurrentUser(profileId: string, signal?: AbortSignalLike): Promise<RedmineCurrentPrincipalV1>;
   listThreads(input: RedmineThreadListInput, signal?: AbortSignalLike): Promise<RedmineThreadListResult>;
@@ -26,6 +30,8 @@ export interface RedmineFeedbackPort {
     evidenceBytes: Uint8Array | null,
     signal?: AbortSignalLike
   ): Promise<RedmineThreadV1>;
+  createMessage(input: RedmineMessageCreateInput, signal?: AbortSignalLike): Promise<RedmineThreadV1>;
+  updateMessage(input: RedmineMessageUpdateInput, signal?: AbortSignalLike): Promise<RedmineThreadV1>;
   getAttachment(input: RedmineAttachmentInput, signal?: AbortSignalLike): Promise<RedmineAttachmentContent>;
 }
 

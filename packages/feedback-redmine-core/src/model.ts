@@ -70,6 +70,27 @@ export type RedmineThreadCreateInput = RedmineThreadLookupInput & {
   locale: string;
   capturedAt: string;
   evidence: RedmineEvidenceMetadata | null;
+  participantName?: string | null;
+};
+
+export type RedmineMessageCreateInput = RedmineThreadLookupInput & {
+  messageId: string;
+  intentId: string;
+  body: string;
+  participantName: string | null;
+};
+
+export type RedmineMessageUpdateInput = RedmineThreadLookupInput & {
+  messageId: string;
+  intentId: string;
+  body: string;
+  expectedVersion: number;
+  participantName: string | null;
+};
+
+export type RedmineParticipantV1 = {
+  participantId: string;
+  credential: string;
 };
 
 export type RedmineAttachmentInput = RedmineThreadLookupInput & {

@@ -76,7 +76,7 @@ export function issueFixture(id = 123) {
           }
         })
       },
-      { id: 30, value: "subject-1" },
+      { id: 30, value: "00000000-0000-4000-8000-000000000007" },
       { id: 31, value: "利用者" }
     ],
     attachments: [{

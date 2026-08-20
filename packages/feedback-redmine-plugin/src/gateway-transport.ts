@@ -4,6 +4,9 @@ import type {
   RedmineAttachmentInput,
   RedmineCurrentPrincipalV1,
   RedmineFeedbackPort,
+  RedmineMessageCreateInput,
+  RedmineMessageUpdateInput,
+  RedmineParticipantV1,
   RedmineProfileResult,
   RedmineThreadCreateInput,
   RedmineThreadListInput,
@@ -26,7 +29,6 @@ import { validateGatewayBasePath } from "./validation.js";
 export type GatewayTransportOptions = {
   profileId: string;
   gatewayBasePath: string;
-  getCsrfToken: () => string | Promise<string>;
   fetch?: typeof globalThis.fetch;
   diagnostics?: RedmineDiagnosticBuffer;
 };
@@ -36,17 +38,28 @@ type DiagnosticContext = { requestId: string; httpStatus: number | null };
 export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
   readonly #profileId: string;
   readonly #basePath: string;
-  readonly #getCsrfToken: () => string | Promise<string>;
   readonly #fetch: typeof globalThis.fetch;
   readonly #diagnostics: RedmineDiagnosticBuffer | null;
   #maximumDownloadBytes = 52_428_800;
+  #participant: Promise<RedmineParticipantV1> | null = null;
+  #memoryParticipant: StoredParticipant | null = null;
 
   constructor(options: GatewayTransportOptions) {
     this.#profileId = options.profileId;
     this.#basePath = validateGatewayBasePath(options.gatewayBasePath);
-    this.#getCsrfToken = options.getCsrfToken;
     this.#fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.#diagnostics = options.diagnostics ?? null;
+  }
+
+  async getOrCreateParticipant(profileId: string, signal?: AbortSignalLike): Promise<RedmineParticipantV1> {
+    this.#assertProfile(profileId);
+    if (!this.#participant) this.#participant = this.#loadOrCreateParticipant(signal);
+    try {
+      return await this.#participant;
+    } catch (error) {
+      this.#participant = null;
+      throw error;
+    }
   }
 
   async getCapabilities(profileId: string, signal?: AbortSignalLike): Promise<RedmineProfileResult> {
@@ -60,8 +73,9 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
 
   async getCurrentUser(profileId: string, signal?: AbortSignalLike): Promise<RedmineCurrentPrincipalV1> {
     this.#assertProfile(profileId);
+    const participant = await this.getOrCreateParticipant(profileId, signal);
     return this.#diagnose("redmine.current-user.get.v1", async (diagnostic) =>
-      parseCurrentUserResult(await this.#json(`${this.#profilePath()}/me`, signal, diagnostic)));
+      parseCurrentUserResult(await this.#json(`${this.#profilePath()}/me`, signal, diagnostic, participant.credential)));
   }
 
   async listThreads(input: RedmineThreadListInput, signal?: AbortSignalLike): Promise<RedmineThreadListResult> {
@@ -81,11 +95,13 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
 
   async getThread(input: RedmineThreadLookupInput, signal?: AbortSignalLike): Promise<RedmineThreadV1> {
     this.#assertProfile(input.profileId);
+    const participant = await this.getOrCreateParticipant(input.profileId, signal);
     return this.#diagnose("redmine.thread.get.v1", async (diagnostic) =>
       parseThreadResult(await this.#json(
         `${this.#profilePath()}/threads/${encodeURIComponent(input.threadId)}?${resourceQuery(input.resourceRef)}`,
         signal,
-        diagnostic
+        diagnostic,
+        participant.credential
       )));
   }
 
@@ -95,8 +111,7 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
     signal?: AbortSignalLike
   ): Promise<RedmineThreadV1> {
     this.#assertProfile(input.profileId);
-    const csrf = await this.#getCsrfToken();
-    if (typeof csrf !== "string" || !csrf.trim()) throw new Error("CSRF tokenが空です");
+    const participant = await this.getOrCreateParticipant(input.profileId, signal);
     const request = {
       resourceRef: input.resourceRef,
       threadId: input.threadId,
@@ -108,7 +123,8 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
       release: input.release,
       locale: input.locale,
       capturedAt: input.capturedAt,
-      evidence: input.evidence
+      evidence: input.evidence,
+      participantName: input.participantName ?? null
     };
     const form = new FormData();
     form.append("request", new Blob([JSON.stringify(request)], { type: "application/json;charset=utf-8" }));
@@ -119,11 +135,56 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
       const response = await this.#request(`${this.#profilePath()}/threads`, signal, {
         method: "POST",
         headers: {
-          "X-Feedback-CSRF": csrf,
           "Idempotency-Key": input.intentId
         },
         body: form
-      }, diagnostic);
+      }, diagnostic, participant.credential);
+      return parseThreadResult(await parseJson(response));
+    });
+  }
+
+  async createMessage(input: RedmineMessageCreateInput, signal?: AbortSignalLike): Promise<RedmineThreadV1> {
+    this.#assertProfile(input.profileId);
+    const participant = await this.getOrCreateParticipant(input.profileId, signal);
+    return this.#diagnose("redmine.message.create.v1", async (diagnostic) => {
+      const response = await this.#request(
+        `${this.#profilePath()}/threads/${encodeURIComponent(input.threadId)}/messages`,
+        signal,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": input.intentId },
+          body: JSON.stringify({
+            messageId: input.messageId,
+            body: input.body,
+            participantName: input.participantName
+          })
+        },
+        diagnostic,
+        participant.credential
+      );
+      return parseThreadResult(await parseJson(response));
+    });
+  }
+
+  async updateMessage(input: RedmineMessageUpdateInput, signal?: AbortSignalLike): Promise<RedmineThreadV1> {
+    this.#assertProfile(input.profileId);
+    const participant = await this.getOrCreateParticipant(input.profileId, signal);
+    return this.#diagnose("redmine.message.update.v1", async (diagnostic) => {
+      const response = await this.#request(
+        `${this.#profilePath()}/threads/${encodeURIComponent(input.threadId)}/messages/${encodeURIComponent(input.messageId)}`,
+        signal,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": input.intentId },
+          body: JSON.stringify({
+            body: input.body,
+            expectedVersion: input.expectedVersion,
+            participantName: input.participantName
+          })
+        },
+        diagnostic,
+        participant.credential
+      );
       return parseThreadResult(await parseJson(response));
     });
   }
@@ -160,20 +221,30 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
     });
   }
 
-  async #json(path: string, signal: AbortSignalLike | undefined, diagnostic: DiagnosticContext): Promise<unknown> {
-    return parseJson(await this.#request(path, signal, {}, diagnostic));
+  async #json(
+    path: string,
+    signal: AbortSignalLike | undefined,
+    diagnostic: DiagnosticContext,
+    credential?: string
+  ): Promise<unknown> {
+    return parseJson(await this.#request(path, signal, {}, diagnostic, credential));
   }
 
   async #request(
     path: string,
     signal: AbortSignalLike | undefined,
     init: RequestInit,
-    diagnostic: DiagnosticContext
+    diagnostic: DiagnosticContext,
+    credential?: string
   ): Promise<Response> {
     let response: Response;
     try {
       response = await this.#fetch(path, {
         ...init,
+        headers: {
+          ...Object.fromEntries(new Headers(init.headers)),
+          ...(credential ? { "X-Feedback-Participant-Credential": credential } : {})
+        },
         mode: "same-origin",
         credentials: "same-origin",
         cache: "no-store",
@@ -217,6 +288,61 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
   #assertProfile(profileId: string): void {
     if (profileId !== this.#profileId) throw new Error("transport profile IDが一致しません");
   }
+
+  async #loadOrCreateParticipant(signal?: AbortSignalLike): Promise<RedmineParticipantV1> {
+    const key = participantStorageKey(this.#profileId);
+    const stored = readParticipant(key) ?? this.#memoryParticipant;
+    if (stored) return { participantId: stored.participantId, credential: stored.credential };
+    const browserProfileId = crypto.randomUUID();
+    const diagnostic = { requestId: crypto.randomUUID(), httpStatus: null as number | null };
+    const response = await this.#request(`${this.#profilePath()}/participants`, signal, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ browserProfileId })
+    }, diagnostic);
+    const participant = parseParticipant(await parseJson(response));
+    const value = { browserProfileId, ...participant };
+    this.#memoryParticipant = value;
+    writeParticipant(key, value);
+    return participant;
+  }
+}
+
+type StoredParticipant = RedmineParticipantV1 & { browserProfileId: string };
+
+function participantStorageKey(profileId: string): string {
+  const origin = globalThis.location?.origin ?? "unknown-origin";
+  return `feedback.redmine.participant.v1:${origin}:${profileId}`;
+}
+
+function readParticipant(key: string): StoredParticipant | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<StoredParticipant> | null;
+    return value && validUuid(value.browserProfileId) && validUuid(value.participantId) &&
+      typeof value.credential === "string" && value.credential.length >= 32 && value.credential.length <= 4096
+      ? value as StoredParticipant : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeParticipant(key: string, value: StoredParticipant): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage拒否時はmemoryで継続する。 */ }
+}
+
+function parseParticipant(value: unknown): RedmineParticipantV1 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new RedmineFeedbackError("redmine.contract_invalid", "participant responseが不正です");
+  const item = value as Record<string, unknown>;
+  if (Object.keys(item).some((key) => key !== "participantId" && key !== "credential") ||
+    !validUuid(item.participantId) || typeof item.credential !== "string" ||
+    item.credential.length < 32 || item.credential.length > 4096) {
+    throw new RedmineFeedbackError("redmine.contract_invalid", "participant responseが不正です");
+  }
+  return { participantId: item.participantId, credential: item.credential };
+}
+
+function validUuid(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
 async function limitedResponseBytes(response: Response, maximum: number): Promise<Uint8Array> {

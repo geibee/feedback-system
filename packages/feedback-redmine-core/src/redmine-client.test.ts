@@ -28,10 +28,9 @@ const createInput = {
   capturedAt: "2026-08-19T00:00:00Z",
   evidence: null,
   author: {
-    source: "host-session" as const,
-    subjectId: "subject-1",
-    displayName: "利用者",
-    redmineUserId: null
+    source: "participant-credential" as const,
+    participantId: "00000000-0000-4000-8000-000000000007",
+    displayName: "利用者"
   }
 };
 
@@ -212,7 +211,7 @@ describe("Redmine trusted HTTP policy", () => {
         const request = JSON.parse(init.body as string) as { issue: ReturnType<typeof issueFixture> & { uploads: unknown[] } };
         expect(request.issue.uploads).toEqual([expect.objectContaining({ token: "context-upload-token" })]);
         expect(request.issue.custom_fields).toEqual(expect.arrayContaining([
-          { id: profile.customFieldIds.submittedById, value: "subject-1" }
+          { id: profile.customFieldIds.submittedById, value: "00000000-0000-4000-8000-000000000007" }
         ]));
         expect(request.issue.custom_fields).toHaveLength(11);
         createdIssue = {

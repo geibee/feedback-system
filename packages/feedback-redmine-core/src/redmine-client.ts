@@ -8,10 +8,19 @@ import {
   type TrustedFeedbackAuthor
 } from "./context.js";
 import { RedmineFeedbackError, contractError } from "./errors.js";
-import { buildRedmineDescription } from "./marker.js";
+import {
+  buildRedmineDescription,
+  buildRedmineMessageNote,
+  initialCommentFromDescription,
+  parseFeedbackMetadata,
+  parseRedmineMessageNote,
+  replaceInitialCommentInDescription
+} from "./marker.js";
 import type {
   RedmineAttachmentContent,
   RedmineEvidenceMetadata,
+  RedmineMessageCreateInput,
+  RedmineMessageUpdateInput,
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadSort
@@ -37,11 +46,39 @@ export type TrustedThreadInput = {
 export type TrustedCreateInput = Omit<RedmineThreadCreateInput, "resourceRef"> & {
   hostResourceKey: string;
   author: TrustedFeedbackAuthor;
+  markerSignature?: string;
+};
+
+export type TrustedMessageCreateInput = Omit<RedmineMessageCreateInput, "resourceRef"> & {
+  hostResourceKey: string;
+  author: TrustedFeedbackAuthor;
+  markerSignature: string;
+};
+
+export type TrustedMessageUpdateInput = Omit<RedmineMessageUpdateInput, "resourceRef"> & {
+  hostResourceKey: string;
+  author: TrustedFeedbackAuthor;
+  markerSignature: string;
 };
 
 export type TrustedCreateResult = {
   thread: RedmineThreadV1;
   disposition: "created" | "recovered";
+};
+
+export type TrustedMutationResult = {
+  thread: RedmineThreadV1;
+  disposition: "created" | "recovered";
+};
+
+export type TrustedMessageOwnership = {
+  kind: "initial" | "reply";
+  markerKind: "initial" | "reply" | "edit";
+  participantId: string;
+  version: number;
+  intentId: string;
+  signature: string;
+  body: string;
 };
 
 export type TrustedConnectionValidation = {
@@ -166,9 +203,9 @@ export class RedmineTrustedClient {
     };
   }
 
-  async getThread(input: TrustedThreadInput, signal?: AbortSignal): Promise<RedmineThreadV1> {
+  async getThread(input: TrustedThreadInput, signal?: AbortSignal, participantId: string | null = null): Promise<RedmineThreadV1> {
     const match = await this.#oneThread(input, signal);
-    return this.#issueDetail(match.summary.issueId, input.threadId, signal);
+    return this.#issueDetail(match.summary.issueId, input.threadId, signal, participantId);
   }
 
   async lookupThreadAuthorization(threadId: string, signal?: AbortSignal): Promise<{
@@ -265,7 +302,13 @@ export class RedmineTrustedClient {
       pageKey: input.location.pageKey,
       hostResourceKey: input.hostResourceKey,
       perspectiveCode: input.perspectiveCode,
-      submittedById: input.author.subjectId,
+      submittedById: input.author.participantId,
+      submittedByName: input.author.displayName,
+      ...(input.author.source === "participant-credential" ? {
+        messageId: input.threadId,
+        participantId: input.author.participantId,
+        messageSignature: input.markerSignature
+      } : {}),
       capturedAt: input.capturedAt
     });
     const issue = {
@@ -293,6 +336,87 @@ export class RedmineTrustedClient {
     }
     const created = await this.#searchThread(input.threadId, input.hostResourceKey, signal);
     return { thread: await this.#recover(created, input, requestHash, signal), disposition: "created" };
+  }
+
+  async createMessageWithDisposition(
+    input: TrustedMessageCreateInput,
+    signal?: AbortSignal
+  ): Promise<TrustedMutationResult> {
+    validateUuid(input.messageId, "message ID");
+    validateUuid(input.intentId, "intent ID");
+    validateMessageBody(input.body, input.participantName);
+    const match = await this.#oneThread(input, signal);
+    const issue = await this.#issueRaw(match.summary.issueId, signal);
+    this.#assertReplyOpen(issue);
+    const existing = findMessageByIntent(issue, input.intentId);
+    if (existing) {
+      if (existing.messageId !== input.messageId || existing.participantId !== input.author.participantId) {
+        throw new RedmineFeedbackError("redmine.thread_mismatch", "同じintent IDの返信内容が一致しません", { upstreamStatus: 409 });
+      }
+      return {
+        thread: await this.#issueDetail(match.summary.issueId, input.threadId, signal, input.author.participantId),
+        disposition: "recovered"
+      };
+    }
+    const notes = buildRedmineMessageNote(input.body, {
+      kind: "reply",
+      messageId: input.messageId,
+      participantId: input.author.participantId,
+      participantName: input.participantName,
+      version: 1,
+      intentId: input.intentId,
+      signature: input.markerSignature
+    });
+    await this.#json("PUT", `issues/${match.summary.issueId}.json`, { issue: { notes } }, signal, 60_000);
+    return {
+      thread: await this.#issueDetail(match.summary.issueId, input.threadId, signal, input.author.participantId),
+      disposition: "created"
+    };
+  }
+
+  async updateMessage(
+    input: TrustedMessageUpdateInput,
+    signal?: AbortSignal
+  ): Promise<RedmineThreadV1> {
+    validateUuid(input.messageId, "message ID");
+    validateUuid(input.intentId, "intent ID");
+    validateMessageBody(input.body, input.participantName);
+    if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 1) throw contractError("expected versionが不正です");
+    const match = await this.#oneThread(input, signal);
+    const issue = await this.#issueRaw(match.summary.issueId, signal);
+    if (findMessageByIntent(issue, input.intentId)) {
+      return this.#issueDetail(match.summary.issueId, input.threadId, signal, input.author.participantId);
+    }
+    const ownership = findMessageOwnership(issue, input.threadId, input.messageId);
+    if (!ownership || ownership.participantId !== input.author.participantId) {
+      throw new RedmineFeedbackError("redmine.permission_denied", "自分の投稿だけを編集できます", { upstreamStatus: 403 });
+    }
+    if (ownership.version !== input.expectedVersion) {
+      throw new RedmineFeedbackError("redmine.thread_mismatch", "投稿が更新されています。再取得してください", { upstreamStatus: 409 });
+    }
+    const notes = buildRedmineMessageNote(input.body, {
+      kind: "edit",
+      messageId: input.messageId,
+      participantId: input.author.participantId,
+      participantName: input.participantName,
+      version: input.expectedVersion + 1,
+      intentId: input.intentId,
+      signature: input.markerSignature
+    });
+    const issueObject = object(issue, "issue");
+    const update = ownership.kind === "initial"
+      ? { description: replaceInitialCommentInDescription(string(issueObject.description, "issue.description"), input.body), notes }
+      : { notes };
+    await this.#json("PUT", `issues/${match.summary.issueId}.json`, { issue: update }, signal, 60_000);
+    return this.#issueDetail(match.summary.issueId, input.threadId, signal, input.author.participantId);
+  }
+
+  async lookupMessageOwnership(
+    input: TrustedThreadInput & { messageId: string },
+    signal?: AbortSignal
+  ): Promise<TrustedMessageOwnership | null> {
+    const match = await this.#oneThread(input, signal);
+    return findMessageOwnership(await this.#issueRaw(match.summary.issueId, signal), input.threadId, input.messageId);
   }
 
   async getAttachment(
@@ -339,7 +463,7 @@ export class RedmineTrustedClient {
     const fields = object(raw, "issue").custom_fields;
     const expected = [
       [this.profile.customFieldIds.requestHash, requestHash],
-      [this.profile.customFieldIds.submittedById, input.author.subjectId],
+      [this.profile.customFieldIds.submittedById, input.author.participantId],
       [this.profile.customFieldIds.applicationKey, this.profile.clientProfile.applicationKey],
       [this.profile.customFieldIds.environmentKey, this.profile.clientProfile.environmentKey],
       [this.profile.customFieldIds.externalWorkspaceKey, this.profile.clientProfile.externalWorkspaceKey],
@@ -375,16 +499,34 @@ export class RedmineTrustedClient {
     return array(value.issues, "issues").map((raw) => ({ raw, summary: normalizeIssueSummary(raw, this.profile) }));
   }
 
-  async #issueDetail(issueId: number, expectedThreadId: string, signal?: AbortSignal): Promise<RedmineThreadV1> {
+  async #issueDetail(
+    issueId: number,
+    expectedThreadId: string,
+    signal?: AbortSignal,
+    participantId: string | null = null
+  ): Promise<RedmineThreadV1> {
+    const issue = await this.#issueRaw(issueId, signal);
+    const url = this.profile.showRedmineLink ? this.#url(`issues/${issueId}`).toString() : null;
+    const thread = normalizeIssueDetail(issue, this.profile, url, participantId);
+    if (thread.threadId !== expectedThreadId) throw new RedmineFeedbackError("redmine.not_found", "threadが見つかりません");
+    return thread;
+  }
+
+  async #issueRaw(issueId: number, signal?: AbortSignal): Promise<unknown> {
     const value = object(
       await this.#json("GET", `issues/${issueId}.json?include=journals,attachments`, undefined, signal, 15_000),
       "issue detail response"
     );
-    const issue = value.issue;
-    const url = this.profile.showRedmineLink ? this.#url(`issues/${issueId}`).toString() : null;
-    const thread = normalizeIssueDetail(issue, this.profile, url);
-    if (thread.threadId !== expectedThreadId) throw new RedmineFeedbackError("redmine.not_found", "threadが見つかりません");
-    return thread;
+    return value.issue;
+  }
+
+  #assertReplyOpen(issueValue: unknown): void {
+    const closedIds = this.profile.closedStatusIds ?? [];
+    if (closedIds.length === 0) return;
+    const status = object(object(issueValue, "issue").status, "issue.status");
+    if (closedIds.includes(positiveInteger(status.id, "issue.status.id"))) {
+      throw new RedmineFeedbackError("redmine.validation_failed", "終了済みthreadへは返信できません", { upstreamStatus: 422 });
+    }
   }
 
   async #upload(filename: string, contentType: string, bytes: Uint8Array, signal?: AbortSignal): Promise<string> {
@@ -415,7 +557,7 @@ export class RedmineTrustedClient {
       ["hostResourceKey", input.hostResourceKey],
       ["perspectiveCode", input.perspectiveCode],
       ["locator", buildLocator(input.location, input.target)],
-      ["submittedById", input.author.subjectId],
+      ["submittedById", input.author.participantId],
       ["submittedByName", input.author.displayName ?? ""]
     ];
     return values.map(([key, value]) => ({ id: ids[key], value }));
@@ -437,7 +579,7 @@ export class RedmineTrustedClient {
   }
 
   async #json(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     path: string,
     body: unknown,
     signal: AbortSignal | undefined,
@@ -448,6 +590,7 @@ export class RedmineTrustedClient {
       ? undefined
       : body instanceof Uint8Array ? Uint8Array.from(body).buffer : JSON.stringify(body);
     const response = await this.#raw(method, this.#url(path).toString(), initBody, signal, timeout, method === "GET", contentType);
+    if (response.status === 204 || response.headers.get("content-length") === "0") return {};
     const buffer = await limitedArrayBuffer(response, 10_485_760);
     try {
       return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buffer));
@@ -457,7 +600,7 @@ export class RedmineTrustedClient {
   }
 
   async #raw(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     url: string,
     body: BodyInit | undefined,
     signal: AbortSignal | undefined,
@@ -525,6 +668,74 @@ export function validateAttachmentContentUrl(baseUrl: URL, input: string): URL {
   const prefix = baseUrl.pathname.endsWith("/") ? baseUrl.pathname : `${baseUrl.pathname}/`;
   if (!parsed.pathname.startsWith(prefix)) throw contractError("attachment content URLがRedmine base path外です");
   return parsed;
+}
+
+function findMessageByIntent(issueValue: unknown, intentId: string): {
+  messageId: string;
+  participantId: string;
+} | null {
+  const issue = object(issueValue, "issue");
+  for (const raw of issue.journals === undefined ? [] : array(issue.journals, "issue.journals")) {
+    const journal = object(raw, "journal");
+    if (typeof journal.notes !== "string") continue;
+    const marked = parseRedmineMessageNote(journal.notes);
+    if (marked?.metadata.intentId === intentId) {
+      return { messageId: marked.metadata.messageId, participantId: marked.metadata.participantId };
+    }
+  }
+  return null;
+}
+
+function findMessageOwnership(issueValue: unknown, threadId: string, messageId: string): TrustedMessageOwnership | null {
+  const issue = object(issueValue, "issue");
+  const description = typeof issue.description === "string" ? issue.description : "";
+  const initial = parseFeedbackMetadata(description);
+  const ownership = new Map<string, TrustedMessageOwnership>();
+  if (initial?.participantId && initial.intentId && initial.messageSignature) {
+    ownership.set(initial.messageId ?? threadId, {
+      kind: "initial",
+      markerKind: "initial",
+      participantId: initial.participantId,
+      version: 1,
+      intentId: initial.intentId,
+      signature: initial.messageSignature,
+      body: initialCommentFromDescription(description)
+    });
+  }
+  for (const raw of issue.journals === undefined ? [] : array(issue.journals, "issue.journals")) {
+    const journal = object(raw, "journal");
+    if (typeof journal.notes !== "string") continue;
+    const marked = parseRedmineMessageNote(journal.notes);
+    if (!marked) continue;
+    if (marked.metadata.kind === "reply") {
+      ownership.set(marked.metadata.messageId, {
+        kind: "reply",
+        markerKind: "reply",
+        participantId: marked.metadata.participantId,
+        version: marked.metadata.version,
+        intentId: marked.metadata.intentId,
+        signature: marked.metadata.signature,
+        body: marked.body
+      });
+    } else {
+      const current = ownership.get(marked.metadata.messageId);
+      if (current && current.participantId === marked.metadata.participantId && marked.metadata.version === current.version + 1) {
+        current.version = marked.metadata.version;
+        current.markerKind = "edit";
+        current.intentId = marked.metadata.intentId;
+        current.signature = marked.metadata.signature;
+        current.body = marked.body;
+      }
+    }
+  }
+  return ownership.get(messageId) ?? null;
+}
+
+function validateMessageBody(body: string, participantName: string | null): void {
+  if (typeof body !== "string" || !body.trim() || body.length > 20_000) throw contractError("message bodyが不正です");
+  if (participantName !== null && (typeof participantName !== "string" || !participantName.trim() || participantName.length > 100)) {
+    throw contractError("participant nameが不正です");
+  }
 }
 
 function validateEvidence(

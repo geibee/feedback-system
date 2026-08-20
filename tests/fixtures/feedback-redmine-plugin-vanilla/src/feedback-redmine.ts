@@ -1,41 +1,18 @@
 import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
 import type {
   RedmineFeedbackPluginController,
-  RedmineFeedbackPluginControllerState,
-  RedmineFeedbackRuntimeOptions
+  RedmineFeedbackPluginControllerState
 } from "@geibee/redmine-plugin/loader";
-
-const locationSubscribers = new Set<() => void>();
-
-export function createVanillaAdapter(): RedmineFeedbackRuntimeOptions["adapter"] {
-  return {
-    getContext: () => ({
-      schemaVersion: "1",
-      applicationKey: "inventory",
-      environmentKey: "production",
-      externalWorkspaceKey: "production-review",
-      release: "fixture",
-      locale: "ja-JP"
-    }),
-    getLocation: () => ({
-      schemaVersion: "1",
-      pageKey: "orders.detail",
-      routeTemplate: "/orders/{orderId}",
-      pathParameters: { orderId: "sha256:fixture" }
-    }),
-    getResourceRef: () => ({ schemaVersion: "1", kind: "record", key: "fixture-order" }),
-    subscribe: (listener) => {
-      locationSubscribers.add(listener);
-      return () => locationSubscribers.delete(listener);
-    },
-    navigate: () => undefined
-  };
-}
+import {
+  createQuickstartAdapter,
+  emitQuickstartLocationChange,
+  quickstartSubscriptionCount
+} from "./quickstart-adapter.js";
 
 const initializationAbort = new AbortController();
 let controller: RedmineFeedbackPluginController | null = null;
 const controllerPromise = createRedmineFeedbackPluginControllerFromRuntimeConfig({
-  adapter: createVanillaAdapter(),
+  adapter: createQuickstartAdapter(),
   signal: initializationAbort.signal,
   onUnavailable: (error) => console.error("Feedback Redmineを利用できません", error)
 }).then((created) => {
@@ -62,10 +39,10 @@ export const feedbackFeature = {
     return controller?.state ?? "disabled";
   },
   activeSubscriptions(): number {
-    return locationSubscribers.size;
+    return quickstartSubscriptionCount();
   },
   emitHostLocationChange(): void {
-    locationSubscribers.forEach((listener) => listener());
+    emitQuickstartLocationChange();
   },
   destroy(): void {
     initializationAbort.abort();

@@ -6,6 +6,12 @@ Redmine正本経路は独立した`contracts/feedback/redmine-gateway.openapi.ya
 公開契約とする。gateway base pathは`/internal/feedback-redmine/v1`で、業務SPAと同一originに置く。
 `@geibee/contracts`、`@geibee/core`、`@geibee/dom-capture`、`@geibee/react-ui`、`@geibee/maplibre`、Redmine core/UI/plugin/gatewayは同じversionを使用する。
 
+`1.0.0-alpha.3`では`FeedbackTargetV1`へ後方互換な`custom` variantを追加した。Canvas、Three.js、独自chartなどのhostは、
+既存`FeedbackTargetResolver`から名前空間付き`provider`、安定した`targetKey`、必須のviewport相対fallback座標を返す。
+現在位置は既存`FeedbackPinPositionProvider`で解決し、providerが存在しないか対象を解決できない場合はfallback座標へ表示する。
+`metadata`は最大20項目のscalar値だけに限定し、認証情報や業務本文を保存しない。`custom` targetを生成するSPAは
+`1.0.0-alpha.3`以降のgatewayと組み合わせる。既存4 variantと保存済みlocatorの読取動作は変更しない。
+
 Principalとcontext authorの`source`は`participant-credential`である。SDKは非公開browser profile UUIDを採番し、gatewayがそこから導出した
 公開participant UUIDとorigin/profile scopeのopaque credentialをlocalStorageへ保存する。非公開UUIDは会話応答やRedmineへ保存しない。
 browserからRedmine URL、API key、project/tracker/custom field IDを指定できない。

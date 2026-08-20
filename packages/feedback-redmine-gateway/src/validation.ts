@@ -233,7 +233,37 @@ function parseTarget(value: unknown): RedmineThreadCreateInput["target"] {
       latitude: finite(item.latitude, "latitude", -90, 90)
     };
   }
+  if (item.kind === "custom") {
+    exact(item, [
+      "schemaVersion", "kind", "provider", "targetKey", "fallbackRelativeX", "fallbackRelativeY", "metadata"
+    ], "custom target", ["metadata"]);
+    const provider = bounded(item.provider, "custom provider", 100);
+    if (!/^[a-z0-9][a-z0-9._-]{0,99}$/u.test(provider)) invalid("custom providerが不正です");
+    return {
+      schemaVersion: "1",
+      kind: "custom",
+      provider,
+      targetKey: customText(item.targetKey, "custom targetKey", 200, false),
+      fallbackRelativeX: relative(item.fallbackRelativeX),
+      fallbackRelativeY: relative(item.fallbackRelativeY),
+      ...(item.metadata === undefined ? {} : { metadata: customMetadata(item.metadata) })
+    };
+  }
   invalid("target kindが不正です");
+}
+
+function customMetadata(value: unknown): Record<string, string | number | boolean | null> {
+  const entries = Object.entries(object(value, "custom metadata"));
+  if (entries.length > 20) invalid("custom metadataは20項目以下で指定してください");
+  const metadata: Record<string, string | number | boolean | null> = {};
+  for (const [key, entry] of entries) {
+    if (key.length > 64 || !/^[A-Za-z][A-Za-z0-9_.-]*$/u.test(key)) invalid("custom metadata keyが不正です");
+    if (entry === null || typeof entry === "boolean") metadata[key] = entry;
+    else if (typeof entry === "string" && Array.from(entry).length <= 500) metadata[key] = entry;
+    else if (typeof entry === "number" && Number.isFinite(entry)) metadata[key] = entry;
+    else invalid("custom metadata valueが不正です");
+  }
+  return metadata;
 }
 
 function resourceRef(value: unknown): FeedbackHostResourceRefV1 {
@@ -278,6 +308,13 @@ function object(value: unknown, name: string): Record<string, unknown> {
 
 function bounded(value: unknown, name: string, maximum: number): string {
   if (typeof value !== "string" || !value || value.length > maximum) invalid(`${name}が不正なstringです`);
+  return value;
+}
+
+function customText(value: unknown, name: string, maximum: number, empty: boolean): string {
+  if (typeof value !== "string" || Array.from(value).length > maximum || (!empty && !value)) {
+    invalid(`${name}が不正なstringです`);
+  }
   return value;
 }
 

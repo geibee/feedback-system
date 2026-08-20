@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeIssueDetail, normalizeIssueSummary, sanitizeFilename } from "./normalize.js";
 import { issueFixture, profile, threadId } from "./test-fixtures.js";
 import { buildRedmineDescription, buildRedmineMessageNote } from "./marker.js";
+import { parseThreadSummary } from "./response-validation.js";
 import type { RedmineIssueDto } from "./redmine-dto.js";
 
 describe("Redmine DTO normalization", () => {
@@ -94,6 +95,34 @@ describe("Redmine DTO normalization", () => {
   it("壊れたlocatorはthread自体を捨てずnullにする", () => {
     const issue = issueFixture();
     issue.custom_fields.find((field) => field.id === 29)!.value = "{invalid";
+    expect(normalizeIssueSummary(issue, profile).locator).toBeNull();
+  });
+
+  it("custom targetをlocatorから制約どおり復元する", () => {
+    const issue = issueFixture();
+    const field = issue.custom_fields.find((entry) => entry.id === 29)!;
+    const locator = JSON.parse(field.value as string) as Record<string, unknown>;
+    locator.target = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "com.example.threejs",
+      targetKey: "model-42",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.75,
+      metadata: { layerName: "equipment", level: 3 }
+    };
+    field.value = JSON.stringify(locator);
+    const summary = normalizeIssueSummary(issue, profile);
+    expect(summary.locator?.target).toEqual(locator.target);
+    expect(parseThreadSummary(summary).locator?.target).toEqual(locator.target);
+
+    const invalidResponse = structuredClone(summary) as unknown as Record<string, unknown>;
+    const invalidLocator = invalidResponse.locator as Record<string, unknown>;
+    (invalidLocator.target as Record<string, unknown>).metadata = { nested: { rejected: true } };
+    expect(() => parseThreadSummary(invalidResponse)).toThrow(/custom target metadata value/u);
+
+    (locator.target as Record<string, unknown>).metadata = { nested: { rejected: true } };
+    field.value = JSON.stringify(locator);
     expect(normalizeIssueSummary(issue, profile).locator).toBeNull();
   });
 

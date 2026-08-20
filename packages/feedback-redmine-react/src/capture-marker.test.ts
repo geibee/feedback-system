@@ -30,4 +30,26 @@ describe("スクリーンショットのFeedback位置", () => {
       subscribe: () => () => undefined
     })).toEqual({ x: 10, y: 20 });
   });
+
+  it("custom targetはhost providerで追従し、未解決時はfallback位置へ投影する", () => {
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 800 });
+    const target = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "com.example.threejs",
+      targetKey: "model-42",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.5
+    } as const;
+    expect(resolveFeedbackPinPosition(target, {
+      getPosition: () => ({ x: 15, y: 25 }),
+      subscribe: () => () => undefined
+    })).toEqual({ x: 15, y: 25 });
+    expect(resolveFeedbackPinPosition(target, {
+      getPosition: () => null,
+      subscribe: () => () => undefined
+    })).toEqual({ x: 250, y: 400 });
+    expect(resolveFeedbackPinPosition(target)).toEqual({ x: 250, y: 400 });
+  });
 });

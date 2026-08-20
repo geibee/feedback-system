@@ -841,10 +841,11 @@ function readState(
   };
 }
 
-function targetLabel(target: FeedbackTargetV1): string {
+export function targetLabel(target: FeedbackTargetV1): string {
   if (target.kind === "ui-element") return `要素 ${target.elementKey}`;
   if (target.kind === "map-feature") return `地図地物 ${target.featureKey}`;
   if (target.kind === "map-position") return "地図上の位置";
+  if (target.kind === "custom") return `カスタム ${target.provider} / ${target.targetKey}`;
   return "画面上の位置";
 }
 

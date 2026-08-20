@@ -8,6 +8,8 @@ addFormats(ajv);
 
 function validator(name: string) {
   const schema = JSON.parse(readFileSync(new URL(`../schemas/${name}.schema.json`, import.meta.url), "utf8"));
+  const existing = typeof schema.$id === "string" ? ajv.getSchema(schema.$id) : undefined;
+  if (existing) return existing;
   return ajv.compile(schema);
 }
 
@@ -98,11 +100,45 @@ describe("Feedback JSON Schema", () => {
         longitude: 139.7,
         latitude: 35.6
       },
-      { schemaVersion: "1", kind: "map-position", longitude: 139.7, latitude: 35.6 }
+      { schemaVersion: "1", kind: "map-position", longitude: 139.7, latitude: 35.6 },
+      {
+        schemaVersion: "1",
+        kind: "custom",
+        provider: "com.example.threejs",
+        targetKey: "model-42",
+        fallbackRelativeX: 0.25,
+        fallbackRelativeY: 0.75,
+        metadata: { layerName: "equipment", level: 3, selected: true, parentId: null }
+      }
     ];
     for (const target of targets) expect(validate(target), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({ schemaVersion: "1", kind: "map-position", longitude: 181, latitude: 0 })).toBe(false);
     expect(validate({ ...targets[0], unknown: true })).toBe(false);
+  });
+
+  it("custom targetの識別子、fallback、metadata制約を検証する", () => {
+    const validate = validator("target");
+    const custom = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "com.example.canvas",
+      targetKey: "shape-1",
+      fallbackRelativeX: 0,
+      fallbackRelativeY: 1
+    };
+    expect(validate(custom), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...custom, provider: "Invalid Provider" })).toBe(false);
+    expect(validate({ ...custom, targetKey: "" })).toBe(false);
+    expect(validate({ ...custom, fallbackRelativeX: -0.1 })).toBe(false);
+    expect(validate({ ...custom, metadata: { "_invalid": true } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: { nested: true } } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: ["array"] } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: "x".repeat(501) } })).toBe(false);
+    expect(validate({
+      ...custom,
+      metadata: Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`key${index}`, index]))
+    })).toBe(false);
+    expect(validate({ ...custom, unknown: true })).toBe(false);
   });
 
   it("webhookはversioned domain eventとactorを必須にする", () => {

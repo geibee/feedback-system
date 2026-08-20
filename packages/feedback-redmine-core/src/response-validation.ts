@@ -124,8 +124,29 @@ function target(value: unknown): FeedbackTargetV1 {
     text(item.sourceKey, "sourceKey", 200); text(item.featureKey, "featureKey", 200);
     if (item.sourceLayer !== undefined) text(item.sourceLayer, "sourceLayer", 200);
     number(item.longitude, -180, 180); number(item.latitude, -90, 90);
+  } else if (item.kind === "custom") {
+    exact(item, [
+      "schemaVersion", "kind", "provider", "targetKey", "fallbackRelativeX", "fallbackRelativeY", "metadata"
+    ], "custom target", ["metadata"]);
+    if (item.schemaVersion !== "1" || typeof item.provider !== "string" ||
+      !customProviderPattern.test(item.provider)) throw invalid("custom target provider");
+    customText(item.targetKey, "targetKey", 200, false);
+    relative(item.fallbackRelativeX); relative(item.fallbackRelativeY);
+    if (item.metadata !== undefined) customMetadata(item.metadata);
   } else throw invalid("target kind");
   return item as unknown as FeedbackTargetV1;
+}
+
+function customMetadata(value: unknown): void {
+  const entries = Object.entries(object(value, "custom target metadata"));
+  if (entries.length > 20) throw invalid("custom target metadata count");
+  for (const [key, entry] of entries) {
+    if (key.length > 64 || !metadataKeyPattern.test(key)) throw invalid("custom target metadata key");
+    if (entry === null || typeof entry === "boolean") continue;
+    if (typeof entry === "string" && Array.from(entry).length <= 500) continue;
+    if (typeof entry === "number" && Number.isFinite(entry)) continue;
+    throw invalid("custom target metadata value");
+  }
 }
 
 function timeline(value: unknown): void {
@@ -198,6 +219,9 @@ function object(value: unknown, name: string): Record<string, unknown> {
 function text(value: unknown, name: string, maximum: number, empty = false): void {
   if (typeof value !== "string" || value.length > maximum || (!empty && !value)) throw invalid(name);
 }
+function customText(value: unknown, name: string, maximum: number, empty: boolean): void {
+  if (typeof value !== "string" || Array.from(value).length > maximum || (!empty && !value)) throw invalid(name);
+}
 function integer(value: unknown, name: string, minimum: number): void {
   if (!Number.isSafeInteger(value) || (value as number) < minimum) throw invalid(name);
 }
@@ -216,3 +240,5 @@ function invalid(name: string): Error { return new Error(`Redmine responseの${n
 
 const activityFields = ["status", "assignee", "priority", "tracker", "subject", "description", "attachment"];
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const customProviderPattern = /^[a-z0-9][a-z0-9._-]{0,99}$/u;
+const metadataKeyPattern = /^[A-Za-z][A-Za-z0-9_.-]*$/u;

@@ -77,6 +77,16 @@ export function resolveFeedbackPinPosition(
     };
   }
   if (
+    target.kind === "custom" &&
+    typeof target.fallbackRelativeX === "number" &&
+    typeof target.fallbackRelativeY === "number"
+  ) {
+    return {
+      x: target.fallbackRelativeX * document.documentElement.clientWidth,
+      y: target.fallbackRelativeY * document.documentElement.clientHeight
+    };
+  }
+  if (
     target.kind === "ui-element" &&
     typeof target.elementKey === "string" &&
     typeof target.relativeX === "number" &&

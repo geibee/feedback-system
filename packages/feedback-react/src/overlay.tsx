@@ -1103,6 +1103,12 @@ function pinPosition(
   if (target.kind === "map-feature" || target.kind === "map-position") {
     return provider?.getPosition(target) ?? null;
   }
+  if (target.kind === "custom") {
+    return provider?.getPosition(target) ?? {
+      x: target.fallbackRelativeX * document.documentElement.clientWidth,
+      y: target.fallbackRelativeY * document.documentElement.clientHeight
+    };
+  }
   if (target.kind !== "ui-element") return null;
   const element = findFeedbackElement(target.elementKey);
   if (!element) return null;
@@ -1363,6 +1369,7 @@ function describeTarget(target: Target): string {
     case "screen-position": return `画面上の位置 (${formatRelative(target.relativeX)}, ${formatRelative(target.relativeY)})`;
     case "map-feature": return `地物 ${target.sourceKey}/${target.featureKey}`;
     case "map-position": return `地図上の地点 (${target.longitude.toFixed(5)}, ${target.latitude.toFixed(5)})`;
+    case "custom": return `カスタム ${target.provider}/${target.targetKey}`;
   }
 }
 

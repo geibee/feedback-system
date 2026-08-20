@@ -8,6 +8,7 @@
 - 旧host auth/authz/CSRF SPIを削除し、公開participant modeへ一本化しました。
 - resource scopeを後方互換で維持しつつ、Profileを閲覧境界とするWorkspace一覧と総件数を追加しました。
 - createの任意`threadUrl`を同一origin・対象threadへ制限し、初回自己編集署名をcontext attachmentから検証するようにしました。
+- `custom` targetのprovider、fallback座標、scalar metadataを投稿境界でfail-closed検証するようにしました。
 
 ## 1.0.0-alpha.1
 

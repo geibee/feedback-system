@@ -277,7 +277,7 @@ export interface components {
                 [key: string]: string;
             };
         };
-        Target: components["schemas"]["UiElementTarget"] | components["schemas"]["ScreenPositionTarget"] | components["schemas"]["MapFeatureTarget"] | components["schemas"]["MapPositionTarget"];
+        Target: components["schemas"]["UiElementTarget"] | components["schemas"]["ScreenPositionTarget"] | components["schemas"]["MapFeatureTarget"] | components["schemas"]["MapPositionTarget"] | components["schemas"]["CustomTarget"];
         UiElementTarget: {
             /** @constant */
             schemaVersion: "1";
@@ -315,6 +315,19 @@ export interface components {
             kind: "map-position";
             longitude: number;
             latitude: number;
+        };
+        CustomTarget: {
+            /** @constant */
+            schemaVersion: "1";
+            /** @constant */
+            kind: "custom";
+            provider: string;
+            targetKey: string;
+            fallbackRelativeX: number;
+            fallbackRelativeY: number;
+            metadata?: {
+                [key: string]: string | number | boolean | null;
+            };
         };
         Attachment: {
             id: number;

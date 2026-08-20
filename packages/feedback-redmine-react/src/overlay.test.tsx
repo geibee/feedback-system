@@ -11,7 +11,7 @@ import {
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
 } from "@geibee/redmine-core";
-import type { FeedbackLocationV1 } from "@geibee/core";
+import type { FeedbackLocationV1, FeedbackTargetResolver } from "@geibee/core";
 import { feedbackErrorMessage } from "./error-message.js";
 import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { RedmineFeedbackOverlay } from "./overlay.js";
@@ -121,6 +121,7 @@ type SetupOptions = {
   workspaceNextResult?: RedmineThreadListResult;
   createError?: unknown;
   contextMenu?: boolean;
+  targetResolver?: FeedbackTargetResolver<Element>;
 };
 
 function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {}) {
@@ -174,7 +175,8 @@ function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {
     clientState,
     adapter: hostAdapter,
     profileId: clientProfile.id,
-    contextMenu: options.contextMenu
+    contextMenu: options.contextMenu,
+    targetResolver: options.targetResolver
   }}><RedmineFeedbackOverlay /></RedmineFeedbackProvider>);
   return { port, clientState, listThreads, getThread, createThread, hostAdapter };
 }
@@ -276,6 +278,22 @@ describe("Redmine共通UI", () => {
     const list = await openWorkspaceList();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("dialog", { name: "他の人の投稿を見る" })).toBeNull();
+  });
+
+  it("custom targetのproviderとkeyをReact textとして安全に表示する", async () => {
+    setup(detail, {
+      targetResolver: () => ({
+        schemaVersion: "1",
+        kind: "custom",
+        provider: "com.example.threejs",
+        targetKey: '<img src=x onerror="alert(1)">',
+        fallbackRelativeX: 0.1,
+        fallbackRelativeY: 0.2
+      })
+    });
+    const composer = await startComposer();
+    expect(within(composer).getByText('カスタム com.example.threejs / <img src=x onerror="alert(1)">')).toBeTruthy();
+    expect(composer.querySelector("img")).toBeNull();
   });
 
   it("右クリックではmenuを表示し、選択後にcomposerを開く", async () => {

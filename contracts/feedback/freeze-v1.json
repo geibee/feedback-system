@@ -1,5 +1,5 @@
 {
-  "frozenAt": "2026-08-19",
+  "frozenAt": "2026-08-21",
   "baselineCommit": "1f30e9a",
   "openapiOperationCount": 47,
   "contracts": {
@@ -9,7 +9,7 @@
     "schemas/application-manifest.schema.json": "sha256:a7e92ba7616b7629889db9b10f735dee26befa0d68a5ef3b4bfc2d3ad1121c43",
     "schemas/installation-manifest.schema.json": "sha256:c70d5bbbc036635ac6e1461b5bc2c7afc614cecf320514132c03fea974abce59",
     "schemas/location.schema.json": "sha256:9249d46c075186f9a98b1493b3c2a4dd85ac1fb794da8b1589209439fec5dd0a",
-    "schemas/target.schema.json": "sha256:1dd2163101ce56a4a01fc9dd5a5828394e0554681a08750674faa9130d830153",
+    "schemas/target.schema.json": "sha256:eacab2dda6e83d08f074d89665bff7f9ab521db8f6705e739ff97f01503dbfef",
     "schemas/token-exchange-jwt.schema.json": "sha256:22033707d1553c8440245e83766c648b783c12f9b81a025e55e47e49f642af9c",
     "schemas/webhook-event.schema.json": "sha256:dbe606a637769887b47e75c294a2a5a1f73e9797d6f261b0852a466c249d6ea6"
   },

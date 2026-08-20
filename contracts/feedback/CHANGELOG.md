@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-21
+
+- `FeedbackTargetV1`へ名前空間付きprovider、安定target key、画面fallback座標、scalar metadataを持つ
+  `custom` variantを後方互換で追加。
+
 ## 2026-08-20
 
 - Redmine gatewayのlive/ready health endpoint、配備時runtime config、名前ベースinstallation manifest、provision plan/result schemaを追加。

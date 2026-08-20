@@ -51,6 +51,38 @@
         "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
         "latitude": { "type": "number", "minimum": -90, "maximum": 90 }
       }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "provider", "targetKey", "fallbackRelativeX", "fallbackRelativeY"],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "kind": { "const": "custom" },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+        },
+        "targetKey": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "fallbackRelativeX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fallbackRelativeY": { "type": "number", "minimum": 0, "maximum": 1 },
+        "metadata": {
+          "type": "object",
+          "maxProperties": 20,
+          "propertyNames": {
+            "maxLength": 64,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string", "maxLength": 500 },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" }
+            ]
+          }
+        }
+      }
     }
   ]
 }

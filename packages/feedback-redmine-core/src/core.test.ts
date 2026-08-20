@@ -179,6 +179,23 @@ describe("Redmine core deterministic model", () => {
     expect(text).toContain('\n  "kind": "feedback-context"');
     expect(text.endsWith("\n")).toBe(true);
   });
+
+  it("custom targetをcanonical locatorへ保存し16 KiB上限を維持する", () => {
+    const customTarget = {
+      schemaVersion: "1" as const,
+      kind: "custom" as const,
+      provider: "com.example.threejs",
+      targetKey: "model-42",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.75,
+      metadata: { selected: true, level: 3, parentId: null, layerName: "equipment" }
+    };
+    expect(JSON.parse(buildLocator(location, customTarget)).target).toEqual(customTarget);
+    expect(() => buildLocator({
+      ...location,
+      pathParameters: { oversized: "x".repeat(16_384) }
+    }, customTarget)).toThrow(/16 KiB/u);
+  });
 });
 
 describe("Redmine profileとcursor", () => {

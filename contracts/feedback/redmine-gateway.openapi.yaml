@@ -629,6 +629,7 @@ components:
         - $ref: '#/components/schemas/ScreenPositionTarget'
         - $ref: '#/components/schemas/MapFeatureTarget'
         - $ref: '#/components/schemas/MapPositionTarget'
+        - $ref: '#/components/schemas/CustomTarget'
     UiElementTarget:
       type: object
       additionalProperties: false
@@ -670,6 +671,29 @@ components:
         kind: { type: string, const: map-position }
         longitude: { type: number, minimum: -180, maximum: 180 }
         latitude: { type: number, minimum: -90, maximum: 90 }
+    CustomTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, provider, targetKey, fallbackRelativeX, fallbackRelativeY]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: custom }
+        provider: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,99}$' }
+        targetKey: { type: string, minLength: 1, maxLength: 200 }
+        fallbackRelativeX: { type: number, minimum: 0, maximum: 1 }
+        fallbackRelativeY: { type: number, minimum: 0, maximum: 1 }
+        metadata:
+          type: object
+          maxProperties: 20
+          propertyNames:
+            maxLength: 64
+            pattern: '^[A-Za-z][A-Za-z0-9_.-]*$'
+          additionalProperties:
+            oneOf:
+              - { type: string, maxLength: 500 }
+              - { type: number }
+              - { type: boolean }
+              - { type: 'null' }
     Attachment:
       type: object
       additionalProperties: false

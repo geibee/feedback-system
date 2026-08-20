@@ -9,6 +9,7 @@
 - Host Adapter未指定時の既定DOM captureと、保存画像へのFeedback位置ピン焼き込みを追加しました。
 - thread deep linkを新規issueへ保存し、Profileによる明示無効だけをキャプチャ無効として表示するようにしました。
 - `styles.css`からShadow DOM注入styleを生成し、配布CSSのdriftを検証するようにしました。
+- `custom` targetをhostの既存pin position providerで追従し、未解決時は保存済みfallback座標へ表示するようにしました。
 
 ## 1.0.0-alpha.1
 

@@ -30,14 +30,14 @@ COPY packages/feedback-redmine-core packages/feedback-redmine-core
 COPY packages/feedback-redmine-react packages/feedback-redmine-react
 COPY packages/feedback-redmine-plugin packages/feedback-redmine-plugin
 COPY apps/feedback-redmine-demo apps/feedback-redmine-demo
-RUN npm --workspace @feedback/contracts run build \
-  && npm --workspace @feedback/core run build \
-  && npm --workspace @feedback/dom-capture run build \
-  && npm --workspace @feedback/react-ui run build \
-  && npm --workspace @feedback/redmine-core run build \
-  && npm --workspace @feedback/redmine-react run build \
-  && npm --workspace @feedback/redmine-plugin run build \
-  && npm --workspace @feedback/redmine-demo run build
+RUN npm --workspace @geibee/contracts run build \
+  && npm --workspace @geibee/core run build \
+  && npm --workspace @geibee/dom-capture run build \
+  && npm --workspace @geibee/react-ui run build \
+  && npm --workspace @geibee/redmine-core run build \
+  && npm --workspace @geibee/redmine-react run build \
+  && npm --workspace @geibee/redmine-plugin run build \
+  && npm --workspace @geibee/redmine-demo run build
 
 FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:c3fed6436b61d2bf2201ec032c35c000871f7ed062dea5d586bc6bf4d0fdd140
 ARG VERSION=dev

@@ -21,16 +21,16 @@ const path = require("node:path");
 const directory = process.env.RELEASE_DIRECTORY;
 const manifest = JSON.parse(fs.readFileSync(path.join(directory, "release-manifest.json"), "utf8"));
 const expected = [
-  "@feedback/contracts",
-  "@feedback/core",
-  "@feedback/dom-capture",
-  "@feedback/react-ui",
-  "@feedback/maplibre",
-  "@feedback/redmine-core",
-  "@feedback/redmine-react",
-  "@feedback/redmine-plugin",
-  "@feedback/redmine-gateway",
-  "@feedback/redmine-ops"
+  "@geibee/contracts",
+  "@geibee/core",
+  "@geibee/dom-capture",
+  "@geibee/react-ui",
+  "@geibee/maplibre",
+  "@geibee/redmine-core",
+  "@geibee/redmine-react",
+  "@geibee/redmine-plugin",
+  "@geibee/redmine-gateway",
+  "@geibee/redmine-ops"
 ];
 if (manifest.schemaVersion !== "1" || manifest.product !== "feedback-redmine" ||
     manifest.version !== "1.0.0-release-check.1" || JSON.stringify(manifest.publishOrder) !== JSON.stringify(expected)) {

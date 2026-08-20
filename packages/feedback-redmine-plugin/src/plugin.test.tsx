@@ -1,6 +1,6 @@
 import { fireEvent, waitFor } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RedmineDiagnosticBuffer, type FeedbackRedmineHostAdapter, type RedmineThreadV1 } from "@feedback/redmine-core";
+import { RedmineDiagnosticBuffer, type FeedbackRedmineHostAdapter, type RedmineThreadV1 } from "@geibee/redmine-core";
 import { downloadDiagnosticJson } from "./diagnostic-download.js";
 import { GatewayRedmineFeedbackTransport } from "./gateway-transport.js";
 import { createRedmineFeedbackPlugin } from "./mount.js";

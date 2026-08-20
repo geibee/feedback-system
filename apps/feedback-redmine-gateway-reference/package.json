@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/redmine-gateway-reference",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/redmine-gateway-reference",
+  "version": "1.0.0-alpha.3",
   "description": "本番配布可能なstateless Feedback Redmine gateway server",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "build": "tsc -p tsconfig.build.json && esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js"
   },
   "dependencies": {
-    "@feedback/redmine-gateway": "1.0.0-alpha.2",
-    "@feedback/redmine-core": "1.0.0-alpha.2"
+    "@geibee/redmine-gateway": "1.0.0-alpha.3",
+    "@geibee/redmine-core": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

@@ -3,7 +3,7 @@ import type {
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
-} from "@feedback/contracts";
+} from "@geibee/contracts";
 import type { RedmineProfileResult } from "./port.js";
 import type { RedmineThreadListResult } from "./model.js";
 import { validateClientProfile } from "./profile.js";

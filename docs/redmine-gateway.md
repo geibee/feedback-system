@@ -3,7 +3,7 @@
 ## 配置境界
 
 gatewayは業務アプリケーションと同一originの`/internal/feedback-redmine/v1`へmountするstateless handlerである。公開契約は
-`contracts/feedback/redmine-gateway.openapi.yaml`、実装用packageは`@feedback/redmine-gateway`である。
+`contracts/feedback/redmine-gateway.openapi.yaml`、実装用packageは`@geibee/redmine-gateway`である。
 
 gatewayはDB、filesystem upload、queue、cache、object storageを使用しない。Redmine API keyはserver-side secretからだけ取得し、
 browser、problem response、metric、access logへ返さない。CORS routeを作らず、HTTPS reverse proxy配下へ置く。
@@ -110,8 +110,8 @@ Docker imageは`node` userで動作し、read-only root filesystem、`--cap-drop
 検証:
 
 ```bash
-npm --workspace @feedback/redmine-gateway run typecheck
-npm --workspace @feedback/redmine-gateway run test
-npm --workspace @feedback/redmine-gateway run build
+npm --workspace @geibee/redmine-gateway run typecheck
+npm --workspace @geibee/redmine-gateway run test
+npm --workspace @geibee/redmine-gateway run build
 bash scripts/check-feedback-redmine-security.sh
 ```

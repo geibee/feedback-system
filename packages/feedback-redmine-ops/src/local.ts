@@ -230,7 +230,7 @@ function composeBinary(context: LocalContext, args: string[], input?: Uint8Array
 
 async function readPackageVersion(): Promise<string> {
   const value = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version?: unknown };
-  if (typeof value.version !== "string") throw new Error("@feedback/redmine-ops versionが不正です");
+  if (typeof value.version !== "string") throw new Error("@geibee/redmine-ops versionが不正です");
   return value.version;
 }
 

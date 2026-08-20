@@ -1,6 +1,6 @@
-import type { RedmineInstallationManifestV1 } from "@feedback/contracts";
+import type { RedmineInstallationManifestV1 } from "@geibee/contracts";
 
-export type { RedmineInstallationManifestV1 } from "@feedback/contracts";
+export type { RedmineInstallationManifestV1 } from "@geibee/contracts";
 
 export const redmineCustomFieldSpecs = {
   threadId: { name: "Feedback Thread ID", format: "string", filter: true },

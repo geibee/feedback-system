@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
-import { FeedbackErrorBoundary, FeedbackOverlay, FeedbackProvider } from "@feedback/react";
-import type { FeedbackHostAdapter, FeedbackTransport } from "@feedback/core";
-import "@feedback/react/styles.css";
+import { FeedbackErrorBoundary, FeedbackOverlay, FeedbackProvider } from "@geibee/react";
+import type { FeedbackHostAdapter, FeedbackTransport } from "@geibee/core";
+import "@geibee/react/styles.css";
 
 const adapter: FeedbackHostAdapter = {
   getContext: () => ({

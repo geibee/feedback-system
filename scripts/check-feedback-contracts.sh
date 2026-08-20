@@ -21,14 +21,14 @@ redmine_tmp=$(mktemp)
 trap 'rm -f "$tmp" "$redmine_tmp"' EXIT
 npx --no-install openapi-typescript "$OPENAPI" -o "$tmp" >/dev/null
 if ! diff -u "$GENERATED" "$tmp"; then
-  echo "[feedback-contract] FAIL: @feedback/contracts の生成型が専用OpenAPIと同期していません" >&2
-  echo "  npm --workspace @feedback/contracts run generate を実行してください" >&2
+  echo "[feedback-contract] FAIL: @geibee/contracts の生成型が専用OpenAPIと同期していません" >&2
+  echo "  npm --workspace @geibee/contracts run generate を実行してください" >&2
   exit 1
 fi
 npx --no-install openapi-typescript contracts/feedback/redmine-gateway.openapi.yaml -o "$redmine_tmp" >/dev/null
 if ! diff -u contracts/feedback/src/redmine-gateway.generated.ts "$redmine_tmp"; then
   echo "[feedback-contract] FAIL: Redmine gateway生成型がOpenAPIと同期していません" >&2
-  echo "  npm --workspace @feedback/contracts run generate:redmine を実行してください" >&2
+  echo "  npm --workspace @geibee/contracts run generate:redmine を実行してください" >&2
   exit 1
 fi
 
@@ -68,7 +68,7 @@ if rg -n '@web-gis|apps/api/openapi|projectId|app\.projects|app\.users|gis_data|
   exit 1
 fi
 if rg -n 'maplibre' packages/feedback-react/package.json packages/feedback-react/src; then
-  echo "[feedback-contract] FAIL: @feedback/react がMapLibreへ依存しています" >&2
+  echo "[feedback-contract] FAIL: @geibee/react がMapLibreへ依存しています" >&2
   exit 1
 fi
 if rg -n 'style=|dangerouslySetInnerHTML|document\.head|<style' \
@@ -77,14 +77,14 @@ if rg -n 'style=|dangerouslySetInnerHTML|document\.head|<style' \
   exit 1
 fi
 if rg -n "from ['\"](react|react-dom|@tanstack/|maplibre-gl)|document\\.|window\\." packages/feedback-core/src; then
-  echo "[feedback-contract] FAIL: @feedback/core にUI/runtime固有依存が混入しています" >&2
+  echo "[feedback-contract] FAIL: @geibee/core にUI/runtime固有依存が混入しています" >&2
   exit 1
 fi
 node -e '
   const value = require("./packages/feedback-core/package.json");
   const forbidden = ["react", "react-dom", "@tanstack/react-query", "maplibre-gl"];
   if (forbidden.some((name) => value.dependencies?.[name] || value.peerDependencies?.[name])) process.exit(1);
-' || { echo "[feedback-contract] FAIL: @feedback/core のpackage dependency境界が不正です" >&2; exit 1; }
+' || { echo "[feedback-contract] FAIL: @geibee/core のpackage dependency境界が不正です" >&2; exit 1; }
 
 undocumented_feedback_variables=$(comm -23 \
   <(rg --no-messages -o -P --no-filename '(?<![A-Z0-9_])FEEDBACK_[A-Z][A-Z0-9_]+' \

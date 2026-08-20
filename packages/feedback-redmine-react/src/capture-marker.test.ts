@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeedbackEvidencePayload } from "@feedback/core";
+import type { FeedbackEvidencePayload } from "@geibee/core";
 import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { resolveFeedbackPinPosition } from "./thread-pins.js";
 

@@ -5,7 +5,7 @@ same-origin gateway pathを読み、host adapterはSPAの明示的なintegration
 
 ## Redmine gateway（標準）
 
-`@feedback/redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
+`@geibee/redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
 `loadProfile`と`loadSecret`を実装する。secretに既定値を置かない。
 
 標準配布gateway serverが次を使用する。

@@ -8,8 +8,8 @@ cd "$ROOT"
 command -v docker >/dev/null 2>&1 || { echo "[feedback-redmine-conformance] FAIL: Dockerが必要です" >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "[feedback-redmine-conformance] FAIL: docker composeが必要です" >&2; exit 1; }
 
-npm --workspace @feedback/redmine-conformance run typecheck
-npm --workspace @feedback/redmine-conformance run test
+npm --workspace @geibee/redmine-conformance run typecheck
+npm --workspace @geibee/redmine-conformance run test
 bash tests/redmine-conformance/run-local-matrix.sh
 
 node <<'NODE'

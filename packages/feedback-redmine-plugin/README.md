@@ -1,14 +1,14 @@
-# @feedback/redmine-plugin
+# @geibee/redmine-plugin
 
 業務アプリケーションのSPA bundleへ組み込むFeedback pluginです。標準入口は
-`@feedback/redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`です。最初に公開runtime configだけを取得し、
+`@geibee/redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`です。最初に公開runtime configだけを取得し、
 `enabled:false`ではReact UI、DOM、gateway通信、購読、timerを作成しません。有効時だけUIをdynamic importして
 Shadow DOMへmountします。
 
 ```ts
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
 
 export function FeedbackIntegration(): null {
   useEffect(() => {

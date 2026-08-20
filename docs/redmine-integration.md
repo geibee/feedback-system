@@ -7,7 +7,7 @@
 Redmine正本方式は、Feedbackのissue、返信、状態、証跡をRedmine issue・journal・attachment・custom fieldだけへ保存する。
 Feedback専用PostgreSQL、object storage、同期worker、server-side cacheは使用しない。
 
-利用経路はSPAへbuild時に同梱する`@feedback/redmine-plugin`とsame-origin gatewayだけである。
+利用経路はSPAへbuild時に同梱する`@geibee/redmine-plugin`とsame-origin gatewayだけである。
 ブラウザ拡張機能、OIDC JWT、host session、個人Redmine API keyをSDKへ渡さない。Feedback利用者はUIから投稿、返信、
 自己編集を行い、開発者はRedmineから返信、担当、優先度、状態変更を行う。両経路の内容はRedmineを正本として同じthreadへ反映する。
 
@@ -61,7 +61,7 @@ attachment bytesをclient cacheの正本にしない。
 
 1. [`redmine-gateway.md`](redmine-gateway.md)に従いgatewayをsame-originへmountする。
 2. server profileとintegration user API keyをsecret managerから設定する。
-3. SPAへ`@feedback/redmine-plugin`を通常のnpm依存として追加する。
+3. SPAへ`@geibee/redmine-plugin`を通常のnpm依存として追加する。
 4. 公開runtime configを同一originへ配置し、Reactのclient-only integration componentから
    `createRedmineFeedbackPluginControllerFromRuntimeConfig()`を呼ぶ。
 5. React cleanupでloaderの`signal`を中止し、作成済みcontrollerを`destroy()`する。
@@ -69,7 +69,7 @@ attachment bytesをclient cacheの正本にしない。
 
 DOMスクリーンショットはpluginが既定で接続する。Profileの`capture.enabled`は通常`true`とし、証跡を保存しない運用だけ明示的に
 `false`にする。HostのCSPでは`img-src`に`data:`と`blob:`を許可する。MapLibreのWebGL canvasを確実に含める場合は
-`@feedback/maplibre`のproviderをHost Adapterへ指定する。
+`@geibee/maplibre`のproviderをHost Adapterへ指定する。
 
 pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、OIDC token、任意HTTP headerを渡せない。通信先は
 runtime configのsame-origin `gatewayBasePath`へ限定する。runtime configの`enabled`を配備時feature flagとし、未指定はschema違反として

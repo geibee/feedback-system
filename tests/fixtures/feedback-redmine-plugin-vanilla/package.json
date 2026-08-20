@@ -1,6 +1,6 @@
 {
   "name": "feedback-redmine-plugin-vanilla-fixture",
-  "version": "1.0.0-alpha.2",
+  "version": "1.0.0-alpha.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@feedback/redmine-plugin": "1.0.0-alpha.2"
+    "@geibee/redmine-plugin": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

@@ -6,19 +6,19 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 packages=(
-  @feedback/dom-capture
-  @feedback/react-ui
-  @feedback/maplibre
-  @feedback/redmine-core
-  @feedback/redmine-react
-  @feedback/redmine-plugin
-  @feedback/redmine-gateway
-  @feedback/redmine-ops
-  @feedback/redmine-gateway-reference
-  @feedback/redmine-demo
+  @geibee/dom-capture
+  @geibee/react-ui
+  @geibee/maplibre
+  @geibee/redmine-core
+  @geibee/redmine-react
+  @geibee/redmine-plugin
+  @geibee/redmine-gateway
+  @geibee/redmine-ops
+  @geibee/redmine-gateway-reference
+  @geibee/redmine-demo
   feedback-redmine-plugin-vanilla-fixture
-  @feedback/redmine-browser-e2e
-  @feedback/redmine-conformance
+  @geibee/redmine-browser-e2e
+  @geibee/redmine-conformance
 )
 
 for package_name in "${packages[@]}"; do

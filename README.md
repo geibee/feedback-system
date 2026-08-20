@@ -3,18 +3,18 @@
 React SPAへ画面内フィードバックを追加し、Redmine issue・journal・attachment・custom fieldを唯一の業務データ正本として使う
 pluginとsame-origin gatewayです。Feedback専用DBやobject storageを新設せず、利用者をRedmineへログインさせずにUI内で会話を完結させます。
 
-> 現在のバージョンは`1.0.0-alpha.2`です。npm packageはregistry公開前のため、repository workspaceまたは
+> 現在のバージョンは`1.0.0-alpha.3`です。npm packageはregistry公開前のため、repository workspaceまたは
 > release builderが生成するtarballから利用します。
 
 ## 標準構成
 
 ```text
 React SPA
-  └─ @feedback/redmine-plugin/loader
+  └─ @geibee/redmine-plugin/loader
        │  配備時runtime configでdynamic import / unmount
        ▼
 same-origin /internal/feedback-redmine/v1
-  └─ @feedback/redmine-gateway
+  └─ @geibee/redmine-gateway
        │  Origin/Fetch Metadata・participant credential
        │  server-side integration API key
        ▼
@@ -32,12 +32,12 @@ Feedback UIは任意位置の投稿、任意のスクリーンショット、返
 
 ## SPAへ組み込む
 
-標準入口は配備時runtime configを読む`@feedback/redmine-plugin/loader`です。`enabled:false`ではDOM、gateway通信、timer、router購読を開始しません。
+標準入口は配備時runtime configを読む`@geibee/redmine-plugin/loader`です。`enabled:false`ではDOM、gateway通信、timer、router購読を開始しません。
 
 ```ts
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
 
 export function FeedbackIntegration(): null {
   useEffect(() => {
@@ -89,9 +89,9 @@ npm run feedback:redmine:local
 - 32 bytes以上のparticipant署名鍵をsecretとして注入できるsame-origin backend
 
 1. Redmineに専用project、tracker、integration user、11 custom fieldsを作る。
-2. `@feedback/redmine-gateway`をsame-originでmountし、participant署名鍵を注入する。
+2. `@geibee/redmine-gateway`をsame-originでmountし、participant署名鍵を注入する。
 3. integration userのAPI keyをserver-side secretだけから注入する。
-4. SPAに`@feedback/redmine-plugin`を同梱し、runtime config loaderをclient-only integration componentから起動する。
+4. SPAに`@geibee/redmine-plugin`を同梱し、runtime config loaderをclient-only integration componentから起動する。
 5. 位置指定投稿、返信、自己編集、Redmine側返信の反映、無効化、再有効化をstagingで確認する。
 
 前提条件から本番運用までを通した手順は[`docs/feedback-redmine-installation.md`](docs/feedback-redmine-installation.md)を参照してください。
@@ -114,7 +114,7 @@ bash scripts/verify-feedback.sh
 `npm run build`は共有契約とRedmine SPA/gateway packageをbuildします。従来runtimeだけは`npm run build:legacy`、
 repository全体は`npm run build:all`です。標準品質ゲートはskip変数なしの`bash scripts/verify-feedback.sh`で、
 package、browser lifecycle/security、gateway container、digest固定Redmine 4-version matrix、legacy互換経路を検証します。
-repository内のSPAとclean consumer検証はVite 8.2を標準とします。公開`@feedback/*` packageはViteをruntime依存に持たず、
+repository内のSPAとclean consumer検証はVite 8.2を標準とします。公開`@geibee/*` packageはViteをruntime依存に持たず、
 導入先のReact 18または19とbundlerを利用します。
 
 ## Release
@@ -133,8 +133,8 @@ Redmine releaseにはnpm tarball、導入・運用CLI、multi-arch gateway/demo 
 
 - Gateway OpenAPI: [`contracts/feedback/redmine-gateway.openapi.yaml`](contracts/feedback/redmine-gateway.openapi.yaml)
 - JSON Schema: [`contracts/feedback/schemas`](contracts/feedback/schemas)
-- npm packages: `@feedback/contracts`、`@feedback/core`、`@feedback/dom-capture`、`@feedback/react-ui`、`@feedback/maplibre`、`@feedback/redmine-core`、
-  `@feedback/redmine-react`、`@feedback/redmine-plugin`、`@feedback/redmine-gateway`
+- npm packages: `@geibee/contracts`、`@geibee/core`、`@geibee/dom-capture`、`@geibee/react-ui`、`@geibee/maplibre`、`@geibee/redmine-core`、
+  `@geibee/redmine-react`、`@geibee/redmine-plugin`、`@geibee/redmine-gateway`
 - Redmine保存契約: issue custom fields、description metadata、`feedback-context-v1.json`
 
 APIまたはDTOを変更するときはOpenAPI、生成型、[`docs/api-compatibility.md`](docs/api-compatibility.md)を同じ変更で更新します。

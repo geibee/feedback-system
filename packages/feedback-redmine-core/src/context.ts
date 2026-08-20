@@ -1,4 +1,4 @@
-import type { FeedbackLocationV1, FeedbackTargetV1 } from "@feedback/contracts";
+import type { FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/contracts";
 import type { RedmineEvidenceMetadata } from "./model.js";
 import { RedmineFeedbackError, contractError } from "./errors.js";
 

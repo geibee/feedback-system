@@ -1,9 +1,9 @@
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
 import type {
   RedmineFeedbackPluginController,
   RedmineFeedbackPluginControllerState,
   RedmineFeedbackRuntimeOptions
-} from "@feedback/redmine-plugin/loader";
+} from "@geibee/redmine-plugin/loader";
 
 const locationSubscribers = new Set<() => void>();
 

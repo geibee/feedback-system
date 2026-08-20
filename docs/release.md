@@ -12,22 +12,22 @@ bash scripts/build-feedback-redmine-release.sh \
 
 生成物:
 
-- `@feedback/contracts`
-- `@feedback/core`
-- `@feedback/dom-capture`
-- `@feedback/react-ui`
-- `@feedback/maplibre`
-- `@feedback/redmine-core`
-- `@feedback/redmine-react`
-- `@feedback/redmine-plugin`
-- `@feedback/redmine-gateway`
-- `@feedback/redmine-ops`
+- `@geibee/contracts`
+- `@geibee/core`
+- `@geibee/dom-capture`
+- `@geibee/react-ui`
+- `@geibee/maplibre`
+- `@geibee/redmine-core`
+- `@geibee/redmine-react`
+- `@geibee/redmine-plugin`
+- `@geibee/redmine-gateway`
+- `@geibee/redmine-ops`
 - linux/amd64・linux/arm64の`feedback-redmine-gateway` OCI archive
 - linux/amd64・linux/arm64のローカル評価用`feedback-redmine-demo` OCI archive
 - imageごと・platformごとのCycloneDX SBOMとHIGH/CRITICAL vulnerability SARIF
 - publish順を持つ`release-manifest.json`と`SHA256SUMS`
 
-release builderはstaging copyだけから`private`を除去し、内部`@feedback/*`依存を指定versionへ固定する。source workspaceは
+release builderはstaging copyだけから`private`を除去し、内部`@geibee/*`依存を指定versionへ固定する。source workspaceは
 変更せず、publishやOCI pushも行わない。`release-manifest.json`の`publishOrder`順に承認済みnpm互換registryへ投入し、
 OCI archiveを承認済みregistryへ同じversion tagでimportする。全HIGH/CRITICALをSARIFへ記録し、vendor修正版がある
 HIGH/CRITICALを検出した場合はrelease生成を失敗させる。修正版がない検出結果はrisk acceptance対象としてrelease reviewで判断する。
@@ -56,7 +56,7 @@ bash scripts/build-feedback-sdk-release.sh \
   --version 1.0.0-rc.1
 ```
 
-`@feedback/contracts`、`@feedback/core`、`@feedback/react-ui`、`@feedback/react`、`@feedback/maplibre`、`@feedback/admin-react`のtarball、
+`@geibee/contracts`、`@geibee/core`、`@geibee/react-ui`、`@geibee/react`、`@geibee/maplibre`、`@geibee/admin-react`のtarball、
 `release-manifest.json`、`SHA256SUMS`を生成する。
 
 ## Legacy Go Service・CLI

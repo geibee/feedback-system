@@ -7,7 +7,7 @@ import type {
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
-} from "@feedback/contracts";
+} from "@geibee/contracts";
 
 export type {
   RedmineAttachmentV1,

@@ -1,12 +1,12 @@
 import { createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { RedmineDiagnosticBuffer } from "@feedback/redmine-core";
+import { RedmineDiagnosticBuffer } from "@geibee/redmine-core";
 import {
   RedmineFeedbackOverlay,
   RedmineFeedbackProvider,
   installRedmineFeedbackStyles,
   type RedmineFeedbackOverlayHandle
-} from "@feedback/redmine-react";
+} from "@geibee/redmine-react";
 import { GatewayRedmineFeedbackTransport } from "./gateway-transport.js";
 import { createBrowserClientState } from "./storage.js";
 import { downloadDiagnosticJson } from "./diagnostic-download.js";

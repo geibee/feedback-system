@@ -1,13 +1,13 @@
-# `@feedback/redmine-ops`
+# `@geibee/redmine-ops`
 
 Feedback Redmineのローカル評価、既存Redmineの読取診断、gateway疎通確認、バックアップ・復元を行うCLIです。
 
 ```bash
-npx @feedback/redmine-ops@1.0.0 local up
-npx @feedback/redmine-ops@1.0.0 local credentials
+npx @geibee/redmine-ops@1.0.0 local up
+npx @geibee/redmine-ops@1.0.0 local credentials
 FEEDBACK_REDMINE_INSPECT_API_KEY='<temporary-admin-key>' \
-  npx @feedback/redmine-ops@1.0.0 inspect --manifest feedback-redmine-installation.json
-npx @feedback/redmine-ops@1.0.0 doctor --origin https://app.example --profile inventory-production
+  npx @geibee/redmine-ops@1.0.0 inspect --manifest feedback-redmine-installation.json
+npx @geibee/redmine-ops@1.0.0 doctor --origin https://app.example --profile inventory-production
 ```
 
 Redmineを変更するRails runnerは既定でplanだけを出力し、同じplan digestを明示したapplyだけを許可します。詳しい手順は

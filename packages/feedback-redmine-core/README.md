@@ -1,8 +1,8 @@
-# @feedback/redmine-core
+# @geibee/redmine-core
 
 Redmine issue、journal、attachment、custom fieldからFeedback threadを構築するbrowser-safeな共通coreです。
 公開entryはUI向けport/modelと決定的な変換だけを含みます。Redmine API keyを受け取るREST connectorは
-`@feedback/redmine-core/trusted`に分離し、server-side gatewayからだけ利用します。
+`@geibee/redmine-core/trusted`に分離し、server-side gatewayからだけ利用します。
 
 DOM、React、Chrome API、Node.js組み込みmodule、filesystem、process環境には依存しません。
 `RedmineDiagnosticBuffer`は許可済みmetadataだけを最大100件のmemory ring bufferへ保持し、永続化やremote送信を行いません。

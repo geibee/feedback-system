@@ -1,6 +1,6 @@
 # Feedback Redmine gateway server
 
-`@feedback/redmine-gateway`の公開participant modeをNode.js HTTP serverへ接続した標準配布serverです。host session、OIDC JWT、
+`@geibee/redmine-gateway`の公開participant modeをNode.js HTTP serverへ接続した標準配布serverです。host session、OIDC JWT、
 固定principal、Feedback専用DBは使用しません。
 
 `FEEDBACK_PUBLIC_ORIGIN`へSPAの正確な公開origin、`FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`へread-only server profile JSONのabsolute pathを指定します。`clientProfileRef`は

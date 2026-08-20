@@ -47,16 +47,16 @@ cleanup() {
 trap cleanup EXIT
 
 packages=(
-  @feedback/contracts
-  @feedback/core
-  @feedback/dom-capture
-  @feedback/react-ui
-  @feedback/maplibre
-  @feedback/redmine-core
-  @feedback/redmine-react
-  @feedback/redmine-plugin
-  @feedback/redmine-gateway
-  @feedback/redmine-ops
+  @geibee/contracts
+  @geibee/core
+  @geibee/dom-capture
+  @geibee/react-ui
+  @geibee/maplibre
+  @geibee/redmine-core
+  @geibee/redmine-react
+  @geibee/redmine-plugin
+  @geibee/redmine-gateway
+  @geibee/redmine-ops
 )
 
 npm run build:redmine
@@ -73,7 +73,7 @@ trap 'cleanup_builder; cleanup' EXIT
 artifacts_file="$release_root/artifacts.tsv"
 : >"$artifacts_file"
 for package_name in "${packages[@]}"; do
-  package_key=${package_name#@feedback/}
+  package_key=${package_name#@geibee/}
   source_dir="$release_root/source-$package_key"
   stage_dir="$release_root/stage-$package_key"
   mkdir -p "$source_dir" "$stage_dir"
@@ -94,7 +94,7 @@ for package_name in "${packages[@]}"; do
     value.publishConfig = { ...(value.publishConfig || {}), access: "restricted" };
     for (const section of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
       for (const name of Object.keys(value[section] || {})) {
-        if (name.startsWith("@feedback/")) value[section][name] = process.env.RELEASE_PACKAGE_VERSION;
+        if (name.startsWith("@geibee/")) value[section][name] = process.env.RELEASE_PACKAGE_VERSION;
       }
     }
     fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);

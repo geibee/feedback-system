@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/conformance-consumer",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/conformance-consumer",
+  "version": "1.0.0-alpha.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,8 +10,8 @@
     "start": "node server-dist/server.js"
   },
   "dependencies": {
-    "@feedback/core": "1.0.0-alpha.2",
-    "@feedback/react": "1.0.0-alpha.2",
+    "@geibee/core": "1.0.0-alpha.3",
+    "@geibee/react": "1.0.0-alpha.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

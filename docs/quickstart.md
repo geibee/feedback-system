@@ -22,7 +22,7 @@ secret managerに保存し、SPA、HTML、runtime config、browser storageへ渡
 
 ## 2. gatewayを組み込む
 
-`@feedback/redmine-gateway`を`/internal/feedback-redmine/v1`としてSPAと同じoriginで公開する。Redmine API keyに加え、
+`@geibee/redmine-gateway`を`/internal/feedback-redmine/v1`としてSPAと同じoriginで公開する。Redmine API keyに加え、
 32 bytes以上のparticipant署名鍵をsecret managerから`participantSigningKey`へ注入する。SDKはOIDC JWTやhost sessionをgatewayへ
 送らない。初回にgatewayが署名したparticipant credentialを取得し、同じorigin・browser profileのlocalStorageへ保存する。
 
@@ -31,13 +31,13 @@ participant credentialも自己編集の所有確認だけを目的とする。g
 
 ## 3. SPAへ同梱する
 
-React 18または19を使うSPAへ`@feedback/redmine-plugin`を追加し、単一のintegration moduleからloader controllerを作る。
+React 18または19を使うSPAへ`@geibee/redmine-plugin`を追加し、単一のintegration moduleからloader controllerを作る。
 runtime loaderは最初に公開設定だけを取得し、`enabled:false`ではReact UI、DOM、gateway通信、timer、router購読を開始しない。
 
 ```ts
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
 
 export function FeedbackIntegration(): null {
   useEffect(() => {
@@ -70,7 +70,7 @@ origin rootを変更できないsubpath配備では`configPath: "/inventory/.wel
 破棄するが、draft、follow、pending intentは保持する。再度`true`にするとdynamic importから再mountする。
 
 `＋ フィードバック`は対象選択modeへ入り、`data-feedback-key`を持つDOM要素を優先し、なければ画面相対座標へfallbackする。
-`contextMenu: true`の場合だけ右クリック投稿を有効化する。MapLibreでは`@feedback/maplibre`のtarget resolverとpin providerを渡す。
+`contextMenu: true`の場合だけ右クリック投稿を有効化する。MapLibreでは`@geibee/maplibre`のtarget resolverとpin providerを渡す。
 スクリーンショットはProfileで明示的に無効化しない限り、pluginが既定DOM providerで取得する。Host Adapterへの
 `captureEvidence`実装は不要で、MapLibre canvasなどhost固有処理が必要な場合だけ差し替える。位置選択後にFeedbackピンを
 画像へ焼き込んでpreviewし、取得成功時は投稿へ自動添付する。取得失敗時は理由を表示し、画像なしでも送信できる。
@@ -94,7 +94,7 @@ digest固定conformanceを含み、未実行を成功として扱わない。
 
 - 一時停止: runtime configをfalseへ配備してページをreloadするか、`setEnabled(false)`を呼ぶ。SPAの再buildは不要で、ローカル状態は保持する。
 - 完全撤去: 先に`await feedback?.purgeLocalState()`で現在origin・profileの端末状態だけを削除し、integration moduleの呼出し、
-  `@feedback/redmine-plugin`依存、gateway mountを削除する。
+  `@geibee/redmine-plugin`依存、gateway mountを削除する。
 - `purgeLocalState()`はparticipant credentialも削除する。再有効化後は新しいUUIDとなり、以前の投稿を自己編集できない。
 - Redmineのissue、journal、attachment、custom fieldsはpluginの無効化・撤去では削除しない。
 

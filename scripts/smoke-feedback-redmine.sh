@@ -15,6 +15,6 @@ playwright_image='mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814
 docker run --rm --ipc=host \
   -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
   -v "$ROOT:/work:ro" -w /work \
-  "$playwright_image" npm run test:plugin:chrome --workspace @feedback/redmine-browser-e2e
+  "$playwright_image" npm run test:plugin:chrome --workspace @geibee/redmine-browser-e2e
 
 echo "[feedback-redmine-smoke] PASS"

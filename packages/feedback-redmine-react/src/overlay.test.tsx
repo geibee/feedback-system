@@ -10,8 +10,8 @@ import {
   type RedmineThreadListResult,
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
-} from "@feedback/redmine-core";
-import type { FeedbackLocationV1 } from "@feedback/core";
+} from "@geibee/redmine-core";
+import type { FeedbackLocationV1 } from "@geibee/core";
 import { feedbackErrorMessage } from "./error-message.js";
 import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { RedmineFeedbackOverlay } from "./overlay.js";

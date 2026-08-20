@@ -35,7 +35,7 @@ if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   npm ci --ignore-scripts --no-audit --no-fund
 fi
 
-for package_name in @feedback/contracts @feedback/core; do
+for package_name in @geibee/contracts @geibee/core; do
   log "$package_name"
   npm --workspace "$package_name" run typecheck
   npm --workspace "$package_name" run test
@@ -53,14 +53,14 @@ bash scripts/check-feedback-redmine-release.sh
 bash scripts/check-feedback-container-platforms.sh
 bash scripts/verify-feedback-go.sh
 
-for package_name in @feedback/react @feedback/maplibre @feedback/admin-react; do
+for package_name in @geibee/react @geibee/maplibre @geibee/admin-react; do
   log "$package_name"
   npm --workspace "$package_name" run typecheck
   npm --workspace "$package_name" run test
   npm --workspace "$package_name" run build
 done
 
-for application in @feedback/admin-console @feedback/token-broker-reference @feedback/conformance-consumer; do
+for application in @geibee/admin-console @geibee/token-broker-reference @geibee/conformance-consumer; do
   log "$application"
   npm --workspace "$application" run typecheck
   npm --workspace "$application" run test

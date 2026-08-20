@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { RedmineThreadSummaryV1 } from "@feedback/redmine-core";
-import type { FeedbackPinPositionProvider } from "@feedback/core";
+import type { RedmineThreadSummaryV1 } from "@geibee/redmine-core";
+import type { FeedbackPinPositionProvider } from "@geibee/core";
 
 export function ThreadPins(props: {
   threads: RedmineThreadSummaryV1[];

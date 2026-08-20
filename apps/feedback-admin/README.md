@@ -12,7 +12,7 @@ VITE_FEEDBACK_ADMIN_OIDC_SCOPE="openid profile email feedback.admin" \
 VITE_FEEDBACK_ADMIN_APPLICATION_KEY=inventory \
 VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY=local \
 VITE_FEEDBACK_ADMIN_WORKSPACE_KEY=east \
-npm --workspace @feedback/admin-console run dev
+npm --workspace @geibee/admin-console run dev
 ```
 
 または次のローカルfixture一式を起動する。

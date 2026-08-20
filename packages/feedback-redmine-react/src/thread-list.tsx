@@ -4,7 +4,7 @@ import type {
   RedmineThreadFilter,
   RedmineThreadSort,
   RedmineThreadSummaryV1
-} from "@feedback/redmine-core";
+} from "@geibee/redmine-core";
 import { useDismissiblePanel } from "./dismissible.js";
 
 export type ThreadListProps = {

@@ -1,4 +1,4 @@
-# @feedback/redmine-gateway
+# @geibee/redmine-gateway
 
 業務アプリケーションと同一originへ組み込む、Web標準`Request`/`Response`ベースのstateless handlerです。
 DB、queue、cache、filesystem upload、object storageを使用しません。

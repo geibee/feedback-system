@@ -1,4 +1,4 @@
-import type { RedmineThreadSummaryV1, RedmineThreadV1 } from "@feedback/contracts";
+import type { RedmineThreadSummaryV1, RedmineThreadV1 } from "@geibee/contracts";
 import {
   buildLocator,
   calculateRequestHash,

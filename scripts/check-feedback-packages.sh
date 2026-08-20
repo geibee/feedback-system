@@ -19,18 +19,18 @@ vite_version=8.2.1
 vite_react_plugin_version=6.0.5
 mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
-  @feedback/contracts
-  @feedback/core
-  @feedback/dom-capture
-  @feedback/react-ui
-  @feedback/react
-  @feedback/maplibre
-  @feedback/admin-react
+  @geibee/contracts
+  @geibee/core
+  @geibee/dom-capture
+  @geibee/react-ui
+  @geibee/react
+  @geibee/maplibre
+  @geibee/admin-react
 )
 declare -A tarballs
 
 for package_name in "${packages[@]}"; do
-  package_key=${package_name#@feedback/}
+  package_key=${package_name#@geibee/}
   node -e '
     const fs = require("node:fs");
     const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
@@ -48,8 +48,8 @@ for package_name in "${packages[@]}"; do
     const [result] = JSON.parse(process.env.PACK_RESULT);
     const files = new Set(result.files.map((file) => file.path));
     const required = ["dist/index.js", "dist/index.d.ts", "package.json", "README.md", "CHANGELOG.md"];
-    if (["@feedback/react", "@feedback/admin-react"].includes(process.env.PACKAGE_NAME)) required.push("dist/styles.css");
-    if (process.env.PACKAGE_NAME === "@feedback/contracts") {
+    if (["@geibee/react", "@geibee/admin-react"].includes(process.env.PACKAGE_NAME)) required.push("dist/styles.css");
+    if (process.env.PACKAGE_NAME === "@geibee/contracts") {
       required.push("openapi.yaml", "token-exchange.openapi.yaml", "schemas/application-manifest.schema.json", "schemas/installation-manifest.schema.json", "schemas/location.schema.json", "schemas/target.schema.json", "schemas/webhook-event.schema.json", "schemas/token-exchange-jwt.schema.json");
     }
     if (required.some((path) => !files.has(path))) process.exit(1);
@@ -79,11 +79,11 @@ node -e '
   ]);
   for (const value of [contracts, core, capture, reactUi]) {
     const names = dependencyNames(value);
-    if (["react", "react-dom", "maplibre-gl", "@feedback/react", "@feedback/maplibre", "@feedback/admin-react"].some((name) => names.has(name))) process.exit(1);
+    if (["react", "react-dom", "maplibre-gl", "@geibee/react", "@geibee/maplibre", "@geibee/admin-react"].some((name) => names.has(name))) process.exit(1);
   }
-  if (dependencyNames(react).has("maplibre-gl") || dependencyNames(react).has("@feedback/maplibre")) process.exit(1);
+  if (dependencyNames(react).has("maplibre-gl") || dependencyNames(react).has("@geibee/maplibre")) process.exit(1);
   if (Object.keys(maplibre.peerDependencies || {}).join(",") !== "maplibre-gl") process.exit(1);
-  if (![contracts, core, capture, reactUi, react, maplibre, admin].every((value) => value.private === true && value.version === "1.0.0-alpha.2")) process.exit(1);
+  if (![contracts, core, capture, reactUi, react, maplibre, admin].every((value) => value.private === true && value.version === "1.0.0-alpha.3")) process.exit(1);
 ' || {
   echo "[feedback-package] FAIL: optional dependencyまたはversion/private metadata境界が不正です" >&2
   exit 1
@@ -108,10 +108,10 @@ for index in "${!react_versions[@]}"; do
       vitest@4.1.9 jsdom@29.1.1 @testing-library/react@16.3.2 react-router-dom@6.30.1
     npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
       "${tarballs[contracts]}" "${tarballs[core]}" "${tarballs["dom-capture"]}" "${tarballs["react-ui"]}" "${tarballs[react]}"
-    test ! -d node_modules/@feedback/maplibre
-    test ! -d node_modules/@feedback/admin-react
+    test ! -d node_modules/@geibee/maplibre
+    test ! -d node_modules/@geibee/admin-react
     test ! -d node_modules/maplibre-gl
-    test -f node_modules/@feedback/react/dist/styles.css
+    test -f node_modules/@geibee/react/dist/styles.css
     npm run typecheck
     npm run build
     npm run test
@@ -119,11 +119,11 @@ for index in "${!react_versions[@]}"; do
     if [[ "$react_version" == 19.* ]]; then
       npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund maplibre-gl@5.24.0 "${tarballs[maplibre]}"
       npm run typecheck:maplibre
-      node --input-type=module -e 'await import("@feedback/maplibre")'
+      node --input-type=module -e 'await import("@geibee/maplibre")'
       npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund "${tarballs["admin-react"]}"
       npm run typecheck:admin
-      test -f node_modules/@feedback/admin-react/dist/styles.css
-      node --input-type=module -e 'await import("@feedback/admin-react")'
+      test -f node_modules/@geibee/admin-react/dist/styles.css
+      node --input-type=module -e 'await import("@geibee/admin-react")'
     fi
   )
   echo "[feedback-package] PASS: clean Vite $vite_version / React $react_version fixture"
@@ -135,7 +135,7 @@ stable_tarball_dir="$feedback_package_tmp/stable-tarballs"
 mkdir -p "$stable_tarball_dir"
 declare -A stable_tarballs
 for package_name in "${packages[@]}"; do
-  package_key=${package_name#@feedback/}
+  package_key=${package_name#@geibee/}
   candidate="$feedback_package_tmp/stable-$package_key"
   mkdir -p "$candidate"
   tar -xzf "${tarballs[$package_key]}" -C "$candidate" --strip-components=1
@@ -146,7 +146,7 @@ for package_name in "${packages[@]}"; do
     value.version = "1.0.0";
     for (const section of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
       for (const name of Object.keys(value[section] || {})) {
-        if (name.startsWith("@feedback/")) value[section][name] = "1.0.0";
+        if (name.startsWith("@geibee/")) value[section][name] = "1.0.0";
       }
     }
     fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);

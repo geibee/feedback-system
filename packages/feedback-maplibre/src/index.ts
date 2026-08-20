@@ -1,6 +1,6 @@
 import type { MapGeoJSONFeature } from "maplibre-gl";
-import type { FeedbackTargetV1, FeedbackThreadV1 } from "@feedback/contracts";
-import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@feedback/core";
+import type { FeedbackTargetV1, FeedbackThreadV1 } from "@geibee/contracts";
+import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@geibee/core";
 
 export const maplibreCanvasSelector = "canvas.maplibregl-canvas";
 export const captureReadyCanvasContextAttributes = { preserveDrawingBuffer: true } as const;
@@ -13,7 +13,7 @@ export type FeedbackMapLibreEvidenceMap = {
 };
 
 export type FeedbackMapLibreEvidenceProviderOptions = {
-  /** DOM全体をPNG化するprovider。通常は@feedback/reactのcreateDomEvidenceProviderを渡す。 */
+  /** DOM全体をPNG化するprovider。通常は@geibee/reactのcreateDomEvidenceProviderを渡す。 */
   capture: FeedbackEvidenceProvider;
   /** React refの初期化順を吸収し、画面内に存在するMapLibre mapを撮影時点で返す。 */
   maps(): readonly FeedbackMapLibreEvidenceMap[];

@@ -1,4 +1,4 @@
-import type { RedmineRuntimeConfigV1 } from "@feedback/contracts";
+import type { RedmineRuntimeConfigV1 } from "@geibee/contracts";
 import {
   createRedmineFeedbackPluginControllerInternal,
   type RedmineFeedbackPluginController,

@@ -8,7 +8,7 @@ consumer="apps/feedback-conformance-consumer"
 node -e '
   const value = require(`./${process.argv[1]}/package.json`);
   const dependencies = new Set(Object.keys(value.dependencies || {}));
-  const expected = new Set(["@feedback/core", "@feedback/react", "react", "react-dom"]);
+  const expected = new Set(["@geibee/core", "@geibee/react", "react", "react-dom"]);
   if (!value.private || dependencies.size !== expected.size || [...dependencies].some((name) => !expected.has(name))) {
     process.exit(1);
   }

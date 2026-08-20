@@ -5,7 +5,7 @@
 
 ## 1. 対応バージョンと前提条件
 
-標準構成は、業務SPAへ組み込む`@feedback/redmine-plugin`、same-originのFeedback Redmine gateway、Redmineからなる。
+標準構成は、業務SPAへ組み込む`@geibee/redmine-plugin`、same-originのFeedback Redmine gateway、Redmineからなる。
 thread、返信、状態、添付ファイル、custom fieldの唯一の正本はRedmineであり、Feedback専用DBやobject storageは使用しない。
 
 検証対象は次のとおりである。
@@ -37,7 +37,7 @@ npm run feedback:redmine:local
 配布済みのreleaseを使う場合は、承認済みregistryとOCI registryへ同じversionのartifactを公開したうえで次を実行する。
 
 ```bash
-npx @feedback/redmine-ops@<version> local up
+npx @geibee/redmine-ops@<version> local up
 ```
 
 既定のデモは`http://127.0.0.1:4173`、Redmine管理画面は`http://127.0.0.1:3001`である。別portは
@@ -59,7 +59,7 @@ node packages/feedback-redmine-ops/dist/cli.js local logs
 node packages/feedback-redmine-ops/dist/cli.js local down
 ```
 
-release版では先頭を`npx @feedback/redmine-ops@<version>`へ置き換える。状態を別directoryに置く場合は全commandへ
+release版では先頭を`npx @geibee/redmine-ops@<version>`へ置き換える。状態を別directoryに置く場合は全commandへ
 `--state-dir /absolute/path`を付ける。直接Redmine公式imageを起動すると初期値`admin` / `admin`が使われる場合があるが、
 このツールは初回provisionで管理者passwordをランダム化する。ツールを経由しない評価環境では初回ログイン直後に必ず変更する。
 
@@ -201,8 +201,8 @@ Feedbackの有効・無効だけならSPAを再buildせず、runtime configの�
 
 ```ts
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@feedback/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
 
 export function FeedbackIntegration(): null {
   useEffect(() => {
@@ -337,7 +337,7 @@ Workspace、Page、Host resourceをdescriptionへ重複記載しない。一方�
 構造化索引なので、遷移用URLだけでは代替しない。URLを押すとSPAのadapterが対象画面へ遷移し、該当threadを開く。
 
 screenshot取得は現在有効で、ローカルProfileも`capture.enabled=true`である。失敗時は画像なしで投稿できるが、CSP、cross-origin image、
-WebGL canvas、upload上限を調べる。MapLibre固有の地物解決と地図pinは自動ではなく、`@feedback/maplibre`のtarget resolverと
+WebGL canvas、upload上限を調べる。MapLibre固有の地物解決と地図pinは自動ではなく、`@geibee/maplibre`のtarget resolverと
 pin position providerをHost Adapterへ指定した場合だけ有効になる。
 
 ## 7. upgradeとrollback

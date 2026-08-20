@@ -1,4 +1,4 @@
-import { RedmineTrustedClient } from "@feedback/redmine-core/trusted";
+import { RedmineTrustedClient } from "@geibee/redmine-core/trusted";
 import type { GatewayDependencies, GatewayServerProfile } from "./profile.js";
 import { GatewayHttpError } from "./problem.js";
 

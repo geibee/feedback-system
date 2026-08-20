@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { validateBaseUrl, validateConnectorProfile } from "@feedback/redmine-core/trusted";
-import type { GatewayServerProfile } from "@feedback/redmine-gateway";
+import { validateBaseUrl, validateConnectorProfile } from "@geibee/redmine-core/trusted";
+import type { GatewayServerProfile } from "@geibee/redmine-gateway";
 
 export type ReferenceGatewayConfig = {
   port: number;

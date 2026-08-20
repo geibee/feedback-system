@@ -1,4 +1,4 @@
-import type { RedmineProblemV1 } from "@feedback/contracts";
+import type { RedmineProblemV1 } from "@geibee/contracts";
 
 export type RedmineErrorCode = RedmineProblemV1["code"];
 

@@ -91,7 +91,11 @@ for package_name in "${packages[@]}"; do
     const value = JSON.parse(fs.readFileSync(file, "utf8"));
     delete value.private;
     value.version = process.env.RELEASE_PACKAGE_VERSION;
-    value.publishConfig = { ...(value.publishConfig || {}), access: "restricted" };
+    value.publishConfig = { registry: "https://npm.pkg.github.com", access: "public" };
+    value.repository = {
+      type: "git",
+      url: "git+https://github.com/geibee/feedback-system.git"
+    };
     for (const section of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
       for (const name of Object.keys(value[section] || {})) {
         if (name.startsWith("@geibee/")) value[section][name] = process.env.RELEASE_PACKAGE_VERSION;
@@ -110,7 +114,9 @@ for package_name in "${packages[@]}"; do
       const fs = require("node:fs");
       const value = JSON.parse(fs.readFileSync(0, "utf8"));
       if (value.name !== process.env.EXPECTED_NAME || value.version !== process.env.EXPECTED_VERSION ||
-          value.private === true || value.publishConfig?.access !== "restricted") process.exit(1);
+          value.private === true || value.publishConfig?.access !== "public" ||
+          value.publishConfig?.registry !== "https://npm.pkg.github.com" ||
+          value.repository?.url !== "git+https://github.com/geibee/feedback-system.git") process.exit(1);
       if (value.exports?.["./self-hosted"]) process.exit(1);
     '
   digest=$(sha256sum "$output/$release_tarball" | awk '{print $1}')
@@ -149,11 +155,13 @@ build_image() {
       '. + [{platform:$platform,vulnerabilityReport:$vulnerability,sbom:$sbom}]' <<<"$reports")
   done
   tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -C "$layout" -cf "$output/$archive" .
-  local digest bytes
+  local digest bytes index_digest
   digest=$(sha256sum "$output/$archive" | awk '{print $1}')
   bytes=$(stat -c '%s' "$output/$archive")
-  jq --arg name "$image_name" --arg archive "$archive" --arg sha256 "$digest" --argjson bytes "$bytes" \
-    --argjson reports "$reports" '. + [{name:$name,archive:$archive,sha256:$sha256,bytes:$bytes,platforms:["linux/amd64","linux/arm64"],reports:$reports}]' \
+  index_digest=$(jq -er '.manifests[0].digest | select(test("^sha256:[a-f0-9]{64}$"))' "$layout/index.json")
+  jq --arg name "$image_name" --arg archive "$archive" --arg sha256 "$digest" --arg indexDigest "$index_digest" \
+    --argjson bytes "$bytes" --argjson reports "$reports" \
+    '. + [{name:$name,archive:$archive,sha256:$sha256,indexDigest:$indexDigest,bytes:$bytes,platforms:["linux/amd64","linux/arm64"],reports:$reports}]' \
     "$images_file" >"$images_file.next"
   mv "$images_file.next" "$images_file"
 }

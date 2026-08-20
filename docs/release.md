@@ -28,8 +28,9 @@ bash scripts/build-feedback-redmine-release.sh \
 - publish順を持つ`release-manifest.json`と`SHA256SUMS`
 
 release builderはstaging copyだけから`private`を除去し、内部`@geibee/*`依存を指定versionへ固定する。source workspaceは
-変更せず、publishやOCI pushも行わない。`release-manifest.json`の`publishOrder`順に承認済みnpm互換registryへ投入し、
-OCI archiveを承認済みregistryへ同じversion tagでimportする。全HIGH/CRITICALをSARIFへ記録し、vendor修正版がある
+変更せず、publishやOCI pushも行わない。tarballは`https://npm.pkg.github.com`、imageは
+`ghcr.io/geibee/feedback-redmine-gateway`と`ghcr.io/geibee/feedback-redmine-demo`を正規公開先とする。
+全HIGH/CRITICALをSARIFへ記録し、vendor修正版がある
 HIGH/CRITICALを検出した場合はrelease生成を失敗させる。修正版がない検出結果はrisk acceptance対象としてrelease reviewで判断する。
 
 ブラウザ拡張ZIPとReact runtime入りself-hosted bundleは標準releaseへ含めない。React 18/19はconsumer SPAのpeer dependencyを使う。
@@ -44,7 +45,21 @@ release前にskip変数なしの`bash scripts/verify-feedback.sh`を実行し、
 - local Compose、provisioner、runtime config、ops CLI
 - Redmine 5.1.12、6.0.10、6.1.3、7.0.0のdigest固定conformance
 
-registry credentialは環境またはuser-level npm設定から注入し、repositoryへ保存しない。生成後は`SHA256SUMS`と署名を検証する。
+`v<package.jsonのversion>` tagをpushすると`.github/workflows/release-feedback-redmine.yml`が正規品質ゲート、release候補生成、
+GitHub Packages・GHCR公開、GitHub Release作成をこの順で実行する。同じtag、npm version、OCI tagは上書きしない。
+公開には`release` environmentの承認規則を設定する。初回公開後にrepository ownerがGitHubのpackage設定でnpm packageと
+container packageをpublicへ設定し、匿名consumerが取得できることを確認する。以後もvisibilityをrelease reviewで確認する。
+
+ローカルから公開scriptを実行する場合は、package write権限を持つ`NODE_AUTH_TOKEN`と`GITHUB_TOKEN`、`GITHUB_ACTOR`を環境から
+注入する。tokenを`.npmrc`、shell引数、repositoryへ保存しない。
+
+```bash
+bash scripts/publish-feedback-redmine-release.sh \
+  --input /tmp/feedback-redmine-release \
+  --version 1.0.0-rc.1
+```
+
+生成後は`SHA256SUMS`と署名を検証する。
 
 ## Legacy Feedback Service SDK
 

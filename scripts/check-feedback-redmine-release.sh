@@ -43,6 +43,7 @@ if (manifest.packages.length !== expected.length || manifest.packages.some((item
 if (!Array.isArray(manifest.images) || manifest.images.length !== 2 ||
     manifest.images.map((item) => item.name).join(",") !== "feedback-redmine-gateway,feedback-redmine-demo" ||
     manifest.images.some((item) => !/^[a-f0-9]{64}$/u.test(item.sha256) ||
+      !/^sha256:[a-f0-9]{64}$/u.test(item.indexDigest) ||
       item.platforms.join(",") !== "linux/amd64,linux/arm64" || !fs.existsSync(path.join(directory, item.archive)) ||
       item.reports.length !== 2 || item.reports.some((report) =>
         !fs.existsSync(path.join(directory, report.sbom)) || !fs.existsSync(path.join(directory, report.vulnerabilityReport))))) {

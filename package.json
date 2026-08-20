@@ -39,6 +39,8 @@
     "build:legacy": "npm run build:shared && npm run build:legacy:packages && npm run build:legacy:apps",
     "build:all": "npm run build:shared && npm run build:redmine:packages && npm run build:redmine:ops && npm --workspace @geibee/redmine-gateway-reference run build && npm --workspace @geibee/redmine-demo run build && npm run build:legacy:packages && npm run build:legacy:apps",
     "test": "bash scripts/verify-feedback.sh",
+    "test:redmine": "bash scripts/verify-feedback-redmine.sh",
+    "test:legacy": "bash scripts/verify-feedback-legacy.sh",
     "smoke:redmine": "bash scripts/smoke-feedback-redmine.sh",
     "feedback:redmine:local": "bash scripts/start-feedback-redmine-local.sh",
     "release:redmine": "bash scripts/build-feedback-redmine-release.sh",

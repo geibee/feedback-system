@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "enabled": true,
+  "profileId": "feedback-local",
+  "gatewayBasePath": "/internal/feedback-redmine/v1"
+}

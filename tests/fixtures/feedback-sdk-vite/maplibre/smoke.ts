@@ -5,7 +5,7 @@ import {
   findUnreadableMapCanvases,
   resolveMapLibreFeedbackTarget,
   resolveMapLibreFeedbackTargetAtClientPoint
-} from "@feedback/maplibre";
+} from "@geibee/maplibre";
 
 type Binding = ReturnType<typeof bindMapLibreFeedbackPins>;
 type Target = ReturnType<typeof resolveMapLibreFeedbackTarget>;

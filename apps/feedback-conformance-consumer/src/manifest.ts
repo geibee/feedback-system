@@ -1,4 +1,4 @@
-import { defineFeedbackManifest, type FeedbackApplicationManifestV1 } from "@feedback/core";
+import { defineFeedbackManifest, type FeedbackApplicationManifestV1 } from "@geibee/core";
 import feedbackManifest from "../feedback-manifest.json";
 
 /** Web GIS と異なるURL・画面語彙を持つ consumer 2 の正本。 */

@@ -1,0 +1,32 @@
+# TLSを終端する業務SPAのserverブロック内へ配置する例。
+# gatewayは外部へ直接公開せず、upstream名は実環境へ置き換える。
+location ^~ /internal/feedback-redmine/v1/ {
+    proxy_pass http://feedback-redmine-gateway:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Request-Id $request_id;
+
+    # OriginとSec-Fetch-*はgatewayの検証に使うため削除・上書きしない。
+    proxy_pass_request_headers on;
+    proxy_redirect off;
+    proxy_request_buffering on;
+    proxy_buffering on;
+    client_max_body_size 11m;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 30s;
+    proxy_read_timeout 30s;
+
+    # 組織の認証gatewayを使う場合はここでauth_request等を適用する。
+    # auth_request /_feedback_external_auth;
+}
+
+# 配備ごとに生成した公開runtime config。API key等のsecretは置かない。
+location = /.well-known/feedback-redmine.json {
+    root /srv/application/public;
+    default_type application/json;
+    add_header Cache-Control "no-store" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    try_files $uri =404;
+}

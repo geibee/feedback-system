@@ -7,19 +7,19 @@ COPY packages/feedback-core/package.json packages/feedback-core/package.json
 COPY packages/feedback-dom-capture/package.json packages/feedback-dom-capture/package.json
 COPY packages/feedback-react/package.json packages/feedback-react/package.json
 COPY apps/feedback-conformance-consumer/package.json apps/feedback-conformance-consumer/package.json
-RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @feedback/contracts --workspace @feedback/core \
-    --workspace @feedback/dom-capture --workspace @feedback/react \
-    --workspace @feedback/conformance-consumer --include-workspace-root=false
+RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @geibee/contracts --workspace @geibee/core \
+    --workspace @geibee/dom-capture --workspace @geibee/react \
+    --workspace @geibee/conformance-consumer --include-workspace-root=false
 COPY contracts/feedback contracts/feedback
 COPY packages/feedback-core packages/feedback-core
 COPY packages/feedback-dom-capture packages/feedback-dom-capture
 COPY packages/feedback-react packages/feedback-react
 COPY apps/feedback-conformance-consumer apps/feedback-conformance-consumer
-RUN npm --workspace @feedback/contracts run build \
-    && npm --workspace @feedback/core run build \
-    && npm --workspace @feedback/dom-capture run build \
-    && npm --workspace @feedback/react run build \
-    && npm --workspace @feedback/conformance-consumer run build
+RUN npm --workspace @geibee/contracts run build \
+    && npm --workspace @geibee/core run build \
+    && npm --workspace @geibee/dom-capture run build \
+    && npm --workspace @geibee/react run build \
+    && npm --workspace @geibee/conformance-consumer run build
 
 FROM docker.io/library/node:22-alpine
 WORKDIR /app

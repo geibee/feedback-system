@@ -27,27 +27,11 @@ export type FeedbackMessageMetadataV1 = {
 };
 
 const marker = "---\nFeedback metadata v1\n";
+const linkMarker = "---\nアプリでこのフィードバックを開く\n";
 
-export function buildRedmineDescription(comment: string, metadata: FeedbackMetadataV1): string {
+export function buildRedmineDescription(comment: string, threadUrl: string | null = null): string {
   const body = comment.replace(/\r\n?/gu, "\n").trim();
-  return `${body}\n\n${marker}${[
-    ["Thread ID", metadata.threadId],
-    ["Intent ID", metadata.intentId],
-    ["Request hash", metadata.requestHash],
-    ["Application", metadata.applicationKey],
-    ["Environment", metadata.environmentKey],
-    ["External workspace", metadata.externalWorkspaceKey],
-    ["Page", metadata.pageKey],
-    ["Host resource", metadata.hostResourceKey],
-    ["Perspective", metadata.perspectiveCode],
-    ["Submitted by ID", metadata.submittedById],
-    ...(metadata.submittedByName === undefined ? [] : [["Submitted by name", metadata.submittedByName ?? ""]]),
-    ...(metadata.messageId === undefined ? [] : [["Message ID", metadata.messageId]]),
-    ...(metadata.participantId === undefined ? [] : [["Participant ID", metadata.participantId]]),
-    ...(metadata.messageSignature === undefined ? [] : [["Message signature", metadata.messageSignature]]),
-    ["Captured at", metadata.capturedAt],
-    ["Context attachment", "feedback-context-v1.json"]
-  ].map(([key, value]) => `${key}: ${value}`).join("\n")}`;
+  return threadUrl ? `${body}\n\n${linkMarker}${threadUrl}` : body;
 }
 
 const messageMarker = "---\nFeedback message v1\n";
@@ -82,13 +66,13 @@ export function parseRedmineMessageNote(notes: string): {
 
 export function initialCommentFromDescription(description: string): string {
   const normalized = description.replace(/\r\n?/gu, "\n");
-  const index = normalized.lastIndexOf(`\n\n${marker}`);
+  const index = descriptionSuffixIndex(normalized);
   return (index < 0 ? normalized : normalized.slice(0, index)).trim();
 }
 
 export function replaceInitialCommentInDescription(description: string, comment: string): string {
   const normalized = description.replace(/\r\n?/gu, "\n");
-  const index = normalized.lastIndexOf(`\n\n${marker}`);
+  const index = descriptionSuffixIndex(normalized);
   if (index < 0) return comment.replace(/\r\n?/gu, "\n").trim();
   return `${comment.replace(/\r\n?/gu, "\n").trim()}${normalized.slice(index)}`;
 }
@@ -126,3 +110,9 @@ export function parseFeedbackMetadata(description: string): Partial<FeedbackMeta
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function descriptionSuffixIndex(description: string): number {
+  const legacy = description.lastIndexOf(`\n\n${marker}`);
+  const link = description.lastIndexOf(`\n\n${linkMarker}`);
+  return Math.max(legacy, link);
+}

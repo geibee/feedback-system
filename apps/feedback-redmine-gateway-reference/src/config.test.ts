@@ -10,10 +10,11 @@ afterEach(() => {
   for (const path of temporaryDirectories.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
-describe("reference gateway config", () => {
+describe("standard gateway config", () => {
   it("固定環境変数と参照先client profileを読み込む", () => {
     const directory = createProfileFiles();
     const config = loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "integration-test-key",
       FEEDBACK_PARTICIPANT_SIGNING_KEY: "participant-signing-test-secret-at-least-32-bytes",
@@ -21,21 +22,38 @@ describe("reference gateway config", () => {
     });
 
     expect(config.port).toBe(9090);
+    expect(config.publicOrigin).toBe("https://app.example.test");
+    expect(config.allowHttpDevelopment).toBe(false);
     expect(config.profiles.get("inventory-production")?.clientProfile.displayName).toBe("Inventory / Production");
     expect(config.secrets.get("FEEDBACK_REDMINE_GATEWAY_API_KEY")).toBe("integration-test-key");
     expect(config.participantSigningKey).toBe("participant-signing-test-secret-at-least-32-bytes");
   });
 
+  it("API keyをread-only secret fileから読み込む", () => {
+    const directory = createProfileFiles();
+    const secretPath = join(directory, "api-key");
+    writeFileSync(secretPath, "file-integration-key\n", { mode: 0o600 });
+    const config = loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
+      FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE: secretPath,
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "participant-signing-test-secret-at-least-32-bytes"
+    });
+    expect(config.secrets.get("FEEDBACK_REDMINE_GATEWAY_API_KEY")).toBe("file-integration-key");
+  });
+
   it.each([
-    ["profile file", { FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
-    ["API key", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
-    ["participant signing key", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key" }]
+    ["public origin", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
+    ["profile file", { FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
+    ["API key", { FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test", FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
+    ["participant signing key", { FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test", FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key" }]
   ])("%s未設定時にfail-fastする", (_name, environment) => {
     expect(() => loadReferenceGatewayConfig(environment)).toThrow(/必須/u);
   });
 
   it("relative profile pathとunknown propertyを拒否する", () => {
     expect(() => loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "server.json",
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
       FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
@@ -43,10 +61,38 @@ describe("reference gateway config", () => {
 
     const directory = createProfileFiles({ arbitrary: true });
     expect(() => loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
       FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
       FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
     })).toThrow(/unknown property/u);
+  });
+
+  it("API keyの値とfileの同時指定を拒否する", () => {
+    const directory = createProfileFiles();
+    expect(() => loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
+      FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE: join(directory, "api-key"),
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
+    })).toThrow(/同時/u);
+  });
+
+  it("本番はHTTPSのoriginだけを受け、開発時だけHTTPを許可する", () => {
+    expect(() => loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "http://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used",
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
+    })).toThrow(/HTTPS/u);
+    expect(() => loadReferenceGatewayConfig({
+      NODE_ENV: "development",
+      FEEDBACK_PUBLIC_ORIGIN: "http://app.example.test/path",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used",
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
+    })).toThrow(/path/u);
   });
 });
 

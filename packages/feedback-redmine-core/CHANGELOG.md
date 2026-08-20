@@ -4,6 +4,8 @@
 
 - browser profile UUIDを参加者IDとするcontext、participant message marker、返信journal、追記型編集、version fold、終了status判定を追加。
 - Profile内Workspace一覧、一覧総件数、scopeへ束縛したcursor v2を追加し、既存resource cursor v1を維持。
+- 新規issueのdescriptionを初回commentとthread URLだけにし、初回自己編集署名をcontext attachmentへ移した。旧metadata blockの読取は維持。
+- `custom` targetをRedmine locatorへ保存・復元し、provider、fallback座標、scalar metadataをfail-closedで検証するようにしました。
 
 ## 1.0.0-alpha.1
 

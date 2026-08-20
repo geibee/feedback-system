@@ -2,7 +2,7 @@ import {
   resolveFeedbackLocation,
   type FeedbackHostAdapter,
   type FeedbackLocationV1
-} from "@feedback/core";
+} from "@geibee/core";
 import { inventoryFeedbackManifest } from "./manifest";
 import type { FeedbackExchangeScope, FeedbackTokenExchangeAdapter } from "./tokenExchange";
 

@@ -1,0 +1,30 @@
+{
+  "name": "@geibee/redmine-ops",
+  "version": "1.0.0-alpha.3",
+  "description": "Feedback Redmineの導入・診断・ローカル運用CLI",
+  "private": true,
+  "type": "module",
+  "files": ["dist", "assets", "README.md", "CHANGELOG.md"],
+  "bin": { "feedback-redmine": "./dist/cli.js" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./assets/*": "./assets/*"
+  },
+  "publishConfig": { "access": "restricted" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@geibee/contracts": "1.0.0-alpha.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.0",
+    "typescript": "^5.6.3",
+    "vitest": "4.1.9"
+  }
+}

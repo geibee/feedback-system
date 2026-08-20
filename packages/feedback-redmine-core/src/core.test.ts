@@ -77,7 +77,17 @@ describe("Redmine core deterministic model", () => {
     expect(subject).not.toContain("\u0000");
   });
 
-  it("metadata blockの順序と初回commentを往復する", () => {
+  it("新規descriptionは初回commentとthread URLだけを保存する", () => {
+    const threadUrl = "https://inventory.example.invalid/orders/1?feedbackThread=00000000-0000-4000-8000-000000000001";
+    const description = buildRedmineDescription("最初のコメント", threadUrl);
+    expect(description).toBe(`最初のコメント\n\n---\nアプリでこのフィードバックを開く\n${threadUrl}`);
+    expect(initialCommentFromDescription(description)).toBe("最初のコメント");
+    expect(parseFeedbackMetadata(description)).toBeNull();
+    expect(description).not.toContain("Application:");
+    expect(description).not.toContain("Host resource:");
+  });
+
+  it("旧metadata blockを読取互換のため解析する", () => {
     const metadata = {
       threadId: "00000000-0000-4000-8000-000000000001",
       intentId: "00000000-0000-4000-8000-000000000002",
@@ -91,7 +101,19 @@ describe("Redmine core deterministic model", () => {
       submittedById: "00000000-0000-4000-8000-000000000007",
       capturedAt: "2026-08-19T00:00:00Z"
     };
-    const description = buildRedmineDescription("最初のコメント", metadata);
+    const description = `最初のコメント\n\n---\nFeedback metadata v1\n${[
+      ["Thread ID", metadata.threadId],
+      ["Intent ID", metadata.intentId],
+      ["Request hash", metadata.requestHash],
+      ["Application", metadata.applicationKey],
+      ["Environment", metadata.environmentKey],
+      ["External workspace", metadata.externalWorkspaceKey],
+      ["Page", metadata.pageKey],
+      ["Host resource", metadata.hostResourceKey],
+      ["Perspective", metadata.perspectiveCode],
+      ["Submitted by ID", metadata.submittedById],
+      ["Captured at", metadata.capturedAt]
+    ].map(([key, value]) => `${key}: ${value}`).join("\n")}`;
     expect(initialCommentFromDescription(description)).toBe("最初のコメント");
     expect(parseFeedbackMetadata(description)).toEqual(metadata);
     expect(description.indexOf("Thread ID:")).toBeLessThan(description.indexOf("Request hash:"));
@@ -148,12 +170,31 @@ describe("Redmine core deterministic model", () => {
         participantId: "00000000-0000-4000-8000-000000000007",
         displayName: null
       },
+      threadUrl: "https://inventory.example.invalid/orders/1?feedbackThread=00000000-0000-4000-8000-000000000001",
+      initialMessageSignature: "signature",
       capturedAt: "2026-08-19T00:00:00Z",
       primaryEvidence: null
     });
     const text = new TextDecoder().decode(bytes);
     expect(text).toContain('\n  "kind": "feedback-context"');
     expect(text.endsWith("\n")).toBe(true);
+  });
+
+  it("custom targetをcanonical locatorへ保存し16 KiB上限を維持する", () => {
+    const customTarget = {
+      schemaVersion: "1" as const,
+      kind: "custom" as const,
+      provider: "com.example.threejs",
+      targetKey: "model-42",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.75,
+      metadata: { selected: true, level: 3, parentId: null, layerName: "equipment" }
+    };
+    expect(JSON.parse(buildLocator(location, customTarget)).target).toEqual(customTarget);
+    expect(() => buildLocator({
+      ...location,
+      pathParameters: { oversized: "x".repeat(16_384) }
+    }, customTarget)).toThrow(/16 KiB/u);
   });
 });
 

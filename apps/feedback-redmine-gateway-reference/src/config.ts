@@ -1,20 +1,27 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { validateConnectorProfile } from "@feedback/redmine-core/trusted";
-import type { GatewayServerProfile } from "@feedback/redmine-gateway";
+import { validateBaseUrl, validateConnectorProfile } from "@geibee/redmine-core/trusted";
+import type { GatewayServerProfile } from "@geibee/redmine-gateway";
 
 export type ReferenceGatewayConfig = {
   port: number;
+  publicOrigin: string;
+  allowHttpDevelopment: boolean;
   profiles: Map<string, GatewayServerProfile>;
   secrets: Map<string, string>;
   participantSigningKey: string;
 };
 
 export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = process.env): ReferenceGatewayConfig {
+  const publicOrigin = parsePublicOrigin(environment);
   const path = environment.FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE;
   if (!path) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEは必須です");
   if (!isAbsolute(path)) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEはabsolute pathである必要があります");
-  const apiKey = requiredSecret(environment, "FEEDBACK_REDMINE_GATEWAY_API_KEY");
+  const apiKey = requiredSecretOrFile(
+    environment,
+    "FEEDBACK_REDMINE_GATEWAY_API_KEY",
+    "FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE"
+  );
   const participantSigningKey = requiredSecret(environment, "FEEDBACK_PARTICIPANT_SIGNING_KEY");
   if (new TextEncoder().encode(participantSigningKey).byteLength < 32) {
     throw new Error("FEEDBACK_PARTICIPANT_SIGNING_KEYは32 bytes以上必要です");
@@ -59,12 +66,44 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
   secrets.set("FEEDBACK_REDMINE_GATEWAY_API_KEY", apiKey);
   const port = Number(environment.PORT ?? "8080");
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error("PORTが不正です");
-  return { port, profiles, secrets, participantSigningKey };
+  return {
+    port,
+    publicOrigin,
+    allowHttpDevelopment: environment.NODE_ENV === "development",
+    profiles,
+    secrets,
+    participantSigningKey
+  };
+}
+
+function parsePublicOrigin(environment: NodeJS.ProcessEnv): string {
+  const input = environment.FEEDBACK_PUBLIC_ORIGIN;
+  if (!input) throw new Error("FEEDBACK_PUBLIC_ORIGINは必須です");
+  const parsed = validateBaseUrl(input, environment.NODE_ENV === "development");
+  if (parsed.pathname !== "/") throw new Error("FEEDBACK_PUBLIC_ORIGINへpathは指定できません");
+  return parsed.origin;
 }
 
 function requiredSecret(environment: NodeJS.ProcessEnv, name: string): string {
   const value = environment[name];
   if (!value) throw new Error(`${name}は必須です`);
+  return value;
+}
+
+function requiredSecretOrFile(environment: NodeJS.ProcessEnv, name: string, fileName: string): string {
+  const direct = environment[name];
+  const path = environment[fileName];
+  if (direct && path) throw new Error(`${name}と${fileName}は同時に指定できません`);
+  if (direct) return direct;
+  if (!path) throw new Error(`${name}または${fileName}は必須です`);
+  if (!isAbsolute(path)) throw new Error(`${fileName}はabsolute pathである必要があります`);
+  let value: string;
+  try {
+    value = readFileSync(path, "utf8").replace(/\r?\n$/u, "");
+  } catch {
+    throw new Error(`${fileName}を読み込めません`);
+  }
+  if (!value || value.includes("\0")) throw new Error(`${fileName}のsecretが不正です`);
   return value;
 }
 

@@ -4,8 +4,8 @@ import {
   parseThreadListResult,
   parseThreadResult,
   sha256Hex
-} from "@feedback/redmine-core";
-import { createFeedbackRedmineGatewayHandler } from "@feedback/redmine-gateway";
+} from "@geibee/redmine-core";
+import { createFeedbackRedmineGatewayHandler } from "@geibee/redmine-gateway";
 
 const [commandArg, endpointArg, seedPathArg, statePathArg] = process.argv.slice(2);
 if (!commandArg || !endpointArg || !seedPathArg || !statePathArg) throw new Error("command/endpoint/seed path/state pathは必須です");
@@ -30,10 +30,10 @@ async function createFixture() {
     "base64"
   ));
   const capturedAt = new Date().toISOString();
-  /** @type {import("@feedback/redmine-core").FeedbackHostResourceRefV1} */
+  /** @type {import("@geibee/redmine-core").FeedbackHostResourceRefV1} */
   const resourceRef = { schemaVersion: "1", kind: "record", key: "conformance-resource" };
   const hostResourceKey = resourceRef.key;
-  /** @type {NonNullable<import("@feedback/redmine-core").RedmineThreadCreateInput["evidence"]>} */
+  /** @type {NonNullable<import("@geibee/redmine-core").RedmineThreadCreateInput["evidence"]>} */
   const evidence = {
     filename: `feedback-${threadId}.png`,
     contentType: "image/png",
@@ -51,7 +51,7 @@ async function createFixture() {
   }));
   assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
 
-  /** @type {import("@feedback/redmine-core").RedmineThreadCreateInput} */
+  /** @type {import("@geibee/redmine-core").RedmineThreadCreateInput} */
   const input = {
     profileId: profile.profileId,
     resourceRef,
@@ -69,6 +69,7 @@ async function createFixture() {
     target: { schemaVersion: "1", kind: "screen-position", relativeX: 0.5, relativeY: 0.5 },
     release: "conformance",
     locale: "ja-JP",
+    threadUrl: `http://app.example/orders/conformance?feedbackThread=${threadId}`,
     capturedAt,
     evidence
   };
@@ -89,6 +90,29 @@ async function createFixture() {
   assert.equal(created.threadId, threadId);
   assert.equal(created.initialComment, "最初のコメント\n再構築テスト");
   assert.equal(created.attachments.length, 2);
+
+  const initialEditIntentId = crypto.randomUUID();
+  const initialEditResponse = await gateway(gatewayRequest(`${profilePath()}/threads/${threadId}/messages/${threadId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Feedback-Participant-Credential": credential,
+      "Idempotency-Key": initialEditIntentId
+    },
+    body: JSON.stringify({
+      body: "最初のコメント\n再構築テスト（編集済み）",
+      participantName: "Conformance participant",
+      expectedVersion: 1
+    })
+  }));
+  assert.equal(initialEditResponse.status, 200, await initialEditResponse.clone().text());
+  const initialEdited = parseThreadResult(await initialEditResponse.json());
+  assert.equal(initialEdited.initialComment, "最初のコメント\n再構築テスト（編集済み）");
+  const rawDescription = (await issueDescription(created.issueId)).replace(/\r\n?/gu, "\n");
+  assert.equal(rawDescription,
+    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n${input.threadUrl}`);
+  assert(!rawDescription.includes("Feedback metadata v1"));
+  assert(!rawDescription.includes("Application:"));
 
   const messageId = crypto.randomUUID();
   const replyIntentId = crypto.randomUUID();
@@ -154,7 +178,7 @@ async function verifyFixture() {
   assert.equal(detailResponse.status, 200, await detailResponse.clone().text());
   const rebuilt = parseThreadResult(await detailResponse.json());
   assert.equal(rebuilt.threadId, state.threadId);
-  assert.equal(rebuilt.initialComment, "最初のコメント\n再構築テスト");
+  assert.equal(rebuilt.initialComment, "最初のコメント\n再構築テスト（編集済み）");
   assert(rebuilt.locator);
   assert.equal(rebuilt.locator.location.pageKey, state.pageKey);
   assert.equal(rebuilt.diagnosticCount, 0);
@@ -184,7 +208,7 @@ async function verifyFixture() {
   assert.equal(await sha256Hex(downloaded), state.evidenceSha256);
   assert.equal(downloaded.byteLength, state.screenshotByteSize);
 
-  /** @type {import("@feedback/redmine-core").RedmineThreadSort[]} */
+  /** @type {import("@geibee/redmine-core").RedmineThreadSort[]} */
   const sorts = ["created_desc", "created_asc", "updated_desc"];
   for (const sort of sorts) {
     const query = new URLSearchParams({
@@ -211,7 +235,7 @@ function profilePath() {
 }
 
 /**
- * @param {import("@feedback/redmine-core/trusted").RedmineFetch} [redmineFetch]
+ * @param {import("@geibee/redmine-core/trusted").RedmineFetch} [redmineFetch]
  */
 function gatewayHandler(redmineFetch = globalThis.fetch) {
   return createFeedbackRedmineGatewayHandler({
@@ -265,10 +289,19 @@ async function updateIssue(issueId, issue) {
   assert.equal(response.status, 204, await response.text());
 }
 
+/** @param {number} issueId */
+async function issueDescription(issueId) {
+  const response = await fetch(`${endpoint}/issues/${issueId}.json`, {
+    headers: { "X-Redmine-API-Key": seed.apiKey }
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  return (await response.json()).issue.description;
+}
+
 /**
  * @param {string} baseUrl
  * @param {any} fixture
- * @returns {import("@feedback/redmine-core/trusted").RedmineConnectorProfile}
+ * @returns {import("@geibee/redmine-core/trusted").RedmineConnectorProfile}
  */
 function connectorProfile(baseUrl, fixture) {
   return {

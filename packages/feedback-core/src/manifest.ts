@@ -1,7 +1,7 @@
 import type {
   FeedbackApplicationManifestV1,
   FeedbackLocationV1
-} from "@feedback/contracts";
+} from "@geibee/contracts";
 
 type ManifestRoute = FeedbackApplicationManifestV1["routes"][number];
 

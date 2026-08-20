@@ -1,4 +1,4 @@
-import type { FeedbackLocationV1, FeedbackTargetV1 } from "@feedback/contracts";
+import type { FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/contracts";
 import type { RedmineEvidenceMetadata } from "./model.js";
 import { RedmineFeedbackError, contractError } from "./errors.js";
 
@@ -21,17 +21,20 @@ export type RedmineFeedbackContextV1 = {
   hostResourceKey: string;
   release: string;
   locale: string;
+  threadUrl: string | null;
   perspectiveCode: string;
   location: FeedbackLocationV1;
   target: FeedbackTargetV1 | null;
   author: TrustedFeedbackAuthor;
+  /** 初回投稿の自己編集権を改ざんから保護する署名。説明欄へは保存しない。 */
+  initialMessageSignature: string | null;
   capturedAt: string;
   primaryEvidence: RedmineEvidenceMetadata | null;
 };
 
 export type RequestHashInput = Omit<
   RedmineFeedbackContextV1,
-  "schemaVersion" | "kind" | "requestHash" | "capturedAt" | "primaryEvidence"
+  "schemaVersion" | "kind" | "requestHash" | "threadUrl" | "initialMessageSignature" | "capturedAt" | "primaryEvidence"
 > & {
   comment: string;
   evidenceSha256: string | null;

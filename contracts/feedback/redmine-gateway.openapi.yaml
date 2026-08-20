@@ -12,7 +12,37 @@ servers:
     description: 業務アプリケーションと同一originの相対path
 tags:
   - name: Redmine feedback
+  - name: Health
 paths:
+  /health/live:
+    get:
+      operationId: getRedmineGatewayLiveness
+      tags: [Health]
+      summary: gateway processのlivenessを取得する
+      responses:
+        '200':
+          description: processはrequestを処理できる
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /health/ready:
+    get:
+      operationId: getRedmineGatewayReadiness
+      tags: [Health]
+      summary: gatewayの必須設定とsecretが読み込み済みか確認する
+      description: Redmine上流の疎通は再起動判定へ含めず、運用doctorで確認する。
+      responses:
+        '200':
+          description: gatewayはFeedback requestを受け付けられる
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
   /profiles/{profileId}/participants:
     post:
       operationId: createRedmineParticipant
@@ -449,6 +479,12 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemEnvelope' }
   schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
     HostResourceRef:
       type: object
       additionalProperties: false
@@ -593,6 +629,7 @@ components:
         - $ref: '#/components/schemas/ScreenPositionTarget'
         - $ref: '#/components/schemas/MapFeatureTarget'
         - $ref: '#/components/schemas/MapPositionTarget'
+        - $ref: '#/components/schemas/CustomTarget'
     UiElementTarget:
       type: object
       additionalProperties: false
@@ -634,6 +671,29 @@ components:
         kind: { type: string, const: map-position }
         longitude: { type: number, minimum: -180, maximum: 180 }
         latitude: { type: number, minimum: -90, maximum: 90 }
+    CustomTarget:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, kind, provider, targetKey, fallbackRelativeX, fallbackRelativeY]
+      properties:
+        schemaVersion: { type: string, const: '1' }
+        kind: { type: string, const: custom }
+        provider: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,99}$' }
+        targetKey: { type: string, minLength: 1, maxLength: 200 }
+        fallbackRelativeX: { type: number, minimum: 0, maximum: 1 }
+        fallbackRelativeY: { type: number, minimum: 0, maximum: 1 }
+        metadata:
+          type: object
+          maxProperties: 20
+          propertyNames:
+            maxLength: 64
+            pattern: '^[A-Za-z][A-Za-z0-9_.-]*$'
+          additionalProperties:
+            oneOf:
+              - { type: string, maxLength: 500 }
+              - { type: number }
+              - { type: boolean }
+              - { type: 'null' }
     Attachment:
       type: object
       additionalProperties: false
@@ -859,6 +919,7 @@ components:
           oneOf: [{ $ref: '#/components/schemas/Target' }, { type: 'null' }]
         release: { type: string, minLength: 1, maxLength: 100 }
         locale: { type: string, minLength: 2, maxLength: 35 }
+        threadUrl: { type: [string, 'null'], format: uri, minLength: 1, maxLength: 2048 }
         capturedAt: { type: string, format: date-time }
         evidence:
           oneOf:

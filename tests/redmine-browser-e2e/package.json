@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/redmine-browser-e2e",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/redmine-browser-e2e",
+  "version": "1.0.0-alpha.3",
   "description": "SPA同梱Feedback Redmine pluginのbrowser lifecycle smoke",
   "private": true,
   "type": "module",

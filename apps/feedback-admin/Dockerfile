@@ -6,8 +6,8 @@ COPY apps/feedback-admin/package.json apps/feedback-admin/package.json
 COPY contracts/feedback/package.json contracts/feedback/package.json
 COPY packages/feedback-core/package.json packages/feedback-core/package.json
 COPY packages/feedback-admin-react/package.json packages/feedback-admin-react/package.json
-RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @feedback/contracts --workspace @feedback/core \
-    --workspace @feedback/admin-react --workspace @feedback/admin-console \
+RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @geibee/contracts --workspace @geibee/core \
+    --workspace @geibee/admin-react --workspace @geibee/admin-console \
     --include-workspace-root=false
 COPY apps/feedback-admin apps/feedback-admin
 COPY contracts/feedback contracts/feedback
@@ -30,10 +30,10 @@ RUN sed -i "s|__CSP_CONNECT_SRC_EXTRA__|${CSP_CONNECT_SRC_EXTRA}|g" /tmp/default
 RUN export VITE_FEEDBACK_ADMIN_APPLICATION_KEY="$FEEDBACK_ADMIN_APPLICATION" \
     VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY="$FEEDBACK_ADMIN_ENVIRONMENT" \
     VITE_FEEDBACK_ADMIN_WORKSPACE_KEY="$FEEDBACK_ADMIN_WORKSPACE" \
-    && npm --workspace @feedback/contracts run build \
-    && npm --workspace @feedback/core run build \
-    && npm --workspace @feedback/admin-react run build \
-    && npm --workspace @feedback/admin-console run build
+    && npm --workspace @geibee/contracts run build \
+    && npm --workspace @geibee/core run build \
+    && npm --workspace @geibee/admin-react run build \
+    && npm --workspace @geibee/admin-console run build
 
 FROM docker.io/library/nginx:1.27-alpine
 

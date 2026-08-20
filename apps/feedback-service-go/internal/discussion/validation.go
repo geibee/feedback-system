@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"regexp"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -124,6 +126,47 @@ func numberValue(object map[string]json.RawMessage, key string, minimum float64,
 	return nil
 }
 
+var (
+	customProviderPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,99}$`)
+	metadataKeyPattern    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
+)
+
+func validateCustomMetadata(raw json.RawMessage) error {
+	metadata, err := decodeObject(raw, "target.metadata")
+	if err != nil {
+		return err
+	}
+	if len(metadata) > 20 {
+		return invalid("request.invalid", "target.metadataは20項目以下で指定してください")
+	}
+	for key, rawValue := range metadata {
+		if len(key) > 64 || !metadataKeyPattern.MatchString(key) {
+			return invalid("request.invalid", "target.metadataのkeyが不正です")
+		}
+		decoder := json.NewDecoder(bytes.NewReader(rawValue))
+		decoder.UseNumber()
+		var value any
+		if err := decoder.Decode(&value); err != nil {
+			return invalid("request.invalid", "target.metadataの値が不正です")
+		}
+		switch typed := value.(type) {
+		case nil, bool:
+		case string:
+			if utf8.RuneCountInString(typed) > 500 {
+				return invalid("request.invalid", "target.metadataの文字列は500文字以下で指定してください")
+			}
+		case json.Number:
+			number, numberErr := typed.Float64()
+			if numberErr != nil || math.IsNaN(number) || math.IsInf(number, 0) {
+				return invalid("request.invalid", "target.metadataの数値が不正です")
+			}
+		default:
+			return invalid("request.invalid", "target.metadataにobjectまたはarrayは指定できません")
+		}
+	}
+	return nil
+}
+
 // ValidateTarget はFeedbackTargetV1のoneOfと未知field拒否を検証する。
 func ValidateTarget(raw json.RawMessage) (json.RawMessage, error) {
 	target, err := decodeObject(raw, "target")
@@ -221,6 +264,33 @@ func ValidateTarget(raw json.RawMessage) (json.RawMessage, error) {
 		}
 		if err := numberValue(target, "latitude", -90, 90); err != nil {
 			return nil, err
+		}
+	case "custom":
+		if err := requireKeys(
+			target,
+			[]string{"schemaVersion", "kind", "provider", "targetKey", "fallbackRelativeX", "fallbackRelativeY"},
+			[]string{"metadata"}, "target",
+		); err != nil {
+			return nil, err
+		}
+		provider, err := stringValue(target, "provider", "target")
+		if err != nil || !customProviderPattern.MatchString(provider) {
+			return nil, invalid("request.invalid", "custom.providerが不正です")
+		}
+		targetKey, err := stringValue(target, "targetKey", "target")
+		if err != nil || utf8.RuneCountInString(targetKey) == 0 || utf8.RuneCountInString(targetKey) > 200 {
+			return nil, invalid("request.invalid", "custom.targetKeyは1文字以上200文字以下で指定してください")
+		}
+		if err := numberValue(target, "fallbackRelativeX", 0, 1); err != nil {
+			return nil, err
+		}
+		if err := numberValue(target, "fallbackRelativeY", 0, 1); err != nil {
+			return nil, err
+		}
+		if metadata, ok := target["metadata"]; ok {
+			if err := validateCustomMetadata(metadata); err != nil {
+				return nil, err
+			}
 		}
 	default:
 		return nil, invalid("request.invalid", "target.kindが不正です")

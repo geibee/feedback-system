@@ -1,4 +1,4 @@
-import type { FeedbackTargetV1 } from "@feedback/core";
+import type { FeedbackTargetV1 } from "@geibee/core";
 
 export const feedbackElementKeyAttribute = "data-feedback-key";
 export const feedbackExcludeAttribute = "data-feedback-exclude";

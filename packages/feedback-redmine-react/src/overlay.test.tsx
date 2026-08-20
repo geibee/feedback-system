@@ -10,11 +10,16 @@ import {
   type RedmineThreadListResult,
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
-} from "@feedback/redmine-core";
-import type { FeedbackLocationV1 } from "@feedback/core";
+} from "@geibee/redmine-core";
+import type { FeedbackLocationV1, FeedbackTargetResolver } from "@geibee/core";
 import { feedbackErrorMessage } from "./error-message.js";
+import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { RedmineFeedbackOverlay } from "./overlay.js";
 import { RedmineFeedbackProvider } from "./provider.js";
+
+vi.mock("./capture-marker.js", () => ({
+  addFeedbackCaptureMarker: vi.fn(async (payload) => payload)
+}));
 
 const threadId = "00000000-0000-4000-8000-000000000001";
 const currentLocation: FeedbackLocationV1 = {
@@ -116,6 +121,7 @@ type SetupOptions = {
   workspaceNextResult?: RedmineThreadListResult;
   createError?: unknown;
   contextMenu?: boolean;
+  targetResolver?: FeedbackTargetResolver<Element>;
 };
 
 function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {}) {
@@ -169,7 +175,8 @@ function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {
     clientState,
     adapter: hostAdapter,
     profileId: clientProfile.id,
-    contextMenu: options.contextMenu
+    contextMenu: options.contextMenu,
+    targetResolver: options.targetResolver
   }}><RedmineFeedbackOverlay /></RedmineFeedbackProvider>);
   return { port, clientState, listThreads, getThread, createThread, hostAdapter };
 }
@@ -273,6 +280,22 @@ describe("Redmine共通UI", () => {
     expect(screen.queryByRole("dialog", { name: "他の人の投稿を見る" })).toBeNull();
   });
 
+  it("custom targetのproviderとkeyをReact textとして安全に表示する", async () => {
+    setup(detail, {
+      targetResolver: () => ({
+        schemaVersion: "1",
+        kind: "custom",
+        provider: "com.example.threejs",
+        targetKey: '<img src=x onerror="alert(1)">',
+        fallbackRelativeX: 0.1,
+        fallbackRelativeY: 0.2
+      })
+    });
+    const composer = await startComposer();
+    expect(within(composer).getByText('カスタム com.example.threejs / <img src=x onerror="alert(1)">')).toBeTruthy();
+    expect(composer.querySelector("img")).toBeNull();
+  });
+
   it("右クリックではmenuを表示し、選択後にcomposerを開く", async () => {
     setup(detail, { contextMenu: true });
     await screen.findByRole("button", { name: /^フィードバック$/u });
@@ -315,12 +338,20 @@ describe("Redmine共通UI", () => {
     fireEvent.change(within(composer).getByLabelText("最初のコメント"), { target: { value: "画像付き指摘" } });
     fireEvent.click(within(composer).getByRole("button", { name: "Feedbackを送信" }));
     await waitFor(() => expect(createThread).toHaveBeenCalledTimes(1));
-    expect(createThread.mock.calls[0]?.[0].evidence).toMatchObject({ contentType: "image/png", byteSize: 4 });
+    const createInput = createThread.mock.calls[0]![0];
+    expect(createInput.evidence).toMatchObject({ contentType: "image/png", byteSize: 4 });
+    const threadUrl = new URL(createInput.threadUrl!);
+    expect(threadUrl.origin).toBe(window.location.origin);
+    expect(threadUrl.searchParams.get("feedbackThread")).toBe(createInput.threadId);
     expect(createThread.mock.calls[0]?.[1]).toEqual(new Uint8Array([1, 2, 3, 4]));
     expect(captureEvidence).toHaveBeenCalledWith(expect.objectContaining({
       excludeSelector: "[data-feedback-redmine-ui]",
       maskSelector: "[data-feedback-mask]"
     }));
+    expect(addFeedbackCaptureMarker).toHaveBeenCalledWith(
+      expect.objectContaining({ contentType: "image/png" }),
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })
+    );
   });
 
   it("別locationの投稿はnavigate完了とlocation一致後に詳細を取得する", async () => {

@@ -8,6 +8,8 @@ addFormats(ajv);
 
 function validator(name: string) {
   const schema = JSON.parse(readFileSync(new URL(`../schemas/${name}.schema.json`, import.meta.url), "utf8"));
+  const existing = typeof schema.$id === "string" ? ajv.getSchema(schema.$id) : undefined;
+  if (existing) return existing;
   return ajv.compile(schema);
 }
 
@@ -98,11 +100,45 @@ describe("Feedback JSON Schema", () => {
         longitude: 139.7,
         latitude: 35.6
       },
-      { schemaVersion: "1", kind: "map-position", longitude: 139.7, latitude: 35.6 }
+      { schemaVersion: "1", kind: "map-position", longitude: 139.7, latitude: 35.6 },
+      {
+        schemaVersion: "1",
+        kind: "custom",
+        provider: "com.example.threejs",
+        targetKey: "model-42",
+        fallbackRelativeX: 0.25,
+        fallbackRelativeY: 0.75,
+        metadata: { layerName: "equipment", level: 3, selected: true, parentId: null }
+      }
     ];
     for (const target of targets) expect(validate(target), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({ schemaVersion: "1", kind: "map-position", longitude: 181, latitude: 0 })).toBe(false);
     expect(validate({ ...targets[0], unknown: true })).toBe(false);
+  });
+
+  it("custom targetの識別子、fallback、metadata制約を検証する", () => {
+    const validate = validator("target");
+    const custom = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "com.example.canvas",
+      targetKey: "shape-1",
+      fallbackRelativeX: 0,
+      fallbackRelativeY: 1
+    };
+    expect(validate(custom), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...custom, provider: "Invalid Provider" })).toBe(false);
+    expect(validate({ ...custom, targetKey: "" })).toBe(false);
+    expect(validate({ ...custom, fallbackRelativeX: -0.1 })).toBe(false);
+    expect(validate({ ...custom, metadata: { "_invalid": true } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: { nested: true } } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: ["array"] } })).toBe(false);
+    expect(validate({ ...custom, metadata: { valid: "x".repeat(501) } })).toBe(false);
+    expect(validate({
+      ...custom,
+      metadata: Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`key${index}`, index]))
+    })).toBe(false);
+    expect(validate({ ...custom, unknown: true })).toBe(false);
   });
 
   it("webhookはversioned domain eventとactorを必須にする", () => {
@@ -224,8 +260,10 @@ function redmineValidator(name: string) {
     "target",
     "redmine-host-resource-ref",
     "redmine-client-profile",
+    "redmine-runtime-config",
     "redmine-model",
-    "redmine-feedback-context"
+    "redmine-feedback-context",
+    "redmine-inspection-report"
   ];
   for (const dependency of schemas) {
     const schema = JSON.parse(readFileSync(new URL(`../schemas/${dependency}.schema.json`, import.meta.url), "utf8"));
@@ -256,6 +294,248 @@ const clientProfile = {
 };
 
 describe("Feedback Redmine JSON Schema", () => {
+  it("runtime configは公開可能な同一origin設定だけを受ける", () => {
+    const validate = validator("redmine-runtime-config");
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1"
+    }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "https://gateway.example.test/v1"
+    })).toBe(false);
+    for (const gatewayBasePath of [
+      "//gateway.example.test/v1",
+      "/internal/../gateway",
+      "/internal/%2e%2E/gateway",
+      "/internal/gateway?token=value",
+      "/internal/gateway#fragment",
+      "/internal/gateway@evil",
+      "/internal\\gateway",
+      `/${"a".repeat(512)}`
+    ]) {
+      expect(validate({
+        schemaVersion: "1",
+        enabled: true,
+        profileId: "inventory-production",
+        gatewayBasePath
+      }), gatewayBasePath).toBe(false);
+    }
+    expect(validate({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      apiKey: "secret"
+    })).toBe(false);
+  });
+
+  it("既存Redmine導入manifestは名前ベースでsecretと数値IDを持たない", () => {
+    const validate = validator("redmine-installation-manifest");
+    const manifest = {
+      schemaVersion: "1",
+      profileId: "inventory-production",
+      displayName: "Inventory / Production",
+      applicationKey: "inventory",
+      environmentKey: "production",
+      externalWorkspaceKey: "production-review",
+      redmineBaseUrl: "https://redmine.example.test",
+      project: { identifier: "feedback", name: "Feedback" },
+      trackerName: "Feedback",
+      openStatusName: "New",
+      closedStatusName: "Closed",
+      defaultPriorityName: "Normal",
+      roleName: "Feedback integration",
+      integrationUser: {
+        login: "feedback_integration",
+        firstName: "Feedback",
+        lastName: "Integration",
+        mail: "feedback-integration@example.test"
+      },
+      isPrivate: true,
+      captureEnabled: true,
+      showRedmineLink: false
+    };
+    expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...manifest, projectId: 10 })).toBe(false);
+    expect(validate({ ...manifest, apiKey: "secret" })).toBe(false);
+  });
+
+  it("provision planとresultはdigestおよび実IDを固定shapeで検証する", () => {
+    const validatePlan = validator("redmine-provision-plan");
+    expect(validatePlan({
+      schemaVersion: "1",
+      redmineVersion: "7.0.0",
+      profileId: "inventory-production",
+      operations: [{ key: "project", action: "create", detail: "projectを作成" }],
+      conflicts: [],
+      planDigest: "a".repeat(64)
+    }), JSON.stringify(validatePlan.errors)).toBe(true);
+    const ids = Object.fromEntries([
+      "threadId", "requestHash", "applicationKey", "environmentKey", "externalWorkspaceKey", "pageKey",
+      "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName"
+    ].map((key, index) => [key, index + 20]));
+    const validateResult = validator("redmine-provision-result");
+    const result = {
+      schemaVersion: "1",
+      redmineVersion: "7.0.0",
+      projectId: 1,
+      trackerId: 2,
+      openStatusId: 3,
+      closedStatusId: 4,
+      defaultPriorityId: 5,
+      integrationUserId: 6,
+      customFieldIds: ids
+    };
+    expect(validateResult(result), JSON.stringify(validateResult.errors)).toBe(true);
+    expect(validateResult({ ...result, customFieldIds: { ...ids, apiKey: 99 } })).toBe(false);
+  });
+
+  it("inspection reportはREST検査、15件の手動確認、承認済み生成物を検証する", () => {
+    const validate = redmineValidator("redmine-inspection-report");
+    const customFieldKeys = [
+      "threadId", "requestHash", "applicationKey", "environmentKey", "externalWorkspaceKey", "pageKey",
+      "hostResourceKey", "perspectiveCode", "locator", "submittedById", "submittedByName"
+    ];
+    const customFieldIds = Object.fromEntries(customFieldKeys.map((key, index) => [key, index + 20]));
+    const manualChecks = [
+      ...customFieldKeys.map((key) => ({
+        key: `custom-field.${key}.scope-and-filter`,
+        detail: `${key}の公開範囲とfilterを確認する`,
+        status: "accepted" as const
+      })),
+      ...["open-to-open", "open-to-closed", "closed-to-open", "closed-to-closed"].map((transition) => ({
+        key: `workflow.${transition}`,
+        detail: `${transition}の遷移を確認する`,
+        status: "accepted" as const
+      }))
+    ];
+    const report = {
+      schemaVersion: "1",
+      redmineVersion: "7.0.0",
+      principal: { id: 1, login: "redmine_admin", admin: true },
+      checks: [{ key: "project", status: "ok", detail: "Feedback projectを検出しました" }],
+      manualChecks,
+      manualCheckDigest: "a".repeat(64),
+      resolvedIds: {
+        projectId: 1,
+        trackerId: 2,
+        roleId: 3,
+        integrationUserId: 4,
+        defaultPriorityId: 5,
+        openStatusId: 6,
+        closedStatusIds: [7],
+        customFieldIds
+      },
+      generated: {
+        clientProfile: { ...clientProfile, showRedmineLink: false },
+        serverProfile: {
+          profileId: "inventory-production",
+          clientProfileRef: "client-profile.json",
+          redmineBaseUrl: "https://redmine.example.test",
+          projectId: 1,
+          trackerId: 2,
+          isPrivate: true,
+          defaultPriorityId: 5,
+          closedStatusIds: [7],
+          customFieldIds,
+          authorizationMode: "resource-scoped",
+          showRedmineLink: false,
+          secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY"
+        },
+        runtimeConfig: {
+          schemaVersion: "1",
+          enabled: true,
+          profileId: "inventory-production",
+          gatewayBasePath: "/internal/feedback-redmine/v1"
+        }
+      }
+    };
+    expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({
+      ...report,
+      manualChecks: manualChecks.map((check) => ({ ...check, status: "unverified" })),
+      generated: null
+    }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({
+      ...report,
+      manualChecks: manualChecks.map((check) => ({ ...check, status: "unverified" }))
+    })).toBe(false);
+    expect(validate({
+      ...report,
+      checks: [{ key: "project", status: "missing", detail: "projectがありません" }]
+    })).toBe(false);
+    expect(validate({ ...report, checks: [] })).toBe(false);
+    expect(validate({ ...report, manualChecks: manualChecks.slice(0, 14) })).toBe(false);
+    expect(validate({ ...report, manualCheckDigest: "A".repeat(64) })).toBe(false);
+    expect(validate({ ...report, resolvedIds: { ...report.resolvedIds, openStatusId: 0 } })).toBe(false);
+    expect(validate({ ...report, resolvedIds: { ...report.resolvedIds, defaultPriorityId: null } })).toBe(false);
+    expect(validate({
+      ...report,
+      generated: {
+        ...report.generated,
+        clientProfile: { ...report.generated.clientProfile, apiKey: "secret" }
+      }
+    })).toBe(false);
+    expect(validate({
+      ...report,
+      generated: {
+        ...report.generated,
+        serverProfile: { ...report.generated.serverProfile, apiKey: "secret" }
+      }
+    })).toBe(false);
+    expect(validate({
+      ...report,
+      generated: {
+        ...report.generated,
+        runtimeConfig: { ...report.generated.runtimeConfig, participantSigningKey: "secret" }
+      }
+    })).toBe(false);
+  });
+
+  it("inspection reportの全階層でcredential fieldを拒否する", () => {
+    const validate = redmineValidator("redmine-inspection-report");
+    const manualChecks = Array.from({ length: 15 }, (_, index) => ({
+      key: `manual.check-${index}`,
+      detail: `手動確認${index}`,
+      status: "unverified"
+    }));
+    const report = {
+      schemaVersion: "1",
+      redmineVersion: null,
+      principal: null,
+      checks: [{ key: "project", status: "missing", detail: "projectがありません" }],
+      manualChecks,
+      manualCheckDigest: "b".repeat(64),
+      resolvedIds: {
+        projectId: null,
+        trackerId: null,
+        roleId: null,
+        integrationUserId: null,
+        defaultPriorityId: null,
+        openStatusId: null,
+        closedStatusIds: [],
+        customFieldIds: {}
+      },
+      generated: null
+    };
+    expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...report, apiKey: "secret" })).toBe(false);
+    expect(validate({ ...report, principal: { id: 1, login: "admin", admin: true, password: "secret" } })).toBe(false);
+    expect(validate({
+      ...report,
+      manualChecks: [{ ...manualChecks[0], apiKey: "secret" }, ...manualChecks.slice(1)]
+    })).toBe(false);
+    expect(validate({
+      ...report,
+      resolvedIds: { ...report.resolvedIds, customFieldIds: { apiKey: 99 } }
+    })).toBe(false);
+  });
+
   it("公開client profileへsecretや接続先を混入できない", () => {
     const validate = redmineValidator("redmine-client-profile");
     expect(validate(clientProfile), JSON.stringify(validate.errors)).toBe(true);

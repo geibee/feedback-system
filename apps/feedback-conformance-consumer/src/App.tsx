@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { FeedbackErrorBoundary, FeedbackOverlay, FeedbackProvider, FeedbackUnavailable } from "@feedback/react";
-import { createFeedbackTransport, type FeedbackTransport } from "@feedback/core";
+import { FeedbackErrorBoundary, FeedbackOverlay, FeedbackProvider, FeedbackUnavailable } from "@geibee/react";
+import { createFeedbackTransport, type FeedbackTransport } from "@geibee/core";
 import {
   buildInventoryFeedbackPath,
   createInventoryHostAdapter,

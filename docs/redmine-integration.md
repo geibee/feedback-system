@@ -1,11 +1,13 @@
 # Redmine正本Feedback導入ガイド
 
+前提条件から本番運用までの一連の手順は[`feedback-redmine-installation.md`](feedback-redmine-installation.md)を正本とする。
+
 ## 目的と構成
 
 Redmine正本方式は、Feedbackのissue、返信、状態、証跡をRedmine issue・journal・attachment・custom fieldだけへ保存する。
 Feedback専用PostgreSQL、object storage、同期worker、server-side cacheは使用しない。
 
-利用経路はSPAへbuild時に同梱する`@feedback/redmine-plugin`とsame-origin gatewayだけである。
+利用経路はSPAへbuild時に同梱する`@geibee/redmine-plugin`とsame-origin gatewayだけである。
 ブラウザ拡張機能、OIDC JWT、host session、個人Redmine API keyをSDKへ渡さない。Feedback利用者はUIから投稿、返信、
 自己編集を行い、開発者はRedmineから返信、担当、優先度、状態変更を行う。両経路の内容はRedmineを正本として同じthreadへ反映する。
 
@@ -25,15 +27,15 @@ API keyをSPA bundle、HTML、client runtime config、browser storage、server p
 | --- | --- | --- | --- | --- |
 | `threadId` | Feedback Thread ID | text 1行 | 必須 | UUIDと冪等回収 |
 | `requestHash` | Feedback Request Hash | text 1行 | 不要 | retry内容の一致確認 |
-| `applicationKey` | Feedback Application Key | text 1行 | 必須 | application分離 |
-| `environmentKey` | Feedback Environment Key | text 1行 | 必須 | environment分離 |
-| `externalWorkspaceKey` | Feedback External Workspace Key | text 1行 | 必須 | workspace分離 |
-| `pageKey` | Feedback Page Key | text 1行 | 必須 | 画面別一覧 |
-| `hostResourceKey` | Feedback Host Resource Key | text 1行 | 必須 | resource認可・filter |
+| `applicationKey` | Feedback Application | text 1行 | 必須 | application分離 |
+| `environmentKey` | Feedback Environment | text 1行 | 必須 | environment分離 |
+| `externalWorkspaceKey` | Feedback Workspace | text 1行 | 必須 | workspace分離 |
+| `pageKey` | Feedback Page | text 1行 | 必須 | 画面別一覧 |
+| `hostResourceKey` | Feedback Host Resource | text 1行 | 必須 | resource認可・filter |
 | `perspectiveCode` | Feedback Perspective | text 1行 | 推奨 | 観点filter |
 | `locator` | Feedback Locator | long text | 不要 | location/targetのcompact JSON |
 | `submittedById` | Feedback Submitted By ID | text 1行 | 不要 | trusted投稿者ID |
-| `submittedByName` | Feedback Submitted By | text 1行 | 不要 | 許可時だけの表示名 |
+| `submittedByName` | Feedback Submitted By Name | text 1行 | 不要 | 許可時だけの表示名 |
 
 field IDは環境固有のnumeric IDをserver profileへ明示し、表示名から推測しない。11個のIDはprofile内で重複不可である。
 `threadId`はUUID v4、`requestHash`はlowercase SHA-256、`hostResourceKey`はhostが選んだresource keyを保存する。
@@ -41,8 +43,12 @@ Redmineにcustom field unique制約はないため、同じthread IDが複数見
 
 ## Redmineへ保存する内容
 
-issue descriptionには人が読める初回コメントとversion付きmetadata blockを保存する。同時に`feedback-context-v1.json`へ
-location、target、release、locale、participant UUIDと自己申告表示名、request hashを保存する。スクリーンショットは
+issue descriptionには人が読める初回コメントと、SPAで同じthreadを開くsame-origin URLだけを保存する。Application、Environment、
+Workspace、Page、Host resourceなどの値はdescriptionへ重複させない。これらのcustom fieldはRedmine APIがProfile／画面／resourceを
+絞り込み、冪等回収と一覧を行うための構造化索引であり、URLからの文字列解析では代替しない。
+
+`feedback-context-v1.json`にはlocation、target、release、locale、participant UUID、自己申告表示名、request hashと
+初回自己編集用署名を保存する。旧issueのdescriptionにある`Feedback metadata v1`は読取互換のため解析するが、新規issueへは書かない。スクリーンショットは
 `feedback-{threadId}.png`または`.webp`として保存し、SHA-256、byte size、viewportをcontextへ記録する。
 
 返信は署名付きmessage markerを持つRedmine journalとして追加する。編集は元journalを上書きせず、version付きedit journalを追記し、
@@ -55,12 +61,19 @@ attachment bytesをclient cacheの正本にしない。
 
 1. [`redmine-gateway.md`](redmine-gateway.md)に従いgatewayをsame-originへmountする。
 2. server profileとintegration user API keyをsecret managerから設定する。
-3. SPAへ`@feedback/redmine-plugin`を通常のnpm依存として追加する。
-4. 単一integration moduleで`createRedmineFeedbackPluginController()`を作り、hostのfeature flagを`setEnabled()`へ接続する。
-5. participant発行、位置指定投稿、返信、自己編集、終了済み返信拒否を検証する。
+3. SPAへ`@geibee/redmine-plugin`を通常のnpm依存として追加する。
+4. 公開runtime configを同一originへ配置し、Reactのclient-only integration componentから
+   `createRedmineFeedbackPluginControllerFromRuntimeConfig()`を呼ぶ。
+5. React cleanupでloaderの`signal`を中止し、作成済みcontrollerを`destroy()`する。
+6. participant発行、位置指定投稿、返信、自己編集、終了済み返信拒否を検証する。
 
-pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、OIDC token、任意HTTP headerを渡せない。通信先はsame-originの
-`/internal/feedback-redmine/v1`へ固定する。feature flag未指定時は有効を既定とする。
+DOMスクリーンショットはpluginが既定で接続する。Profileの`capture.enabled`は通常`true`とし、証跡を保存しない運用だけ明示的に
+`false`にする。HostのCSPでは`img-src`に`data:`と`blob:`を許可する。MapLibreのWebGL canvasを確実に含める場合は
+`@geibee/maplibre`のproviderをHost Adapterへ指定する。
+
+pluginの公開optionにはRedmine URL、API key、project/tracker/custom field ID、OIDC token、任意HTTP headerを渡せない。通信先は
+runtime configのsame-origin `gatewayBasePath`へ限定する。runtime configの`enabled`を配備時feature flagとし、未指定はschema違反として
+fail-closedにする。host固有feature flagへ直接接続する既存consumerだけが`createRedmineFeedbackPluginController()`を使用する。
 
 `setEnabled(false)`は通信、polling、購読、React rootとcontroller所有mountを破棄し、再有効化できる。draft、follow、
 pending intentは保持する。完全撤去では先に`purgeLocalState()`を明示実行し、integration module、npm依存、gateway mountを削除する。

@@ -1,4 +1,4 @@
-# @feedback/redmine-gateway
+# @geibee/redmine-gateway
 
 業務アプリケーションと同一originへ組み込む、Web標準`Request`/`Response`ベースのstateless handlerです。
 DB、queue、cache、filesystem upload、object storageを使用しません。
@@ -10,6 +10,7 @@ server-side secretからだけ取得し、responseやproblemへ含めません�
 thread一覧はscope省略時のresource境界と、`scope=workspace`のProfile全体境界を提供します。Workspace一覧では
 resourceKind/resourceKey/pageKeyを受け付けず、server profileに固定されたapplication/environment/workspace/project/trackerだけで
 Redmineを絞り込みます。公開participant modeではProfileへ到達できる利用者がこの一覧を閲覧できるため、Profileの公開範囲を認可境界として扱います。
+createの任意`threadUrl`は同一originと対象thread IDを検証してから、Redmine issueの説明欄へ人がクリックできるURLとして保存します。
 
 実装時は`contracts/feedback/redmine-gateway.openapi.yaml`と次を必須にしてください。
 

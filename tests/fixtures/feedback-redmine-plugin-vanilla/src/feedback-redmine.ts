@@ -1,61 +1,52 @@
-import { createRedmineFeedbackPluginController } from "@feedback/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
 import type {
-  RedmineFeedbackPluginControllerState,
-  RedmineFeedbackPluginControllerOptions
-} from "@feedback/redmine-plugin/loader";
+  RedmineFeedbackPluginController,
+  RedmineFeedbackPluginControllerState
+} from "@geibee/redmine-plugin/loader";
+import {
+  createQuickstartAdapter,
+  emitQuickstartLocationChange,
+  quickstartSubscriptionCount
+} from "./quickstart-adapter.js";
 
-const locationSubscribers = new Set<() => void>();
-
-export function createVanillaAdapter(): RedmineFeedbackPluginControllerOptions["adapter"] {
-  return {
-    getContext: () => ({
-      schemaVersion: "1",
-      applicationKey: "inventory",
-      environmentKey: "production",
-      externalWorkspaceKey: "production-review",
-      release: "fixture",
-      locale: "ja-JP"
-    }),
-    getLocation: () => ({
-      schemaVersion: "1",
-      pageKey: "orders.detail",
-      routeTemplate: "/orders/{orderId}",
-      pathParameters: { orderId: "sha256:fixture" }
-    }),
-    getResourceRef: () => ({ schemaVersion: "1", kind: "record", key: "fixture-order" }),
-    subscribe: (listener) => {
-      locationSubscribers.add(listener);
-      return () => locationSubscribers.delete(listener);
-    },
-    navigate: () => undefined
-  };
-}
-
-const controller = createRedmineFeedbackPluginController({
-  profileId: "inventory-production",
-  adapter: createVanillaAdapter(),
+const initializationAbort = new AbortController();
+let controller: RedmineFeedbackPluginController | null = null;
+const controllerPromise = createRedmineFeedbackPluginControllerFromRuntimeConfig({
+  adapter: createQuickstartAdapter(),
+  signal: initializationAbort.signal,
   onUnavailable: (error) => console.error("Feedback Redmineを利用できません", error)
+}).then((created) => {
+  if (initializationAbort.signal.aborted) {
+    created?.destroy();
+    return null;
+  }
+  controller = created;
+  return created;
 });
 
-/** fixtureのhost feature flagとFeedback controllerを結ぶ唯一のintegration境界です。 */
+/** fixtureのruntime configとFeedback controllerを結ぶ唯一のintegration境界です。 */
 export const feedbackFeature = {
-  setEnabled(enabled: boolean): Promise<void> {
-    return controller.setEnabled(enabled);
+  async ready(): Promise<void> {
+    await controllerPromise;
   },
-  purgeLocalState(): Promise<void> {
-    return controller.purgeLocalState();
+  async setEnabled(enabled: boolean): Promise<void> {
+    await (await controllerPromise)?.setEnabled(enabled);
+  },
+  async purgeLocalState(): Promise<void> {
+    await (await controllerPromise)?.purgeLocalState();
   },
   state(): RedmineFeedbackPluginControllerState {
-    return controller.state;
+    return controller?.state ?? "disabled";
   },
   activeSubscriptions(): number {
-    return locationSubscribers.size;
+    return quickstartSubscriptionCount();
   },
   emitHostLocationChange(): void {
-    locationSubscribers.forEach((listener) => listener());
+    emitQuickstartLocationChange();
   },
   destroy(): void {
-    controller.destroy();
+    initializationAbort.abort();
+    controller?.destroy();
   }
 };
 

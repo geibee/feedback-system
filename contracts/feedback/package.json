@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/contracts",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/contracts",
+  "version": "1.0.0-alpha.3",
   "description": "フィードバックサービス v1 の OpenAPI、JSON Schema、TypeScript 契約",
   "private": true,
   "type": "module",

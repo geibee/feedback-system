@@ -3,7 +3,7 @@
 ## 配置境界
 
 gatewayは業務アプリケーションと同一originの`/internal/feedback-redmine/v1`へmountするstateless handlerである。公開契約は
-`contracts/feedback/redmine-gateway.openapi.yaml`、実装用packageは`@feedback/redmine-gateway`である。
+`contracts/feedback/redmine-gateway.openapi.yaml`、実装用packageは`@geibee/redmine-gateway`である。
 
 gatewayはDB、filesystem upload、queue、cache、object storageを使用しない。Redmine API keyはserver-side secretからだけ取得し、
 browser、problem response、metric、access logへ返さない。CORS routeを作らず、HTTPS reverse proxy配下へ置く。
@@ -40,7 +40,7 @@ server profileはRedmine URL、project/tracker/default priority、private flag�
 secret referenceを持つ。clientがこれらを上書きできるrequest fieldはない。Redmine base URLは本番でHTTPSだけを許可し、
 userinfo、query、fragment、dot segmentを拒否する。
 
-reference appではprofileを2ファイルへ分ける。client profileにはUIへ公開できる値だけを置き、server profileから
+標準gateway serverではprofileを2ファイルへ分ける。client profileにはUIへ公開できる値だけを置き、server profileから
 `clientProfileRef`で参照する。API keyをどちらのJSONにも置かない。
 
 ```json
@@ -72,7 +72,7 @@ reference appではprofileを2ファイルへ分ける。client profileにはUI�
 }
 ```
 
-設定する環境変数は[`environment-variables.md`](environment-variables.md)を参照する。reference appの3変数はいずれも
+設定する環境変数は[`environment-variables.md`](environment-variables.md)を参照する。標準serverの必須変数はいずれも
 未設定時に起動を失敗し、secretに既定値はない。libraryを本番hostへ組み込む場合は環境変数名を公開契約にせず、既存の
 設定・secret注入機構から`loadProfile`、`loadSecret`、`participantSigningKey`を実装する。
 
@@ -80,7 +80,8 @@ reference appではprofileを2ファイルへ分ける。client profileにはUI�
 
 gatewayはparticipant発行、profile/capability、current participant、thread list/create/detail、message create/update、attachmentの固定operationだけを受け付ける。
 unknown query、JSON field、multipart partを拒否する。createは`multipart/form-data`の`request` JSONと任意の`evidence`だけを受け、
-`Idempotency-Key`とbodyの`intentId`一致を必須にする。
+`Idempotency-Key`とbodyの`intentId`一致を必須にする。任意の`threadUrl`はgatewayと同一originで、対象`threadId`の
+`feedbackThread` queryを含む場合だけ受け付ける。
 
 trusted connectorはcreate前にthread IDを検索する。同じrequest hashのissueがあれば200で回収し、確認済みの新規作成は201を返す。
 POST結果が通信断で不明な場合はPOSTをblind retryせず、thread検索だけを行う。hash不一致またはduplicate thread IDは409相当で拒否する。
@@ -90,12 +91,17 @@ attachment `content_url`はRedmine base URLと同じorigin/base pathだけを許
 
 返信と編集もmutationごとにUUID `Idempotency-Key`を必須とする。返信は終了statusで拒否し、自己編集は終了後も許可する。
 edit requestの`expectedVersion`がRedmine journalからfoldした最新版と違う場合は409を返す。message所有markerはcredentialとは別に署名し、
-credentialや署名鍵をRedmine、response log、diagnosticへ保存しない。
+初回署名は`feedback-context-v1.json`、返信・編集署名はjournalへ保存する。credentialや署名鍵をRedmine、response log、diagnosticへ保存しない。
 
-## reference app
+## 標準gateway server
 
-`apps/feedback-redmine-gateway-reference`は公開participant modeのWeb標準handlerをNode HTTP serverへ接続する最小例である。
-session cookieや固定principalは使用しない。本番artifactには含めず、secret managerやreverse proxyは配備環境側で用意する。
+`apps/feedback-redmine-gateway-reference`は公開participant modeのWeb標準handlerをNode HTTP serverへ接続した標準配布serverのsourceである。
+session cookieや固定principalは使用しない。releaseはlinux/amd64・linux/arm64 OCI archive、SBOM、脆弱性reportを生成する。
+secret managerやreverse proxyは配備環境側で用意する。
+
+`FEEDBACK_PUBLIC_ORIGIN`を必須とし、requestのHost headerから公開originを推測しない。起動時にprofileとsecretを検証し、
+`/internal/feedback-redmine/v1/health/live`と`/health/ready`を公開する。完全な環境変数と本番手順は
+[`feedback-redmine-installation.md`](feedback-redmine-installation.md)を参照する。
 
 Docker imageは`node` userで動作し、read-only root filesystem、`--cap-drop ALL`、
 `no-new-privileges`で起動できる。reverse proxyのaccess logからcookie、request body、query、
@@ -104,8 +110,8 @@ Docker imageは`node` userで動作し、read-only root filesystem、`--cap-drop
 検証:
 
 ```bash
-npm --workspace @feedback/redmine-gateway run typecheck
-npm --workspace @feedback/redmine-gateway run test
-npm --workspace @feedback/redmine-gateway run build
+npm --workspace @geibee/redmine-gateway run typecheck
+npm --workspace @geibee/redmine-gateway run test
+npm --workspace @geibee/redmine-gateway run build
 bash scripts/check-feedback-redmine-security.sh
 ```

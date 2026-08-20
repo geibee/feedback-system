@@ -1,0 +1,13 @@
+:root {
+  color: #172033;
+  background: #eef2f7;
+  font-family: system-ui, sans-serif;
+}
+
+body { margin: 0; }
+main { max-width: 760px; margin: 0 auto; padding: 72px 24px; }
+.eyebrow { color: #52637a; font-size: 12px; font-weight: 700; letter-spacing: .16em; }
+h1 { font-size: clamp(40px, 8vw, 72px); line-height: 1; margin: 12px 0 24px; }
+section { margin-top: 40px; padding: 32px; border: 1px solid #c7d0dc; border-radius: 18px; background: white; box-shadow: 0 18px 50px rgb(23 32 51 / 8%); }
+a { color: #075bd8; }
+#feedback-status { margin-top: 24px; color: #52637a; }

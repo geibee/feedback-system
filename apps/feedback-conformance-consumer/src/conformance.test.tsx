@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FeedbackHostAdapter, FeedbackTransport } from "@feedback/core";
+import type { FeedbackHostAdapter, FeedbackTransport } from "@geibee/core";
 import { InventoryConsumer } from "./App";
 import {
   buildInventoryFeedbackPath,

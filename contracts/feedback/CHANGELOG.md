@@ -1,8 +1,18 @@
 # Changelog
 
+## 2026-08-21
+
+- `FeedbackTargetV1`へ名前空間付きprovider、安定target key、画面fallback座標、scalar metadataを持つ
+  `custom` variantを後方互換で追加。
+- managed RedmineのREST検査、15件の手動確認、承認digest、生成profileを固定shapeで表す
+  `redmine-inspection-report.v1` schemaとTypeScript型を追加。
+
 ## 2026-08-20
 
+- Redmine gatewayのlive/ready health endpoint、配備時runtime config、名前ベースinstallation manifest、provision plan/result schemaを追加。
+- runtime configのgateway path制約をbrowser側validatorと同期した。
 - Redmine thread一覧へ後方互換なWorkspace scopeと`totalCount`を追加し、resource cursor v1と分離したWorkspace cursorを定義。
+- Redmine thread createへ、同一origin・対象threadへ限定した任意`threadUrl`を追加。
 
 ## 2026-08-19
 

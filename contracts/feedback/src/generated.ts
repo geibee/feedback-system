@@ -1179,6 +1179,18 @@ export interface components {
             kind: "map-position";
             longitude: number;
             latitude: number;
+        } | {
+            /** @constant */
+            schemaVersion: "1";
+            /** @constant */
+            kind: "custom";
+            provider: string;
+            targetKey: string;
+            fallbackRelativeX: number;
+            fallbackRelativeY: number;
+            metadata?: {
+                [key: string]: string | number | boolean | null;
+            };
         };
         /** FeedbackWebhookEventV1 */
         "webhook-event.schema": {

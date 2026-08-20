@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/core",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/core",
+  "version": "1.0.0-alpha.3",
   "description": "フレームワーク非依存のフィードバック transport と host adapter",
   "private": true,
   "type": "module",
@@ -27,7 +27,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@feedback/contracts": "1.0.0-alpha.2"
+    "@geibee/contracts": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

@@ -22,16 +22,18 @@ import {
   type RedmineThreadSort,
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
-} from "@feedback/redmine-core";
-import type { FeedbackEvidencePayload, FeedbackLocationV1, FeedbackTargetV1 } from "@feedback/core";
-import { resolveDomFeedbackTarget } from "@feedback/react-ui";
+} from "@geibee/redmine-core";
+import type { FeedbackEvidencePayload, FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/core";
+import { resolveDomFeedbackTarget } from "@geibee/react-ui";
+import { createDomEvidenceProvider } from "./capture.js";
+import { addFeedbackCaptureMarker, type FeedbackCaptureMarkerPosition } from "./capture-marker.js";
 import { useDismissiblePanel } from "./dismissible.js";
 import { feedbackErrorMessage } from "./error-message.js";
 import { useRedmineFeedbackRuntime } from "./provider.js";
 import { useVisiblePolling } from "./storage.js";
 import { ThreadDrawer } from "./thread-drawer.js";
 import { ThreadList } from "./thread-list.js";
-import { ThreadPins } from "./thread-pins.js";
+import { resolveFeedbackPinPosition, ThreadPins } from "./thread-pins.js";
 
 export type RedmineFeedbackOverlayHandle = {
   refresh(): Promise<void>;
@@ -43,7 +45,7 @@ export type RedmineFeedbackOverlayProps = {
 };
 
 type CaptureState =
-  | { kind: "disabled" }
+  | { kind: "disabled"; reason: "profile" }
   | { kind: "capturing" }
   | { kind: "failed"; message: string }
   | { kind: "ready"; payload: FeedbackEvidencePayload; url: string };
@@ -63,7 +65,7 @@ export const RedmineFeedbackOverlay = forwardRef<
   const captureGeneration = useRef(0);
   const selectedGeneration = useRef(0);
   const navigating = useRef(false);
-  const captureRef = useRef<CaptureState>({ kind: "disabled" });
+  const captureRef = useRef<CaptureState>({ kind: "disabled", reason: "profile" });
   const [profile, setProfile] = useState<RedmineClientProfileV1 | null>(null);
   const [capabilities, setCapabilities] = useState<RedmineCapabilitiesV1 | null>(null);
   const [principal, setPrincipal] = useState<{ participantId: string } | null>(null);
@@ -89,10 +91,11 @@ export const RedmineFeedbackOverlay = forwardRef<
   const [comment, setComment] = useState("");
   const [participantName, setParticipantName] = useState("");
   const [perspectiveCode, setPerspectiveCode] = useState("");
-  const [capture, setCapture] = useState<CaptureState>({ kind: "disabled" });
+  const [capture, setCapture] = useState<CaptureState>({ kind: "disabled", reason: "profile" });
   const [submitting, setSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
   const [submissionTarget, setSubmissionTarget] = useState<FeedbackTargetV1 | null>(null);
+  const [submissionPosition, setSubmissionPosition] = useState<FeedbackCaptureMarkerPosition | null>(null);
   const [pickingTarget, setPickingTarget] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -280,7 +283,8 @@ export const RedmineFeedbackOverlay = forwardRef<
     setPickingTarget(false);
     setContextMenu(null);
     setSubmissionTarget(null);
-    replaceCapture({ kind: "disabled" });
+    setSubmissionPosition(null);
+    replaceCapture({ kind: "disabled", reason: "profile" });
     setBrowseOpen(false);
     setSelectedThreadId(null);
     setSelectedThread(null);
@@ -300,7 +304,8 @@ export const RedmineFeedbackOverlay = forwardRef<
   const openCurrentThread = useCallback(async (threadId: string, position?: { x: number; y: number }) => {
     setBrowseOpen(false);
     setSubmissionTarget(null);
-    replaceCapture({ kind: "disabled" });
+    setSubmissionPosition(null);
+    replaceCapture({ kind: "disabled", reason: "profile" });
     setDrawerSide(position && position.x > document.documentElement.clientWidth / 2 ? "left" : "right");
     setSelectedError(null);
     setSelectedThreadId(threadId);
@@ -345,10 +350,13 @@ export const RedmineFeedbackOverlay = forwardRef<
   }, [openCurrentThread]);
   useImperativeHandle(ref, () => ({ refresh, openThread: openCurrentThread }), [openCurrentThread, refresh]);
 
-  const captureEvidence = useCallback(async (target: FeedbackTargetV1) => {
+  const captureEvidence = useCallback(async (
+    target: FeedbackTargetV1,
+    selectedPosition: FeedbackCaptureMarkerPosition | null
+  ) => {
     const generation = ++captureGeneration.current;
-    if (!profile?.capture.enabled || !runtime.adapter.captureEvidence) {
-      replaceCapture({ kind: "disabled" });
+    if (!profile?.capture.enabled) {
+      replaceCapture({ kind: "disabled", reason: "profile" });
       return;
     }
     const location = runtime.adapter.getLocation();
@@ -358,7 +366,10 @@ export const RedmineFeedbackOverlay = forwardRef<
     }
     replaceCapture({ kind: "capturing" });
     try {
-      const payload = await runtime.adapter.captureEvidence({
+      const provider = runtime.adapter.captureEvidence ?? createDomEvidenceProvider({
+        maxBytes: profile.capture.maximumUploadBytes
+      });
+      let payload = await provider({
         context: runtime.adapter.getContext(),
         location,
         target,
@@ -367,6 +378,9 @@ export const RedmineFeedbackOverlay = forwardRef<
       });
       if (generation !== captureGeneration.current) return;
       if (!payload) throw new Error("スクリーンショットを生成できませんでした");
+      const markerPosition = resolveFeedbackPinPosition(target, runtime.pinPositionProvider) ?? selectedPosition;
+      if (!markerPosition) throw new Error("フィードバック位置をスクリーンショットへ描画できませんでした");
+      payload = await addFeedbackCaptureMarker(payload, markerPosition);
       if (payload.bytes.byteLength > profile.capture.maximumUploadBytes ||
         !profile.capture.contentTypes.includes(payload.contentType)) {
         throw new Error("スクリーンショットがProfileの添付条件を満たしません");
@@ -384,15 +398,16 @@ export const RedmineFeedbackOverlay = forwardRef<
         });
       }
     }
-  }, [profile, replaceCapture, runtime.adapter]);
+  }, [profile, replaceCapture, runtime.adapter, runtime.pinPositionProvider]);
 
-  const beginComposer = useCallback((target: FeedbackTargetV1) => {
+  const beginComposer = useCallback((target: FeedbackTargetV1, position: FeedbackCaptureMarkerPosition) => {
     setContextMenu(null);
     setPickingTarget(false);
     setBrowseOpen(false);
     closeThread();
     setSubmissionTarget(target);
-    void captureEvidence(target);
+    setSubmissionPosition(position);
+    void captureEvidence(target, position);
   }, [captureEvidence, closeThread]);
 
   const resolvePointerTarget = useCallback((clientX: number, clientY: number, action: "pick" | "context-menu") => {
@@ -410,7 +425,7 @@ export const RedmineFeedbackOverlay = forwardRef<
       if (!target) return;
       event.preventDefault();
       event.stopPropagation();
-      beginComposer(target);
+      beginComposer(target, { x: event.clientX, y: event.clientY });
     };
     document.addEventListener("click", click, true);
     return () => document.removeEventListener("click", click, true);
@@ -433,7 +448,8 @@ export const RedmineFeedbackOverlay = forwardRef<
   const closeComposer = useCallback(() => {
     captureGeneration.current += 1;
     setSubmissionTarget(null);
-    replaceCapture({ kind: "disabled" });
+    setSubmissionPosition(null);
+    replaceCapture({ kind: "disabled", reason: "profile" });
   }, [replaceCapture]);
 
   const submit = async () => {
@@ -453,6 +469,8 @@ export const RedmineFeedbackOverlay = forwardRef<
       const existing = await runtime.clientState.getPendingIntent(runtime.profileId, principalScopeHash);
       const threadId = existing?.clientDraftHash === localHash ? existing.threadId : crypto.randomUUID();
       const intentId = existing?.clientDraftHash === localHash ? existing.intentId : crypto.randomUUID();
+      const hostThreadUrl = runtime.adapter.getFeedbackThreadUrl?.(threadId);
+      const threadUrl = hostThreadUrl === undefined ? buildFeedbackThreadUrl(window.location, threadId) : hostThreadUrl;
       pendingIntent = {
         schemaVersion: "1",
         profileId: runtime.profileId,
@@ -485,6 +503,7 @@ export const RedmineFeedbackOverlay = forwardRef<
         target: submissionTarget,
         release: context.release,
         locale: context.locale ?? (document.documentElement.lang || "ja-JP"),
+        threadUrl,
         capturedAt: new Date().toISOString(),
         evidence,
         participantName: participantName.trim() || null
@@ -562,7 +581,7 @@ export const RedmineFeedbackOverlay = forwardRef<
         setComment(value);
         if (principalScopeHash) void runtime.clientState.setDraft(runtime.profileId, principalScopeHash, value || null);
       }}
-      onRecapture={() => void captureEvidence(submissionTarget)}
+      onRecapture={() => void captureEvidence(submissionTarget, submissionPosition)}
       onBrowse={() => {
         closeComposer();
         setBrowseOpen(true);
@@ -635,7 +654,7 @@ export const RedmineFeedbackOverlay = forwardRef<
     {contextMenu && <FeedbackContextMenu
       value={contextMenu}
       onClose={() => setContextMenu(null)}
-      onSelect={() => beginComposer(contextMenu.target)}
+      onSelect={() => beginComposer(contextMenu.target, { x: contextMenu.clientX, y: contextMenu.clientY })}
     />}
     {error && <p className="feedback-redmine-toast feedback-redmine-error" role="alert">{error}</p>}
   </div>;
@@ -681,7 +700,7 @@ function Composer(props: {
         <img src={props.capture.url} alt="証跡プレビュー" />
       </>}
       {props.capture.kind === "failed" && <p className="feedback-redmine-error" role="alert">{props.capture.message}</p>}
-      {props.capture.kind === "disabled" && <p className="feedback-redmine-note">この環境ではスクリーンショットを保存しません。</p>}
+      {props.capture.kind === "disabled" && <p className="feedback-redmine-note">このProfileではスクリーンショット保存が無効です。</p>}
       {props.profile.capture.enabled && <button
         type="button"
         className="feedback-redmine-text-button"
@@ -765,6 +784,15 @@ export function feedbackLocationMatches(left: FeedbackLocationV1, right: Feedbac
     equalParameters(left.queryParameters ?? {}, right.queryParameters ?? {});
 }
 
+export function buildFeedbackThreadUrl(
+  location: Pick<Location, "origin" | "pathname">,
+  threadId: string
+): string {
+  const url = new URL(location.pathname || "/", location.origin);
+  url.searchParams.set("feedbackThread", threadId);
+  return url.toString();
+}
+
 function equalParameters(left: Record<string, string>, right: Record<string, string>): boolean {
   const keys = Object.keys(left);
   return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
@@ -813,10 +841,11 @@ function readState(
   };
 }
 
-function targetLabel(target: FeedbackTargetV1): string {
+export function targetLabel(target: FeedbackTargetV1): string {
   if (target.kind === "ui-element") return `要素 ${target.elementKey}`;
   if (target.kind === "map-feature") return `地図地物 ${target.featureKey}`;
   if (target.kind === "map-position") return "地図上の位置";
+  if (target.kind === "custom") return `カスタム ${target.provider} / ${target.targetKey}`;
   return "画面上の位置";
 }
 

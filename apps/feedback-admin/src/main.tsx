@@ -1,9 +1,9 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { FeedbackAdminConsole, FeedbackAdminErrorBoundary } from "@feedback/admin-react";
-import { createFeedbackTransport } from "@feedback/core";
+import { FeedbackAdminConsole, FeedbackAdminErrorBoundary } from "@geibee/admin-react";
+import { createFeedbackTransport } from "@geibee/core";
 import { getAccessToken, getUserManager, refreshAccessToken } from "./auth";
-import "@feedback/admin-react/styles.css";
+import "@geibee/admin-react/styles.css";
 import "./styles.css";
 
 function AdminApplication() {

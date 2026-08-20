@@ -6,7 +6,7 @@ import type {
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadSort
-} from "@feedback/redmine-core";
+} from "@geibee/redmine-core";
 import { GatewayHttpError } from "./problem.js";
 
 export function parseResourceQuery(query: URLSearchParams, allowedExtra: readonly string[]): FeedbackHostResourceRefV1 {
@@ -71,11 +71,11 @@ export function parseListQuery(query: URLSearchParams): {
   return { ...(scope === "resource" ? { scope } : {}), resourceRef: resource, pageKey, sort, filter, ...(cursor ? { cursor } : {}) };
 }
 
-export function parseCreateRequest(value: unknown, profileId: string): RedmineThreadCreateInput {
+export function parseCreateRequest(value: unknown, profileId: string, requestOrigin: string): RedmineThreadCreateInput {
   const item = exact(value, [
     "resourceRef", "threadId", "intentId", "comment", "perspectiveCode", "location", "target", "release", "locale",
-    "capturedAt", "evidence", "participantName"
-  ], "create request", ["participantName"]);
+    "threadUrl", "capturedAt", "evidence", "participantName"
+  ], "create request", ["threadUrl", "participantName"]);
   const location = exact(item.location, ["schemaVersion", "pageKey", "routeTemplate", "pathParameters", "queryParameters"], "location", ["queryParameters"]);
   if (location.schemaVersion !== "1") invalid("location schemaVersionが不正です");
   stringMap(location.pathParameters, "pathParameters");
@@ -103,10 +103,29 @@ export function parseCreateRequest(value: unknown, profileId: string): RedmineTh
     target,
     release: bounded(item.release, "release", 100),
     locale: bounded(item.locale, "locale", 35),
+    threadUrl: parseThreadUrl(item.threadUrl, threadId, requestOrigin),
     capturedAt: dateTime(item.capturedAt, "capturedAt"),
     evidence,
     participantName: participantName(item.participantName)
   };
+}
+
+function parseThreadUrl(value: unknown, threadId: string, requestOrigin: string): string | null {
+  if (value === undefined || value === null) return null;
+  const text = bounded(value, "threadUrl", 2_048);
+  let parsed: URL;
+  let origin: URL;
+  try {
+    parsed = new URL(text);
+    origin = new URL(requestOrigin);
+  } catch {
+    invalid("threadUrlがURLではありません");
+  }
+  if ((parsed!.protocol !== "https:" && parsed!.protocol !== "http:") || parsed!.origin !== origin!.origin ||
+    parsed!.username || parsed!.password || parsed!.searchParams.get("feedbackThread") !== threadId) {
+    invalid("threadUrlは同一originでfeedbackThreadを含む必要があります");
+  }
+  return parsed!.toString();
 }
 
 export function parseCreateParticipantRequest(value: unknown): { browserProfileId: string } {
@@ -214,7 +233,37 @@ function parseTarget(value: unknown): RedmineThreadCreateInput["target"] {
       latitude: finite(item.latitude, "latitude", -90, 90)
     };
   }
+  if (item.kind === "custom") {
+    exact(item, [
+      "schemaVersion", "kind", "provider", "targetKey", "fallbackRelativeX", "fallbackRelativeY", "metadata"
+    ], "custom target", ["metadata"]);
+    const provider = bounded(item.provider, "custom provider", 100);
+    if (!/^[a-z0-9][a-z0-9._-]{0,99}$/u.test(provider)) invalid("custom providerが不正です");
+    return {
+      schemaVersion: "1",
+      kind: "custom",
+      provider,
+      targetKey: customText(item.targetKey, "custom targetKey", 200, false),
+      fallbackRelativeX: relative(item.fallbackRelativeX),
+      fallbackRelativeY: relative(item.fallbackRelativeY),
+      ...(item.metadata === undefined ? {} : { metadata: customMetadata(item.metadata) })
+    };
+  }
   invalid("target kindが不正です");
+}
+
+function customMetadata(value: unknown): Record<string, string | number | boolean | null> {
+  const entries = Object.entries(object(value, "custom metadata"));
+  if (entries.length > 20) invalid("custom metadataは20項目以下で指定してください");
+  const metadata: Record<string, string | number | boolean | null> = {};
+  for (const [key, entry] of entries) {
+    if (key.length > 64 || !/^[A-Za-z][A-Za-z0-9_.-]*$/u.test(key)) invalid("custom metadata keyが不正です");
+    if (entry === null || typeof entry === "boolean") metadata[key] = entry;
+    else if (typeof entry === "string" && Array.from(entry).length <= 500) metadata[key] = entry;
+    else if (typeof entry === "number" && Number.isFinite(entry)) metadata[key] = entry;
+    else invalid("custom metadata valueが不正です");
+  }
+  return metadata;
 }
 
 function resourceRef(value: unknown): FeedbackHostResourceRefV1 {
@@ -259,6 +308,13 @@ function object(value: unknown, name: string): Record<string, unknown> {
 
 function bounded(value: unknown, name: string, maximum: number): string {
   if (typeof value !== "string" || !value || value.length > maximum) invalid(`${name}が不正なstringです`);
+  return value;
+}
+
+function customText(value: unknown, name: string, maximum: number, empty: boolean): string {
+  if (typeof value !== "string" || Array.from(value).length > maximum || (!empty && !value)) {
+    invalid(`${name}が不正なstringです`);
+  }
   return value;
 }
 

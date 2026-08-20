@@ -1,6 +1,6 @@
 {
-  "name": "@feedback/admin-react",
-  "version": "1.0.0-alpha.2",
+  "name": "@geibee/admin-react",
+  "version": "1.0.0-alpha.3",
   "description": "Feedback Service v1向けの独立React管理コンソール",
   "private": true,
   "type": "module",
@@ -31,8 +31,8 @@
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@feedback/contracts": "1.0.0-alpha.2",
-    "@feedback/core": "1.0.0-alpha.2"
+    "@geibee/contracts": "1.0.0-alpha.3",
+    "@geibee/core": "1.0.0-alpha.3"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

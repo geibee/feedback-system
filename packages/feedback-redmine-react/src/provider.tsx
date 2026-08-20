@@ -3,8 +3,8 @@ import type {
   ClientStatePort,
   FeedbackRedmineHostAdapter,
   RedmineFeedbackPort
-} from "@feedback/redmine-core";
-import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@feedback/core";
+} from "@geibee/redmine-core";
+import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@geibee/core";
 
 export type RedmineFeedbackRuntime = {
   port: RedmineFeedbackPort;

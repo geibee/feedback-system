@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RedmineFetch } from "@feedback/redmine-core/trusted";
+import type { RedmineFetch } from "@geibee/redmine-core/trusted";
 import { createFeedbackRedmineGatewayHandler } from "./handler.js";
 import type { GatewayDependencies, GatewayServerProfile } from "./profile.js";
 
@@ -281,6 +281,7 @@ describe("gateway create protection", () => {
       target: { schemaVersion: "1", kind: "screen-position", relativeX: 0.5, relativeY: 0.5 },
       release: "2026.08.19",
       locale: "ja-JP",
+      threadUrl: `https://app.example/orders/value?feedbackThread=${threadId}`,
       capturedAt: "2026-08-19T00:00:00Z",
       evidence: null,
       ...extra
@@ -330,6 +331,28 @@ describe("gateway create protection", () => {
       }
     ));
     expect(response.status).toBe(400);
+    expect(deps.redmineFetch).not.toHaveBeenCalled();
+  });
+
+  it("thread URLは同一originかつ対象threadだけを許可する", async () => {
+    const createPath = "/internal/feedback-redmine/v1/profiles/inventory-production/threads";
+    const deps = dependencies();
+    const handler = createFeedbackRedmineGatewayHandler(deps.value);
+    const credential = await participantCredential(handler);
+    for (const threadUrl of [
+      `https://evil.example/orders/1?feedbackThread=${threadId}`,
+      "https://app.example/orders/1?feedbackThread=00000000-0000-4000-8000-000000000099"
+    ]) {
+      const response = await handler(request(createPath, {
+        method: "POST",
+        headers: {
+          "X-Feedback-Participant-Credential": credential,
+          "Idempotency-Key": "00000000-0000-4000-8000-000000000002"
+        },
+        body: createForm({ threadUrl })
+      }));
+      expect(response.status).toBe(400);
+    }
     expect(deps.redmineFetch).not.toHaveBeenCalled();
   });
 

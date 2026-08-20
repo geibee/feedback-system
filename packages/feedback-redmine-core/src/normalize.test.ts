@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeIssueDetail, normalizeIssueSummary, sanitizeFilename } from "./normalize.js";
 import { issueFixture, profile, threadId } from "./test-fixtures.js";
 import { buildRedmineDescription, buildRedmineMessageNote } from "./marker.js";
+import { parseThreadSummary } from "./response-validation.js";
 import type { RedmineIssueDto } from "./redmine-dto.js";
 
 describe("Redmine DTO normalization", () => {
@@ -32,23 +33,9 @@ describe("Redmine DTO normalization", () => {
     const participantId = "00000000-0000-4000-8000-000000000007";
     const messageId = "00000000-0000-4000-8000-000000000008";
     const issue: RedmineIssueDto = issueFixture();
-    issue.description = buildRedmineDescription("最初のコメント", {
-      threadId,
-      intentId: "00000000-0000-4000-8000-000000000002",
-      requestHash: "a".repeat(64),
-      applicationKey: "inventory",
-      environmentKey: "production",
-      externalWorkspaceKey: "production-review",
-      pageKey: "orders.detail",
-      hostResourceKey: "opaque-resource",
-      perspectiveCode: "ux",
-      submittedById: participantId,
-      submittedByName: "利用者",
-      messageId: threadId,
-      participantId,
-      messageSignature: "signature",
-      capturedAt: "2026-08-19T00:00:00Z"
-    });
+    issue.description = `最初のコメント\n\n---\nFeedback metadata v1\n` +
+      `Intent ID: 00000000-0000-4000-8000-000000000002\n` +
+      `Submitted by name: 利用者\nMessage ID: ${threadId}\nParticipant ID: ${participantId}\nMessage signature: signature`;
     issue.journals = [{
       id: 12,
       user: { id: 7, name: "Integration" },
@@ -75,6 +62,30 @@ describe("Redmine DTO normalization", () => {
     expect(thread.messages?.[1]?.versions.map((version) => version.body)).toEqual(["返信 v1", "返信 v2"]);
   });
 
+  it("新規descriptionではcontext attachmentとcustom fieldから初回投稿者を復元する", () => {
+    const participantId = "00000000-0000-4000-8000-000000000007";
+    const issue = issueFixture();
+    issue.description = buildRedmineDescription(
+      "最初のコメント",
+      `https://inventory.example.invalid/orders/1?feedbackThread=${threadId}`
+    );
+    issue.attachments.push({
+      id: 91,
+      filename: "feedback-context-v1.json",
+      filesize: 512,
+      content_type: "application/json",
+      author: { id: 7, name: "投稿者" },
+      created_on: "2026-08-19T00:00:00Z"
+    });
+    const thread = normalizeIssueDetail(issue, profile, null, participantId);
+    expect(thread.initialComment).toBe("最初のコメント");
+    expect(thread.messages?.[0]).toMatchObject({
+      id: threadId,
+      canEdit: true,
+      author: { kind: "participant", participantId, displayName: "利用者" }
+    });
+  });
+
   it("inline preview上限を超える画像をdownload-onlyにする", () => {
     const issue = issueFixture();
     issue.attachments[0]!.filesize = profile.clientProfile.attachments.maximumInlinePreviewBytes + 1;
@@ -84,6 +95,34 @@ describe("Redmine DTO normalization", () => {
   it("壊れたlocatorはthread自体を捨てずnullにする", () => {
     const issue = issueFixture();
     issue.custom_fields.find((field) => field.id === 29)!.value = "{invalid";
+    expect(normalizeIssueSummary(issue, profile).locator).toBeNull();
+  });
+
+  it("custom targetをlocatorから制約どおり復元する", () => {
+    const issue = issueFixture();
+    const field = issue.custom_fields.find((entry) => entry.id === 29)!;
+    const locator = JSON.parse(field.value as string) as Record<string, unknown>;
+    locator.target = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "com.example.threejs",
+      targetKey: "model-42",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.75,
+      metadata: { layerName: "equipment", level: 3 }
+    };
+    field.value = JSON.stringify(locator);
+    const summary = normalizeIssueSummary(issue, profile);
+    expect(summary.locator?.target).toEqual(locator.target);
+    expect(parseThreadSummary(summary).locator?.target).toEqual(locator.target);
+
+    const invalidResponse = structuredClone(summary) as unknown as Record<string, unknown>;
+    const invalidLocator = invalidResponse.locator as Record<string, unknown>;
+    (invalidLocator.target as Record<string, unknown>).metadata = { nested: { rejected: true } };
+    expect(() => parseThreadSummary(invalidResponse)).toThrow(/custom target metadata value/u);
+
+    (locator.target as Record<string, unknown>).metadata = { nested: { rejected: true } };
+    field.value = JSON.stringify(locator);
     expect(normalizeIssueSummary(issue, profile).locator).toBeNull();
   });
 

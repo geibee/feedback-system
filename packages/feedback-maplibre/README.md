@@ -1,8 +1,8 @@
-# @feedback/maplibre
+# @geibee/maplibre
 
 MapLibre featureを製品横断の安定した `sourceKey` / `featureKey` へ変換し、Overlay pinの位置解決、地図markerの lifecycleと
 WebGL証跡取得を管理する任意 package です。`maplibre-gl` はこの package だけの peer dependencyで、
-`@feedback/react` の導入には不要です。
+`@geibee/react` の導入には不要です。
 
 `bindMapLibreFeedbackPins` は style reload でmarkerを再構築し、required layer消滅時とmap unload時に
 markerを破棄します。
@@ -13,7 +13,7 @@ markerを破棄します。
 地理座標や地物を保持する場合は、client座標をMapLibre targetへ変換するresolverを接続します。
 
 ```tsx
-import { resolveMapLibreFeedbackTargetAtClientPoint } from "@feedback/maplibre";
+import { resolveMapLibreFeedbackTargetAtClientPoint } from "@geibee/maplibre";
 
 <FeedbackOverlay
   targetResolver={(input) => {
@@ -39,7 +39,7 @@ import { resolveMapLibreFeedbackTargetAtClientPoint } from "@feedback/maplibre";
 import {
   createMapLibreFeedbackPinPositionProvider,
   resolveMapLibreFeedbackTargetAtClientPoint
-} from "@feedback/maplibre";
+} from "@geibee/maplibre";
 
 const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
 
@@ -67,8 +67,8 @@ MapLibreの既定WebGL設定では描画後のbufferが保持されず、通常�
 地図、Marker、Popup、NavigationControl、ScaleControlなどをDOM全体と一緒に撮影します。
 
 ```ts
-import { createMapLibreEvidenceProvider } from "@feedback/maplibre";
-import { createDomEvidenceProvider } from "@feedback/react";
+import { createMapLibreEvidenceProvider } from "@geibee/maplibre";
+import { createDomEvidenceProvider } from "@geibee/react";
 
 const captureEvidence = createMapLibreEvidenceProvider({
   capture: createDomEvidenceProvider(),
@@ -88,7 +88,7 @@ tileや画像がCORS対応している必要があります。再描画が完了
 単純な代替手段として、MapLibre生成時に次の設定も利用できます。
 
 ```ts
-import { captureReadyCanvasContextAttributes } from "@feedback/maplibre";
+import { captureReadyCanvasContextAttributes } from "@geibee/maplibre";
 
 new Map({
   // ...

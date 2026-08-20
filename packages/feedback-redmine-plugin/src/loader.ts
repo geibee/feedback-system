@@ -24,3 +24,11 @@ export function createRedmineFeedbackPluginController(
     () => import("./storage.js")
   );
 }
+
+export {
+  createRedmineFeedbackPluginControllerFromRuntimeConfig,
+  defaultRedmineRuntimeConfigPath,
+  defaultRedmineRuntimeConfigTimeoutMs,
+  validateRuntimeConfig
+} from "./runtime-config.js";
+export type { RedmineFeedbackRuntimeOptions } from "./runtime-config.js";

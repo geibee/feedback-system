@@ -1,4 +1,4 @@
-import type { RedmineThreadSummaryV1, RedmineThreadV1 } from "@feedback/contracts";
+import type { RedmineThreadSummaryV1, RedmineThreadV1 } from "@geibee/contracts";
 import {
   buildLocator,
   calculateRequestHash,
@@ -283,10 +283,12 @@ export class RedmineTrustedClient {
       hostResourceKey: input.hostResourceKey,
       release: input.release,
       locale: input.locale,
+      threadUrl: input.threadUrl ?? null,
       perspectiveCode: input.perspectiveCode,
       location: input.location,
       target: input.target,
       author: input.author,
+      initialMessageSignature: input.markerSignature ?? null,
       capturedAt: input.capturedAt,
       primaryEvidence: input.evidence
     };
@@ -304,25 +306,7 @@ export class RedmineTrustedClient {
         description: "Feedback primary evidence"
       });
     }
-    const description = buildRedmineDescription(input.comment, {
-      threadId: input.threadId,
-      intentId: input.intentId,
-      requestHash,
-      applicationKey: this.profile.clientProfile.applicationKey,
-      environmentKey: this.profile.clientProfile.environmentKey,
-      externalWorkspaceKey: this.profile.clientProfile.externalWorkspaceKey,
-      pageKey: input.location.pageKey,
-      hostResourceKey: input.hostResourceKey,
-      perspectiveCode: input.perspectiveCode,
-      submittedById: input.author.participantId,
-      submittedByName: input.author.displayName,
-      ...(input.author.source === "participant-credential" ? {
-        messageId: input.threadId,
-        participantId: input.author.participantId,
-        messageSignature: input.markerSignature
-      } : {}),
-      capturedAt: input.capturedAt
-    });
+    const description = buildRedmineDescription(input.comment, input.threadUrl ?? null);
     const issue = {
       project_id: this.profile.projectId,
       tracker_id: this.profile.trackerId,
@@ -399,7 +383,7 @@ export class RedmineTrustedClient {
     if (findMessageByIntent(issue, input.intentId)) {
       return this.#issueDetail(match.summary.issueId, input.threadId, signal, input.author.participantId);
     }
-    const ownership = findMessageOwnership(issue, input.threadId, input.messageId);
+    const ownership = await this.#messageOwnership(issue, input.threadId, input.messageId, signal);
     if (!ownership || ownership.participantId !== input.author.participantId) {
       throw new RedmineFeedbackError("redmine.permission_denied", "自分の投稿だけを編集できます", { upstreamStatus: 403 });
     }
@@ -428,7 +412,8 @@ export class RedmineTrustedClient {
     signal?: AbortSignal
   ): Promise<TrustedMessageOwnership | null> {
     const match = await this.#oneThread(input, signal);
-    return findMessageOwnership(await this.#issueRaw(match.summary.issueId, signal), input.threadId, input.messageId);
+    const issue = await this.#issueRaw(match.summary.issueId, signal);
+    return this.#messageOwnership(issue, input.threadId, input.messageId, signal);
   }
 
   async getAttachment(
@@ -522,6 +507,59 @@ export class RedmineTrustedClient {
     const thread = normalizeIssueDetail(issue, this.profile, url, participantId);
     if (thread.threadId !== expectedThreadId) throw new RedmineFeedbackError("redmine.not_found", "threadが見つかりません");
     return thread;
+  }
+
+  async #messageOwnership(
+    issue: unknown,
+    threadId: string,
+    messageId: string,
+    signal?: AbortSignal
+  ): Promise<TrustedMessageOwnership | null> {
+    const legacy = findMessageOwnership(issue, threadId, messageId);
+    if (legacy || messageId !== threadId) return legacy;
+    const initial = await this.#initialOwnershipFromContext(issue, threadId, signal);
+    return initial ? findMessageOwnership(issue, threadId, messageId, initial) : null;
+  }
+
+  async #initialOwnershipFromContext(
+    issueValue: unknown,
+    threadId: string,
+    signal?: AbortSignal
+  ): Promise<TrustedMessageOwnership | null> {
+    const issue = object(issueValue, "issue");
+    const attachment = (issue.attachments === undefined ? [] : array(issue.attachments, "issue.attachments"))
+      .map((value) => object(value, "attachment"))
+      .find((value) => value.filename === "feedback-context-v1.json");
+    if (!attachment || typeof attachment.content_url !== "string") return null;
+    const target = validateAttachmentContentUrl(this.#baseUrl, attachment.content_url);
+    const response = await this.#raw("GET", target.toString(), undefined, signal, 15_000, true);
+    const buffer = await limitedArrayBuffer(response, 1_048_576);
+    let context: Record<string, unknown>;
+    try {
+      context = object(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buffer)), "feedback context");
+    } catch {
+      throw contractError("feedback context attachmentが不正です");
+    }
+    const author = object(context.author, "feedback context author");
+    const fields = issue.custom_fields;
+    const expectedRequestHash = customFieldValue(fields, this.profile.customFieldIds.requestHash);
+    const expectedParticipantId = customFieldValue(fields, this.profile.customFieldIds.submittedById);
+    if (!expectedRequestHash || !expectedParticipantId) return null;
+    if (context.schemaVersion !== "1" || context.kind !== "feedback-context" || context.threadId !== threadId ||
+      context.requestHash !== expectedRequestHash || author.participantId !== expectedParticipantId ||
+      typeof context.intentId !== "string" || typeof context.initialMessageSignature !== "string" ||
+      !context.initialMessageSignature || context.initialMessageSignature.length > 512) return null;
+    validateUuid(context.intentId, "feedback context intent ID");
+    validateUuid(expectedParticipantId, "feedback context participant ID");
+    return {
+      kind: "initial",
+      markerKind: "initial",
+      participantId: expectedParticipantId,
+      version: 1,
+      intentId: context.intentId,
+      signature: context.initialMessageSignature,
+      body: initialCommentFromDescription(string(issue.description, "issue.description"))
+    };
   }
 
   async #issueRaw(issueId: number, signal?: AbortSignal): Promise<unknown> {
@@ -698,7 +736,12 @@ function findMessageByIntent(issueValue: unknown, intentId: string): {
   return null;
 }
 
-function findMessageOwnership(issueValue: unknown, threadId: string, messageId: string): TrustedMessageOwnership | null {
+function findMessageOwnership(
+  issueValue: unknown,
+  threadId: string,
+  messageId: string,
+  initialFallback: TrustedMessageOwnership | null = null
+): TrustedMessageOwnership | null {
   const issue = object(issueValue, "issue");
   const description = typeof issue.description === "string" ? issue.description : "";
   const initial = parseFeedbackMetadata(description);
@@ -713,6 +756,8 @@ function findMessageOwnership(issueValue: unknown, threadId: string, messageId: 
       signature: initial.messageSignature,
       body: initialCommentFromDescription(description)
     });
+  } else if (initialFallback) {
+    ownership.set(threadId, { ...initialFallback });
   }
   for (const raw of issue.journals === undefined ? [] : array(issue.journals, "issue.journals")) {
     const journal = object(raw, "journal");

@@ -3,7 +3,7 @@ import type {
   FeedbackLocationV1,
   FeedbackParticipant,
   FeedbackTargetV1
-} from "@feedback/contracts";
+} from "@geibee/contracts";
 
 export type FeedbackEvidenceRequest = {
   context: FeedbackHostContextV1;

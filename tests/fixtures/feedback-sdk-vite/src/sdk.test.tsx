@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useMemo, useRef } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
-import { FeedbackOverlay, FeedbackProvider } from "@feedback/react";
-import type { FeedbackHostAdapter, FeedbackTransport } from "@feedback/core";
+import { FeedbackOverlay, FeedbackProvider } from "@geibee/react";
+import type { FeedbackHostAdapter, FeedbackTransport } from "@geibee/core";
 
 const session = {
   id: "10000000-0000-4000-8000-000000000001",

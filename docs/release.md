@@ -12,33 +12,60 @@ bash scripts/build-feedback-redmine-release.sh \
 
 生成物:
 
-- `@feedback/contracts`
-- `@feedback/core`
-- `@feedback/dom-capture`
-- `@feedback/react-ui`
-- `@feedback/maplibre`
-- `@feedback/redmine-core`
-- `@feedback/redmine-react`
-- `@feedback/redmine-plugin`
-- `@feedback/redmine-gateway`
+- `@geibee/contracts`
+- `@geibee/core`
+- `@geibee/dom-capture`
+- `@geibee/react-ui`
+- `@geibee/maplibre`
+- `@geibee/redmine-core`
+- `@geibee/redmine-react`
+- `@geibee/redmine-plugin`
+- `@geibee/redmine-gateway`
+- `@geibee/redmine-ops`
+- linux/amd64・linux/arm64の`feedback-redmine-gateway` OCI archive
+- linux/amd64・linux/arm64のローカル評価用`feedback-redmine-demo` OCI archive
+- imageごと・platformごとのCycloneDX SBOMとHIGH/CRITICAL vulnerability SARIF
 - publish順を持つ`release-manifest.json`と`SHA256SUMS`
 
-release builderはstaging copyだけから`private`を除去し、内部`@feedback/*`依存を指定versionへ固定する。source workspaceは
-変更せず、publishやOCI pushも行わない。`release-manifest.json`の`publishOrder`順に承認済みnpm互換registryへ投入する。
+release builderはstaging copyだけから`private`を除去し、内部`@geibee/*`依存を指定versionへ固定する。source workspaceは
+変更せず、publishやOCI pushも行わない。tarballは`https://npm.pkg.github.com`、imageは
+`ghcr.io/geibee/feedback-redmine-gateway`と`ghcr.io/geibee/feedback-redmine-demo`を正規公開先とする。
+全HIGH/CRITICALをSARIFへ記録し、vendor修正版がある
+HIGH/CRITICALを検出した場合はrelease生成を失敗させる。修正版がない検出結果はrisk acceptance対象としてrelease reviewで判断する。
 
-ブラウザ拡張ZIP、React runtime入りself-hosted bundle、reference gateway imageは標準releaseへ含めない。React 18/19は
-consumer SPAのpeer dependencyを使う。`apps/feedback-redmine-gateway-reference`は公開participant modeのローカル確認用sourceで、
-本番artifactではない。
+ブラウザ拡張ZIPとReact runtime入りself-hosted bundleは標準releaseへ含めない。React 18/19はconsumer SPAのpeer dependencyを使う。
+`apps/feedback-redmine-gateway-reference`は標準gateway imageのsourceである。
 
 release前にskip変数なしの`bash scripts/verify-feedback.sh`を実行し、次をすべて通す。
 
-- cleanなReact 18/19 + Vite tarball consumer
+- cleanなReact 18/19 + Vite 8.2 tarball consumer
 - controllerのdisable/re-enable/destroy/purge browser lifecycle
 - browser bundleのsource map、dynamic code、test credential、remote script scan
 - gatewayのnon-root/read-only container probe
+- local Compose、provisioner、runtime config、ops CLI
 - Redmine 5.1.12、6.0.10、6.1.3、7.0.0のdigest固定conformance
 
-registry credentialは環境またはuser-level npm設定から注入し、repositoryへ保存しない。生成後は`SHA256SUMS`と署名を検証する。
+`v<package.jsonのversion>` tagをpushすると`.github/workflows/release-feedback-redmine.yml`が正規品質ゲート、release候補生成、
+GitHub Release draftと全assetの準備、GitHub Packages・GHCR公開、draft公開をこの順で実行する。suffix付きversionだけを
+prereleaseにし、stable versionは通常releaseにする。途中失敗後は同じintegrity/digestの公開済みartifactとdraftを再利用し、
+異なる内容が同じversion/tagに存在する場合は停止する。
+
+repositoryではimmutable releasesを有効にし、`release` environmentへ承認規則を設定する。GitHub PackagesとGHCRのwrite権限は
+このrepositoryのrelease workflowだけに付与し、同じversion/tagへの手動publishを許可しない。GHCRのversion tagは探索用であり、
+配備時はGitHub Releaseの`release-manifest.json`に記録された`indexDigest`を使って
+`ghcr.io/geibee/<image>@sha256:...`の形式で固定する。初回公開後にrepository ownerがGitHubのpackage設定でnpm packageと
+container packageをpublicへ設定し、匿名consumerが取得できることを確認する。以後もvisibilityとdigestをrelease reviewで確認する。
+
+障害復旧でローカルから公開scriptを実行する場合はworkflowを停止し、単一writerであることを確認してから、package write権限を持つ
+`NODE_AUTH_TOKEN`と`GITHUB_TOKEN`、`GITHUB_ACTOR`を環境から注入する。tokenを`.npmrc`、shell引数、repositoryへ保存しない。
+
+```bash
+bash scripts/publish-feedback-redmine-release.sh \
+  --input /tmp/feedback-redmine-release \
+  --version 1.0.0-rc.1
+```
+
+生成後は`SHA256SUMS`と署名を検証する。
 
 ## Legacy Feedback Service SDK
 
@@ -50,7 +77,7 @@ bash scripts/build-feedback-sdk-release.sh \
   --version 1.0.0-rc.1
 ```
 
-`@feedback/contracts`、`@feedback/core`、`@feedback/react-ui`、`@feedback/react`、`@feedback/maplibre`、`@feedback/admin-react`のtarball、
+`@geibee/contracts`、`@geibee/core`、`@geibee/react-ui`、`@geibee/react`、`@geibee/maplibre`、`@geibee/admin-react`のtarball、
 `release-manifest.json`、`SHA256SUMS`を生成する。
 
 ## Legacy Go Service・CLI

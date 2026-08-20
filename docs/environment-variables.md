@@ -1,27 +1,68 @@
 # 環境変数
 
-新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。profile ID、host adapter、feature flagは
-SPAの明示的なintegration moduleから渡し、Redmine接続情報やsecretをbrowserへ渡さない。
+新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。公開runtime configからprofile ID、enabled、
+same-origin gateway pathを読み、host adapterはSPAの明示的なintegration moduleから渡す。Redmine接続情報やsecretをbrowserへ渡さない。
 
 ## Redmine gateway（標準）
 
-`@feedback/redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
+`@geibee/redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
 `loadProfile`と`loadSecret`を実装する。secretに既定値を置かない。
 
-ローカル確認用reference appだけが次を使用する。
+標準配布gateway serverが次を使用する。
 
 ```text
+FEEDBACK_PUBLIC_ORIGIN
 FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
 FEEDBACK_REDMINE_GATEWAY_API_KEY
+FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE
 FEEDBACK_PARTICIPANT_SIGNING_KEY
+PORT
 ```
 
-profile fileはread-only server profile JSONへのabsolute pathである。API keyはFeedback専用integration user用、participant signing keyは
+`FEEDBACK_PUBLIC_ORIGIN`は利用者が開くSPAの正確なoriginで、本番ではHTTPSを必須とする。gatewayはHost headerからoriginを
+推測しない。profile fileはread-only server profile JSONへのabsolute pathである。API keyは値または`_FILE`のabsolute pathの
+どちらか一方で指定する。API keyはFeedback専用integration user用、participant signing keyは
 browser profile用credentialとRedmine message markerのHMAC署名用で、いずれも必須かつ既定値を持たない。署名鍵は32 bytes以上とし、
 API keyとともにprofile file、image、SPAへ記載しない。鍵を変更すると既存localStorage credentialは無効になり、新participant採番が必要になる。
+`PORT`の既定値は8080である。`NODE_ENV=development`のときだけローカル評価用HTTPを許可し、本番では設定しない。
 
 library組込時も環境変数名そのものは契約ではない。配備環境のsecret managerから`participantSigningKey`へ値を注入し、
 Redmine API keyとparticipant signing keyをlog、metric、problem responseへ含めない。
+
+## Redmine導入・ローカル運用CLI
+
+既存Redmineのread-only inspectは、指定した環境変数から一時administrator API keyを読む。既定の変数名は次であり、
+`--api-key-env`で組織のsecret名へ変更できる。
+
+```text
+FEEDBACK_REDMINE_INSPECT_API_KEY
+```
+
+ローカルCLIはstate directoryの0600 `.env`へ次を生成する。利用者が本番runtimeへ設定する変数ではなく、値に既定secretはない。
+
+```text
+FEEDBACK_REDMINE_COMPOSE_PROJECT
+FEEDBACK_REDMINE_STATE_DIR
+FEEDBACK_REDMINE_OPS_ASSETS
+FEEDBACK_REDMINE_HOST_UID
+FEEDBACK_REDMINE_HOST_GID
+FEEDBACK_REDMINE_DB_PASSWORD
+FEEDBACK_REDMINE_SECRET_KEY_BASE
+FEEDBACK_PARTICIPANT_SIGNING_KEY
+FEEDBACK_REDMINE_ADMIN_PORT
+FEEDBACK_REDMINE_DEMO_PORT
+FEEDBACK_REDMINE_GATEWAY_IMAGE
+FEEDBACK_REDMINE_DEMO_IMAGE
+```
+
+`local up`のoptionからportとimageを変更し、生成済みstateの`.env`を直接編集しない。state directoryにはAPI key、管理者password、
+participant署名鍵が含まれるため0700で保護する。
+
+Redmine release builderの一時buildx builder名だけを次で変更できる。本番runtimeへ設定しない。
+
+```text
+FEEDBACK_REDMINE_RELEASE_BUILDER
+```
 
 Redmine Docker適合性試験だけが次を使用し、本番runtimeへ設定しない。
 
@@ -251,12 +292,15 @@ FEEDBACK_CONNECTOR_ID_FILE
 FEEDBACK_CONNECTOR_MARKER
 FEEDBACK_VERIFY_SKIP_NPM_CI
 FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS
+FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES
+FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS
 FEEDBACK_EXTRACTION_SKIP_DOCKER_BUILD
 FEEDBACK_EXTRACTION_SKIP_STANDALONE_SMOKE
 ```
 
-`FEEDBACK_VERIFY_SKIP_NPM_CI`と`FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS`は局所切り分け用で、release/CIの合格証跡では
-使用しない。
+`FEEDBACK_VERIFY_SKIP_NPM_CI`、`FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS`、`FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES`、
+`FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS`は局所切り分けとaggregate script内の重複排除専用である。利用者が直接設定した実行を
+release/CIの合格証跡として扱わない。
 
 ## Service storage
 

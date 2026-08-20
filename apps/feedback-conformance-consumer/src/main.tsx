@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { InventoryConsumer } from "./App";
-import "@feedback/react/styles.css";
+import "@geibee/react/styles.css";
 import "./styles.css";
 
 if (window.location.pathname === "/") {

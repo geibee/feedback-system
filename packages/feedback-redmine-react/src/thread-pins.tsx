@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { RedmineThreadSummaryV1 } from "@feedback/redmine-core";
-import type { FeedbackPinPositionProvider } from "@feedback/core";
+import type { RedmineThreadSummaryV1 } from "@geibee/redmine-core";
+import type { FeedbackPinPositionProvider } from "@geibee/core";
 
 export function ThreadPins(props: {
   threads: RedmineThreadSummaryV1[];
@@ -25,7 +25,9 @@ export function ThreadPins(props: {
     };
   }, [props.positionProvider]);
   const pins = useMemo(() => props.threads.flatMap((thread) => {
-    const position = pinPosition(thread, props.positionProvider);
+    const position = thread.locator?.target
+      ? resolveFeedbackPinPosition(thread.locator.target, props.positionProvider)
+      : null;
     return position ? [{ thread, position }] : [];
     // positionVersionはhost layout変更後のDOM座標再読込を行う。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,10 +59,12 @@ export function ThreadPins(props: {
   </svg>;
 }
 
-function pinPosition(thread: RedmineThreadSummaryV1, provider?: FeedbackPinPositionProvider): { x: number; y: number } | null {
-  const target = thread.locator?.target as Record<string, unknown> | null | undefined;
-  if (!target) return null;
-  const provided = provider?.getPosition(thread.locator!.target!);
+export function resolveFeedbackPinPosition(
+  value: Parameters<FeedbackPinPositionProvider["getPosition"]>[0],
+  provider?: FeedbackPinPositionProvider
+): { x: number; y: number } | null {
+  const target = value as Record<string, unknown>;
+  const provided = provider?.getPosition(value);
   if (provided) return provided;
   if (
     target.kind === "screen-position" &&
@@ -70,6 +74,16 @@ function pinPosition(thread: RedmineThreadSummaryV1, provider?: FeedbackPinPosit
     return {
       x: target.relativeX * document.documentElement.clientWidth,
       y: target.relativeY * document.documentElement.clientHeight
+    };
+  }
+  if (
+    target.kind === "custom" &&
+    typeof target.fallbackRelativeX === "number" &&
+    typeof target.fallbackRelativeY === "number"
+  ) {
+    return {
+      x: target.fallbackRelativeX * document.documentElement.clientWidth,
+      y: target.fallbackRelativeY * document.documentElement.clientHeight
     };
   }
   if (

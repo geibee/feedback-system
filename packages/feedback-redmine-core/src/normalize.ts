@@ -2,8 +2,8 @@ import type {
   RedmineAttachmentV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
-} from "@feedback/contracts";
-import { parseFeedbackTarget } from "@feedback/core";
+} from "@geibee/contracts";
+import { parseFeedbackTarget } from "@geibee/core";
 import { contractError } from "./errors.js";
 import {
   initialCommentFromDescription,
@@ -79,9 +79,21 @@ export function normalizeIssueDetail(
   const timeline: TimelineItem[] = [];
   const description = string(issue.description, "issue.description", 65_535, true);
   const initialMetadata = parseFeedbackMetadata(description);
-  const initialParticipantId = validUuid(initialMetadata?.participantId) ? initialMetadata!.participantId! : null;
+  const fields = customFieldMap(issue.custom_fields);
+  const contextAttached = attachments.some((attachment) => {
+    try {
+      return string(record(attachment, "attachment").filename, "attachment.filename", 255) === "feedback-context-v1.json";
+    } catch {
+      return false;
+    }
+  });
+  const submittedById = optionalField(fields, profile.customFieldIds.submittedById);
+  const submittedByName = optionalField(fields, profile.customFieldIds.submittedByName);
+  const initialParticipantId = validUuid(initialMetadata?.participantId)
+    ? initialMetadata!.participantId!
+    : contextAttached && validUuid(submittedById ?? undefined) ? submittedById! : null;
   const initialMessageId = validUuid(initialMetadata?.messageId) ? initialMetadata!.messageId! : summary.threadId;
-  const initialDisplayName = initialMetadata?.submittedByName?.trim() || summary.author.name;
+  const initialDisplayName = initialMetadata?.submittedByName?.trim() || submittedByName?.trim() || summary.author.name;
   const messages: ConversationMessage[] = [{
     id: initialMessageId,
     kind: "initial",

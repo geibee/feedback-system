@@ -1,12 +1,12 @@
-# @feedback/admin-react
+# @geibee/admin-react
 
 Feedback Service v1だけを利用する独立管理UIです。導入先の業務API、DB、route、OIDC audienceには依存しません。
 session/scope/perspective、thread/evidence/deep link、manifest、retention、membership、notification delivery、
 server-side CSV/XLSX/証跡パッケージexportを管理できます。
 
 ```tsx
-import { FeedbackAdminConsole } from "@feedback/admin-react";
-import "@feedback/admin-react/styles.css";
+import { FeedbackAdminConsole } from "@geibee/admin-react";
+import "@geibee/admin-react/styles.css";
 
 <FeedbackAdminConsole
   transport={transport}

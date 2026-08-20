@@ -8,7 +8,7 @@ Feedback Service v1は、1つの組織またはtrust domainごとにServiceを�
 同じ`portal`などのkeyを共有できない。複数組織で同じkeyを使う場合はServiceを分ける。
 
 この制約を変更して共有マルチテナントにする場合は、`tenantKey`をHostContextと全API scopeへ追加し、DB制約を
-`UNIQUE (tenant_id, application_key)`へ変更する。その変更は`/feedback/v2`と`@feedback/*` 2.xで行う。
+`UNIQUE (tenant_id, application_key)`へ変更する。その変更は`/feedback/v2`と`@geibee/*` 2.xで行う。
 
 ## Installation manifest
 

@@ -2,10 +2,10 @@ import {
   decodeListCursor,
   encodeListCursor,
   RedmineFeedbackError
-} from "@feedback/redmine-core";
+} from "@geibee/redmine-core";
 import {
   validateConnectorProfile
-} from "@feedback/redmine-core/trusted";
+} from "@geibee/redmine-core/trusted";
 import { validateSameOriginRequest } from "./csrf.js";
 import { readCreateMultipart } from "./multipart.js";
 import { GatewayHttpError, jsonResponse, problemResponse } from "./problem.js";
@@ -160,7 +160,7 @@ async function handlePublicRoute(
       profile.clientProfile.capture.maximumUploadBytes + 262_144
     );
     const multipart = await readCreateMultipart(request, maximum);
-    const input = parseCreateRequest(multipart.request, route.profileId);
+    const input = parseCreateRequest(multipart.request, route.profileId, requestOrigin);
     assertEvidencePart(input.evidence, multipart.evidence);
     if (request.headers.get("Idempotency-Key") !== input.intentId) {
       throw new GatewayHttpError(400, "redmine.contract_invalid", "Idempotency-Keyとintent IDが一致しません");

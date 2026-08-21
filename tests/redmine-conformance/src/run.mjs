@@ -69,7 +69,7 @@ async function createFixture() {
     target: { schemaVersion: "1", kind: "screen-position", relativeX: 0.5, relativeY: 0.5 },
     release: "conformance",
     locale: "ja-JP",
-    threadUrl: `http://app.example/orders/conformance?feedbackThread=${threadId}`,
+    threadUrl: `http://app.example/orders/(draft)[1]?feedbackThread=${threadId}`,
     capturedAt,
     evidence
   };
@@ -110,7 +110,8 @@ async function createFixture() {
   assert.equal(initialEdited.initialComment, "最初のコメント\n再構築テスト（編集済み）");
   const rawDescription = (await issueDescription(created.issueId)).replace(/\r\n?/gu, "\n");
   assert.equal(rawDescription,
-    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n${input.threadUrl}`);
+    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n` +
+    `http://app.example/orders/%28draft%29%5B1%5D?feedbackThread=${threadId}`);
   assert(!rawDescription.includes("Feedback metadata v1"));
   assert(!rawDescription.includes("Application:"));
 

@@ -4,7 +4,11 @@ import type {
   FeedbackRedmineHostAdapter,
   RedmineFeedbackPort
 } from "@geibee/feedback-redmine-core";
-import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@geibee/feedback-core";
+import type {
+  FeedbackEvidenceProvider,
+  FeedbackPinPositionProvider,
+  FeedbackTargetResolver
+} from "@geibee/feedback-core";
 
 export type RedmineFeedbackRuntime = {
   port: RedmineFeedbackPort;
@@ -14,6 +18,11 @@ export type RedmineFeedbackRuntime = {
   contextMenu?: boolean;
   targetResolver?: FeedbackTargetResolver<Element>;
   pinPositionProvider?: FeedbackPinPositionProvider;
+  captureDiagnostics?: {
+    wrapProvider?(provider: FeedbackEvidenceProvider): FeedbackEvidenceProvider;
+    getWarning(): string | null;
+    subscribe(listener: () => void): () => void;
+  };
 };
 
 const RuntimeContext = createContext<RedmineFeedbackRuntime | null>(null);

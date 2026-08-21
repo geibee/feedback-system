@@ -31,6 +31,7 @@ function handle(): RedmineFeedbackPluginHandle {
     refresh: async () => undefined,
     openThread: async () => undefined,
     clearLocalState: async () => undefined,
+    registerMapLibreMap: () => () => undefined,
     downloadDiagnostics: () => undefined,
     destroy: vi.fn()
   };
@@ -62,6 +63,38 @@ describe("SPA plugin controller", () => {
     expect(importPlugin).not.toHaveBeenCalled();
     expect(importStorage).not.toHaveBeenCalled();
     expect(document.querySelector("[data-feedback-redmine-host]")).toBeNull();
+  });
+
+  it("MapLibre mapを有効化前に登録し、disable中も次のmountへ引き継ぐ", async () => {
+    const unregisterFirst = vi.fn();
+    const unregisterSecond = vi.fn();
+    const handles = [handle(), handle()];
+    const registerFirst = vi.spyOn(handles[0]!, "registerMapLibreMap").mockReturnValue(unregisterFirst);
+    const registerSecond = vi.spyOn(handles[1]!, "registerMapLibreMap").mockReturnValue(unregisterSecond);
+    const controller = createRedmineFeedbackPluginControllerInternal(
+      baseOptions,
+      async () => ({ createRedmineFeedbackPlugin: () => handles.shift()! }),
+      vi.fn()
+    );
+    const canvas = document.createElement("canvas");
+    const map = {
+      getCanvas: () => canvas,
+      on: () => undefined,
+      off: () => undefined,
+      triggerRepaint: () => undefined
+    };
+
+    const unregister = controller.registerMapLibreMap(map);
+    await controller.setEnabled(true);
+    expect(registerFirst).toHaveBeenCalledWith(map);
+
+    await controller.setEnabled(false);
+    expect(unregisterFirst).toHaveBeenCalledOnce();
+    await controller.setEnabled(true);
+    expect(registerSecond).toHaveBeenCalledWith(map);
+
+    unregister();
+    expect(unregisterSecond).toHaveBeenCalledOnce();
   });
 
   it("loading中とenabled後の二重enableでimportとmountを重複しない", async () => {

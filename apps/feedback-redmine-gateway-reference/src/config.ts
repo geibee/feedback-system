@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { validateBaseUrl, validateConnectorProfile } from "@geibee/feedback-redmine-core/trusted";
+import {
+  validateBaseUrl,
+  validateConnectorProfile,
+  type RedmineConnectorProfile
+} from "@geibee/feedback-redmine-core/trusted";
 import type { GatewayServerProfile } from "@geibee/feedback-redmine-gateway";
 
 export type ReferenceGatewayConfig = {
@@ -14,9 +18,6 @@ export type ReferenceGatewayConfig = {
 
 export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = process.env): ReferenceGatewayConfig {
   const publicOrigin = parsePublicOrigin(environment);
-  const path = environment.FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE;
-  if (!path) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEは必須です");
-  if (!isAbsolute(path)) throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEはabsolute pathである必要があります");
   const apiKey = requiredSecretOrFile(
     environment,
     "FEEDBACK_REDMINE_GATEWAY_API_KEY",
@@ -26,36 +27,7 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
   if (new TextEncoder().encode(participantSigningKey).byteLength < 32) {
     throw new Error("FEEDBACK_PARTICIPANT_SIGNING_KEYは32 bytes以上必要です");
   }
-  const document = parseJsonFile(path, "gateway profile file");
-  const value = exactObject(document, [
-    "profileId", "clientProfileRef", "redmineBaseUrl", "projectId", "trackerId", "isPrivate", "defaultPriorityId",
-    "customFieldIds", "authorizationMode", "showRedmineLink", "secretRef", "closedStatusIds"
-  ], "gateway profile");
-  if (typeof value.clientProfileRef !== "string" || !value.clientProfileRef) {
-    throw new Error("clientProfileRefが不正です");
-  }
-  if (value.authorizationMode !== "resource-scoped" || value.secretRef !== "FEEDBACK_REDMINE_GATEWAY_API_KEY") {
-    throw new Error("authorizationMode/secretRefが不正です");
-  }
-  const clientProfilePath = isAbsolute(value.clientProfileRef)
-    ? value.clientProfileRef
-    : resolve(dirname(path), value.clientProfileRef);
-  const clientProfile = parseJsonFile(clientProfilePath, "client profile file");
-  const candidate = {
-    profileId: value.profileId,
-    clientProfile,
-    redmineBaseUrl: value.redmineBaseUrl,
-    projectId: value.projectId,
-    trackerId: value.trackerId,
-    isPrivate: value.isPrivate,
-    defaultPriorityId: value.defaultPriorityId,
-    customFieldIds: value.customFieldIds,
-    showRedmineLink: value.showRedmineLink,
-    closedStatusIds: value.closedStatusIds
-  } as GatewayServerProfile;
-  const connector = validateConnectorProfile(candidate, {
-    allowHttpDevelopment: environment.NODE_ENV === "development"
-  });
+  const connector = loadConnectorProfile(environment);
   const profiles = new Map<string, GatewayServerProfile>();
   const secrets = new Map<string, string>();
   profiles.set(connector.profileId, {
@@ -74,6 +46,61 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
     secrets,
     participantSigningKey
   };
+}
+
+function loadConnectorProfile(environment: NodeJS.ProcessEnv) {
+  const path = environment.FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE;
+  const json = environment.FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON;
+  if (path && json) {
+    throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEとFEEDBACK_REDMINE_GATEWAY_PROFILE_JSONは同時に指定できません");
+  }
+  if (!path && !json) {
+    throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEまたはFEEDBACK_REDMINE_GATEWAY_PROFILE_JSONは必須です");
+  }
+  if (path && !isAbsolute(path)) {
+    throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_FILEはabsolute pathである必要があります");
+  }
+  if (json && new TextEncoder().encode(json).byteLength > 65_536) {
+    throw new Error("FEEDBACK_REDMINE_GATEWAY_PROFILE_JSONが長すぎます");
+  }
+  const document = path
+    ? parseJsonFile(path, "gateway profile file")
+    : parseJson(json!, "gateway profile JSON");
+  const clientProfileKey = path ? "clientProfileRef" : "clientProfile";
+  const value = exactObject(document, [
+    "profileId", clientProfileKey, "redmineBaseUrl", "projectId", "trackerId", "isPrivate", "defaultPriorityId",
+    "customFieldIds", "authorizationMode", "showRedmineLink", "secretRef", "closedStatusIds"
+  ], "gateway profile");
+  if (value.authorizationMode !== "resource-scoped" || value.secretRef !== "FEEDBACK_REDMINE_GATEWAY_API_KEY") {
+    throw new Error("authorizationMode/secretRefが不正です");
+  }
+  let clientProfile: unknown;
+  if (path) {
+    if (typeof value.clientProfileRef !== "string" || !value.clientProfileRef) {
+      throw new Error("clientProfileRefが不正です");
+    }
+    const clientProfilePath = isAbsolute(value.clientProfileRef)
+      ? value.clientProfileRef
+      : resolve(dirname(path), value.clientProfileRef);
+    clientProfile = parseJsonFile(clientProfilePath, "client profile file");
+  } else {
+    clientProfile = value.clientProfile;
+  }
+  const candidate = {
+    profileId: value.profileId,
+    clientProfile,
+    redmineBaseUrl: value.redmineBaseUrl,
+    projectId: value.projectId,
+    trackerId: value.trackerId,
+    isPrivate: value.isPrivate,
+    defaultPriorityId: value.defaultPriorityId,
+    customFieldIds: value.customFieldIds,
+    showRedmineLink: value.showRedmineLink,
+    closedStatusIds: value.closedStatusIds
+  } as RedmineConnectorProfile;
+  return validateConnectorProfile(candidate, {
+    allowHttpDevelopment: environment.NODE_ENV === "development"
+  });
 }
 
 function parsePublicOrigin(environment: NodeJS.ProcessEnv): string {
@@ -109,7 +136,15 @@ function requiredSecretOrFile(environment: NodeJS.ProcessEnv, name: string, file
 
 function parseJsonFile(path: string, name: string): unknown {
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
+    return parseJson(readFileSync(path, "utf8"), name);
+  } catch {
+    throw new Error(`${name}をJSONとして読み込めません`);
+  }
+}
+
+function parseJson(value: string, name: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
   } catch {
     throw new Error(`${name}をJSONとして読み込めません`);
   }

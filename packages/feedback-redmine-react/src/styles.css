@@ -328,6 +328,16 @@
   font-size: 12px;
 }
 
+.feedback-redmine-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+}
+
 .feedback-redmine-toast {
   position: fixed;
   right: var(--feedback-redmine-launcher-right);

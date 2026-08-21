@@ -10,6 +10,7 @@ export type {
   RedmineFeedbackPluginControllerOptions,
   RedmineFeedbackPluginControllerState
 };
+export type { FeedbackMapLibreEvidenceMap } from "./maplibre-registration.js";
 
 /**
  * Feedback UIを必要になるまで読込まないSPA向けcontrollerを作成します。

@@ -4,6 +4,7 @@ import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@gei
 
 export const maplibreCanvasSelector = "canvas.maplibregl-canvas";
 export const captureReadyCanvasContextAttributes = { preserveDrawingBuffer: true } as const;
+const mapLibreEvidenceProviderMarker = Symbol.for("@geibee/feedback-maplibre/evidence-provider");
 
 export type FeedbackMapLibreEvidenceMap = {
   getCanvas(): HTMLCanvasElement;
@@ -34,7 +35,7 @@ type FrozenMapCanvas = {
 export function createMapLibreEvidenceProvider(
   options: FeedbackMapLibreEvidenceProviderOptions
 ): FeedbackEvidenceProvider {
-  return async (request) => {
+  const provider: FeedbackEvidenceProvider = async (request) => {
     const maps = [...new Set(options.maps())];
     const frozen = await Promise.all(maps.map((map) => freezeMapCanvas(
       map,
@@ -47,6 +48,13 @@ export function createMapLibreEvidenceProvider(
       installed.reverse().forEach(restoreFrozenCanvas);
     }
   };
+  Object.defineProperty(provider, mapLibreEvidenceProviderMarker, { value: true });
+  return provider;
+}
+
+/** providerがMapLibreのWebGL退避を実装しているか、plugin診断から副作用なく確認する。 */
+export function isMapLibreEvidenceProvider(provider: FeedbackEvidenceProvider | undefined): boolean {
+  return Boolean(provider && (provider as unknown as Record<PropertyKey, unknown>)[mapLibreEvidenceProviderMarker]);
 }
 
 /** preserveDrawingBuffer無効のMapLibre canvasを検出し、旧来のDOM capture設定漏れを可視化する。 */

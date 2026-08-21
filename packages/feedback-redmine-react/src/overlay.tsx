@@ -92,6 +92,7 @@ export const RedmineFeedbackOverlay = forwardRef<
   const [participantName, setParticipantName] = useState("");
   const [perspectiveCode, setPerspectiveCode] = useState("");
   const [capture, setCapture] = useState<CaptureState>({ kind: "disabled", reason: "profile" });
+  const [captureWarning, setCaptureWarning] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
   const [submissionTarget, setSubmissionTarget] = useState<FeedbackTargetV1 | null>(null);
@@ -268,6 +269,29 @@ export const RedmineFeedbackOverlay = forwardRef<
     if (profile) void refresh();
   }, [profile, refresh]);
   useEffect(() => {
+    const diagnostics = runtime.captureDiagnostics;
+    if (!profile?.capture.enabled || !diagnostics) {
+      setCaptureWarning(null);
+      return;
+    }
+    const refreshWarning = () => setCaptureWarning(diagnostics.getWarning());
+    refreshWarning();
+    const unsubscribe = diagnostics.subscribe(refreshWarning);
+    const observer = new MutationObserver((records) => {
+      if (records.some(canvasMutationMayChangeDiagnostic)) refreshWarning();
+    });
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+    return () => {
+      observer.disconnect();
+      unsubscribe();
+    };
+  }, [profile?.capture.enabled, runtime.captureDiagnostics]);
+  useEffect(() => {
     if (browseOpen && profile) void loadWorkspaceThreads(undefined, false);
   }, [browseOpen, filter, loadWorkspaceThreads, profile, sort]);
   useEffect(() => {
@@ -366,9 +390,11 @@ export const RedmineFeedbackOverlay = forwardRef<
     }
     replaceCapture({ kind: "capturing" });
     try {
-      const provider = runtime.adapter.captureEvidence ?? createDomEvidenceProvider({
+      setCaptureWarning(runtime.captureDiagnostics?.getWarning() ?? null);
+      const baseProvider = runtime.adapter.captureEvidence ?? createDomEvidenceProvider({
         maxBytes: profile.capture.maximumUploadBytes
       });
+      const provider = runtime.captureDiagnostics?.wrapProvider?.(baseProvider) ?? baseProvider;
       let payload = await provider({
         context: runtime.adapter.getContext(),
         location,
@@ -571,6 +597,7 @@ export const RedmineFeedbackOverlay = forwardRef<
       profile={profile}
       target={submissionTarget}
       capture={capture}
+      captureWarning={captureWarning}
       participantName={participantName}
       perspectiveCode={perspectiveCode}
       comment={comment}
@@ -657,13 +684,25 @@ export const RedmineFeedbackOverlay = forwardRef<
       onSelect={() => beginComposer(contextMenu.target, { x: contextMenu.clientX, y: contextMenu.clientY })}
     />}
     {error && <p className="feedback-redmine-toast feedback-redmine-error" role="alert">{error}</p>}
+    {captureWarning && !submissionTarget && !error && <p
+      className="feedback-redmine-toast feedback-redmine-warning"
+      role="status"
+    >{captureWarning}</p>}
   </div>;
 });
+
+function canvasMutationMayChangeDiagnostic(record: MutationRecord): boolean {
+  if (record.type === "attributes") return record.target instanceof HTMLCanvasElement;
+  return [...record.addedNodes, ...record.removedNodes].some((node) =>
+    node instanceof HTMLCanvasElement || (node instanceof Element && node.querySelector("canvas") !== null)
+  );
+}
 
 function Composer(props: {
   profile: RedmineClientProfileV1;
   target: FeedbackTargetV1;
   capture: CaptureState;
+  captureWarning: string | null;
   participantName: string;
   perspectiveCode: string;
   comment: string;
@@ -694,6 +733,7 @@ function Composer(props: {
       他の人の投稿を見る
     </button>
     <div className="feedback-redmine-evidence">
+      {props.captureWarning && <p className="feedback-redmine-warning" role="status">{props.captureWarning}</p>}
       {props.capture.kind === "capturing" && <p role="status">投稿時点の画面を取得しています…</p>}
       {props.capture.kind === "ready" && <>
         <p>投稿時点の画面を証跡として自動添付します（{props.capture.payload.viewportWidth}×{props.capture.payload.viewportHeight}）</p>

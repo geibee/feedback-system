@@ -7,6 +7,7 @@ import {
   createMapLibreFeedbackPinPositionProvider,
   createMapLibreEvidenceProvider,
   findUnreadableMapCanvases,
+  isMapLibreEvidenceProvider,
   resolveMapLibreFeedbackTarget,
   resolveMapLibreFeedbackTargetAtClientPoint
 } from "./index";
@@ -195,6 +196,8 @@ describe("MapLibre target adapter", () => {
       return null;
     });
     const provider = createMapLibreEvidenceProvider({ capture, maps: () => [map] });
+    expect(isMapLibreEvidenceProvider(provider)).toBe(true);
+    expect(isMapLibreEvidenceProvider(capture)).toBe(false);
 
     await provider({} as never);
 

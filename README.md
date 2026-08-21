@@ -30,6 +30,10 @@ node packages/feedback-redmine-ops/dist/cli.js local down
 前提はReact 18または19、検証済みRedmine（5.1.12、6.0.10、6.1.3、7.0.0）、
 HTTPSで公開できるsame-origin gatewayです。
 
+標準導入ではHost Adapterとplugin controllerを接続します。capture providerを指定しなくても通常のDOM画面を撮影できます。
+設定の違い、既存Composeへの追加、env-only gateway構成は
+[`SPA導入ガイド`](docs/spa-integration-guide.md)へまとめています。
+
 ### 1. Redmineを準備する
 
 Feedback専用project、tracker、integration user、role、status、workflow、11個のcustom fieldを作成します。
@@ -59,6 +63,7 @@ gatewayには次の値だけをserver-sideで設定します。
 
 - `FEEDBACK_PUBLIC_ORIGIN`: SPAの公開origin
 - `FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`: 生成済み`server-profile.json`
+- または`FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON`: `clientProfile`を含むenv-only profile JSON
 - `FEEDBACK_REDMINE_GATEWAY_API_KEY`または`_FILE`: integration userのAPI key
 - `FEEDBACK_PARTICIPANT_SIGNING_KEY`: 32 bytes以上のランダムな秘密値
 
@@ -133,10 +138,14 @@ npx @geibee/feedback-redmine-ops@next doctor \
 
 最後にSPAから1件投稿し、Redmineへのissue作成、双方からの返信、添付画像を確認すれば導入完了です。
 停止するときはruntime configの`enabled`を`false`にします。
+これはplugin全体のfeature flagです。スクリーンショットだけの有効・無効はgatewayのclient profileにある
+`capture.enabled`で制御します。
 
 ## 詳細資料
 
 - 本番配備、backup、upgrade、障害調査: [`docs/feedback-redmine-installation.md`](docs/feedback-redmine-installation.md)
+- SPAへの標準導入とgateway構成: [`docs/spa-integration-guide.md`](docs/spa-integration-guide.md)
+- MapLibre／地物単位の任意連携: [`docs/maplibre-integration.md`](docs/maplibre-integration.md)
 - 環境変数とsecret: [`docs/environment-variables.md`](docs/environment-variables.md)
 - APIとpackageの互換性: [`docs/api-compatibility.md`](docs/api-compatibility.md)
 - 開発者向けrelease手順: [`docs/release.md`](docs/release.md)

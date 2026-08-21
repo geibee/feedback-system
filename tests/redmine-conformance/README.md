@@ -2,7 +2,8 @@
 
 Docker Official Imageをdigestで固定し、throw-away SQLite containerでissue作成、journal、attachment、
 Redmineだけからのthread再構築を確認する。作成、一覧、詳細、attachment取得はすべて業務アプリケーションと
-同一originのgateway handlerを経由する。既存のRedmineやvolumeには接続しない。
+同一originのgateway handlerを経由する。issue本文のSPA URLはCommonMarkとTextileの両形式でlink化を確認する。
+既存のRedmineやvolumeには接続しない。
 
 ```bash
 bash tests/redmine-conformance/run-local-matrix.sh

@@ -22,6 +22,7 @@ packages=(
   @geibee/feedback-core
   @geibee/feedback-dom-capture
   @geibee/feedback-react-ui
+  @geibee/feedback-maplibre
   @geibee/feedback-redmine-core
   @geibee/feedback-redmine-react
   @geibee/feedback-redmine-plugin

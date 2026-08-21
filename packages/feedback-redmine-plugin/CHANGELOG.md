@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- SPA/gatewayの認証失敗案内を管理者向けgateway確認へ変更し、旧browser extensionのoptions案内を除去した。
+- capture有効時の未登録MapLibre WebGL canvas診断と、controller/handleの`registerMapLibreMap(map)`遅延登録・解除APIを追加した。
+
 - strictなsame-origin配備時設定`/.well-known/feedback-redmine.json`を読むruntime loaderを追加し、設定失敗時はfail-closedにした。
 - runtime config取得へ既定5秒のtimeoutと`AbortSignal`を追加し、React hostの破棄後に遅延mountしないようにした。
 - gateway署名participant credentialをlocalStorageへ保存し、OIDC/session/CSRF callbackに依存しない公開modeへ変更。

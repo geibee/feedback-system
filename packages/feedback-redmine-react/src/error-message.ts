@@ -6,7 +6,7 @@ export function feedbackErrorMessage(
 ): string {
   if (!(error instanceof RedmineFeedbackError)) return `${target}を完了できません。時間をおいて再試行してください。`;
   if (error.code === "redmine.invalid_api_key" || error.code === "redmine.unauthenticated") {
-    return "Redmineの認証を確認してください。拡張機能ではoptionsからAPI keyを再入力してください。";
+    return "Redmineの認証を確認できません。管理者にgatewayのRedmine認証設定を確認してもらってください。";
   }
   if (error.code === "redmine.permission_denied") return `${target}に必要なRedmine project権限がありません。管理者へ確認してください。`;
   if (error.code === "redmine.not_found") return `${target}の対象が削除されたか、現在のprofileから参照できません。`;

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -48,6 +49,17 @@ function runImage(image) {
     if (!actualVersion.startsWith(expectedVersion)) throw new Error(`Redmine version mismatch: ${actualVersion} != ${expectedVersion}`);
     run("node", ["tests/redmine-conformance/src/run.mjs", "create", `http://127.0.0.1:${port}`, seedPath, statePath], environment);
     const state = JSON.parse(readFileSync(statePath, "utf8"));
+    run("docker", ["cp", "tests/redmine-conformance/seed/render-description.rb",
+      `${container}:/usr/src/redmine/tmp/feedback-redmine-render-description.rb`], environment);
+    const renderedOutput = output("docker", ["exec", "-e", `SECRET_KEY_BASE=${conformanceSecret}`, container,
+      "bundle", "exec", "rails", "runner", "/usr/src/redmine/tmp/feedback-redmine-render-description.rb",
+      String(state.issueId)], environment);
+    const rendered = parseLastJson(renderedOutput);
+    const expectedHref = `http://app.example/orders/%28draft%29%5B1%5D?feedbackThread=${state.threadId}`;
+    for (const format of ["common_mark", "textile"]) {
+      const html = String(rendered[format]);
+      assert(html.includes(`href="${expectedHref}"`), `${format}でthread URLがlinkになっていません: ${html}`);
+    }
     run("docker", ["cp", "tests/redmine-conformance/seed/journals.rb", `${container}:/usr/src/redmine/tmp/feedback-redmine-journals.rb`], environment);
     run("docker", ["exec", "-e", `SECRET_KEY_BASE=${conformanceSecret}`, container,
       "bundle", "exec", "rails", "runner", "/usr/src/redmine/tmp/feedback-redmine-journals.rb", String(state.issueId),

@@ -1,4 +1,8 @@
 import type { RedmineFeedbackPluginHandle } from "./mount.js";
+import {
+  validateMapLibreEvidenceMap,
+  type FeedbackMapLibreEvidenceMap
+} from "./maplibre-registration.js";
 import type { RedmineFeedbackPluginOptions } from "./validation.js";
 
 export type RedmineFeedbackPluginControllerState = "disabled" | "loading" | "enabled" | "destroyed";
@@ -14,6 +18,8 @@ export type RedmineFeedbackPluginController = {
   readonly state: RedmineFeedbackPluginControllerState;
   setEnabled(enabled: boolean): Promise<void>;
   getHandle(): RedmineFeedbackPluginHandle | null;
+  /** controllerの有効化前後を問わずMapLibre mapを撮影対象へ登録し、戻り値で解除する。 */
+  registerMapLibreMap(map: FeedbackMapLibreEvidenceMap): () => void;
   purgeLocalState(): Promise<void>;
   destroy(): void;
 };
@@ -41,6 +47,8 @@ export function createRedmineFeedbackPluginControllerInternal(
   let ownedMount: HTMLDivElement | null = null;
   let pending: Promise<void> | null = null;
   let permanentlyDestroyed = false;
+  const registeredMaps = new Map<FeedbackMapLibreEvidenceMap, number>();
+  const mountedMapUnregisters = new Map<FeedbackMapLibreEvidenceMap, () => void>();
 
   const notifyUnavailable = (error: unknown) => {
     try {
@@ -53,6 +61,8 @@ export function createRedmineFeedbackPluginControllerInternal(
   const removeMountedPlugin = () => {
     const currentHandle = handle;
     handle = null;
+    mountedMapUnregisters.forEach((unregister) => unregister());
+    mountedMapUnregisters.clear();
     try {
       currentHandle?.destroy();
     } catch (error) {
@@ -106,6 +116,9 @@ export function createRedmineFeedbackPluginControllerInternal(
           }
           const { mount: _mount, mountParent: _mountParent, ...pluginOptions } = options;
           handle = plugin.createRedmineFeedbackPlugin({ ...pluginOptions, mount });
+          registeredMaps.forEach((_count, map) => {
+            mountedMapUnregisters.set(map, handle!.registerMapLibreMap(map));
+          });
           if (permanentlyDestroyed || generation !== requestGeneration) {
             removeMountedPlugin();
             return;
@@ -127,6 +140,28 @@ export function createRedmineFeedbackPluginControllerInternal(
     getHandle() {
       return state === "enabled" ? handle : null;
     },
+    registerMapLibreMap(map) {
+      if (permanentlyDestroyed) throw new Error("Feedback controllerはdestroy済みです");
+      const validated = validateMapLibreEvidenceMap(map);
+      const count = registeredMaps.get(validated) ?? 0;
+      registeredMaps.set(validated, count + 1);
+      if (count === 0 && handle) {
+        mountedMapUnregisters.set(validated, handle.registerMapLibreMap(validated));
+      }
+      let registered = true;
+      return () => {
+        if (!registered) return;
+        registered = false;
+        const current = registeredMaps.get(validated) ?? 0;
+        if (current > 1) {
+          registeredMaps.set(validated, current - 1);
+          return;
+        }
+        registeredMaps.delete(validated);
+        mountedMapUnregisters.get(validated)?.();
+        mountedMapUnregisters.delete(validated);
+      };
+    },
     async purgeLocalState() {
       try {
         const storage = await importStorage();
@@ -138,6 +173,7 @@ export function createRedmineFeedbackPluginControllerInternal(
     destroy() {
       if (permanentlyDestroyed) return;
       disable();
+      registeredMaps.clear();
       permanentlyDestroyed = true;
       state = "destroyed";
     }

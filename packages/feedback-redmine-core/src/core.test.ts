@@ -87,6 +87,14 @@ describe("Redmine core deterministic model", () => {
     expect(description).not.toContain("Host resource:");
   });
 
+  it("CommonMarkとTextileの自動linkを壊さないthread URLへする", () => {
+    const threadUrl = "https://inventory.example.invalid/orders/(draft)[1]?feedbackThread=00000000-0000-4000-8000-000000000001";
+    expect(buildRedmineDescription("comment", threadUrl)).toContain(
+      "https://inventory.example.invalid/orders/%28draft%29%5B1%5D" +
+      "?feedbackThread=00000000-0000-4000-8000-000000000001"
+    );
+  });
+
   it("旧metadata blockを読取互換のため解析する", () => {
     const metadata = {
       threadId: "00000000-0000-4000-8000-000000000001",

@@ -26,6 +26,7 @@ COPY contracts/feedback contracts/feedback
 COPY packages/feedback-core packages/feedback-core
 COPY packages/feedback-dom-capture packages/feedback-dom-capture
 COPY packages/feedback-react-ui packages/feedback-react-ui
+COPY packages/feedback-maplibre packages/feedback-maplibre
 COPY packages/feedback-redmine-core packages/feedback-redmine-core
 COPY packages/feedback-redmine-react packages/feedback-redmine-react
 COPY packages/feedback-redmine-plugin packages/feedback-redmine-plugin
@@ -34,6 +35,7 @@ RUN npm --workspace @geibee/feedback-contracts run build \
   && npm --workspace @geibee/feedback-core run build \
   && npm --workspace @geibee/feedback-dom-capture run build \
   && npm --workspace @geibee/feedback-react-ui run build \
+  && npm --workspace @geibee/feedback-maplibre run build \
   && npm --workspace @geibee/feedback-redmine-core run build \
   && npm --workspace @geibee/feedback-redmine-react run build \
   && npm --workspace @geibee/feedback-redmine-plugin run build \

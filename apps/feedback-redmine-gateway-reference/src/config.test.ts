@@ -42,6 +42,18 @@ describe("standard gateway config", () => {
     expect(config.secrets.get("FEEDBACK_REDMINE_GATEWAY_API_KEY")).toBe("file-integration-key");
   });
 
+  it("client profileを含む環境変数だけでgateway profileを読み込む", () => {
+    const config = loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON: JSON.stringify(createCombinedProfile()),
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "integration-test-key",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "participant-signing-test-secret-at-least-32-bytes"
+    });
+
+    expect(config.profiles.get("inventory-production")?.clientProfile.capture.enabled).toBe(true);
+    expect(config.profiles.get("inventory-production")?.redmineBaseUrl).toBe("https://redmine.example.invalid/redmine");
+  });
+
   it.each([
     ["public origin", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
     ["profile file", { FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
@@ -79,6 +91,16 @@ describe("standard gateway config", () => {
     })).toThrow(/同時/u);
   });
 
+  it("profile fileとprofile JSONの同時指定を拒否する", () => {
+    expect(() => loadReferenceGatewayConfig({
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/config/server.json",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON: JSON.stringify(createCombinedProfile()),
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "key",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32)
+    })).toThrow(/同時/u);
+  });
+
   it("本番はHTTPSのoriginだけを受け、開発時だけHTTPを許可する", () => {
     expect(() => loadReferenceGatewayConfig({
       FEEDBACK_PUBLIC_ORIGIN: "http://app.example.test",
@@ -99,20 +121,30 @@ describe("standard gateway config", () => {
 function createProfileFiles(extra: Record<string, unknown> = {}): string {
   const directory = mkdtempSync(join(tmpdir(), "feedback-redmine-gateway-"));
   temporaryDirectories.push(directory);
-  writeFileSync(join(directory, "client.json"), JSON.stringify({
-    schemaVersion: "1",
-    id: "inventory-production",
-    displayName: "Inventory / Production",
-    applicationKey: "inventory",
-    environmentKey: "production",
-    externalWorkspaceKey: "production-review",
-    perspectives: [{ code: "ux", label: "UI/UX" }],
-    capture: { enabled: true, maximumUploadBytes: 1_048_576, contentTypes: ["image/png"] },
-    attachments: { maximumInlinePreviewBytes: 1_048_576, maximumDownloadBytes: 1_048_576 }
-  }));
+  const combined = createCombinedProfile(extra);
+  writeFileSync(join(directory, "client.json"), JSON.stringify(combined.clientProfile));
+  const { clientProfile: _clientProfile, ...serverProfile } = combined;
   writeFileSync(join(directory, "server.json"), JSON.stringify({
+    ...serverProfile,
+    clientProfileRef: "client.json"
+  }));
+  return directory;
+}
+
+function createCombinedProfile(extra: Record<string, unknown> = {}) {
+  return {
     profileId: "inventory-production",
-    clientProfileRef: "client.json",
+    clientProfile: {
+      schemaVersion: "1",
+      id: "inventory-production",
+      displayName: "Inventory / Production",
+      applicationKey: "inventory",
+      environmentKey: "production",
+      externalWorkspaceKey: "production-review",
+      perspectives: [{ code: "ux", label: "UI/UX" }],
+      capture: { enabled: true, maximumUploadBytes: 1_048_576, contentTypes: ["image/png"] },
+      attachments: { maximumInlinePreviewBytes: 1_048_576, maximumDownloadBytes: 1_048_576 }
+    },
     redmineBaseUrl: "https://redmine.example.invalid/redmine",
     projectId: 12,
     trackerId: 4,
@@ -136,6 +168,5 @@ function createProfileFiles(extra: Record<string, unknown> = {}): string {
     closedStatusIds: [5],
     secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY",
     ...extra
-  }));
-  return directory;
+  };
 }

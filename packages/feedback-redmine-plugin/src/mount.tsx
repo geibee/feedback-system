@@ -2,20 +2,33 @@ import { createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { RedmineDiagnosticBuffer } from "@geibee/feedback-redmine-core";
 import {
+  createDomEvidenceProvider,
   RedmineFeedbackOverlay,
   RedmineFeedbackProvider,
   installRedmineFeedbackStyles,
   type RedmineFeedbackOverlayHandle
 } from "@geibee/feedback-redmine-react";
+import {
+  createMapLibreEvidenceProvider,
+  findUnreadableMapCanvases,
+  isMapLibreEvidenceProvider
+} from "@geibee/feedback-maplibre";
+import type { FeedbackRedmineHostAdapter } from "@geibee/feedback-redmine-core";
 import { GatewayRedmineFeedbackTransport } from "./gateway-transport.js";
 import { createBrowserClientState } from "./storage.js";
 import { downloadDiagnosticJson } from "./diagnostic-download.js";
+import {
+  validateMapLibreEvidenceMap,
+  type FeedbackMapLibreEvidenceMap
+} from "./maplibre-registration.js";
 import { validatePluginOptions, type RedmineFeedbackPluginOptions } from "./validation.js";
 
 export type RedmineFeedbackPluginHandle = {
   refresh(): Promise<void>;
   openThread(threadId: string): Promise<void>;
   clearLocalState(principalScopeHash: string): Promise<void>;
+  /** 遅延生成されたMapLibre mapを撮影対象へ登録し、戻り値で解除する。 */
+  registerMapLibreMap(map: FeedbackMapLibreEvidenceMap): () => void;
   downloadDiagnostics(): void;
   destroy(): void;
 };
@@ -41,6 +54,31 @@ export function createRedmineFeedbackPlugin(
   let root: Root | null = null;
   let diagnostics: RedmineDiagnosticBuffer;
   let clientState: ReturnType<typeof createBrowserClientState>;
+  const registeredMaps = new Map<FeedbackMapLibreEvidenceMap, number>();
+  const captureDiagnosticListeners = new Set<() => void>();
+  const captureDiagnostics = {
+    getWarning() {
+      if (isMapLibreEvidenceProvider(options.adapter.captureEvidence)) return null;
+      const registeredCanvases = new Set(Array.from(registeredMaps.keys()).flatMap((map) => {
+        try {
+          return [map.getCanvas()];
+        } catch {
+          return [];
+        }
+      }));
+      const unregistered = findUnreadableMapCanvases(options.mount.ownerDocument).some(
+        (canvas) => !registeredCanvases.has(canvas)
+      );
+      return unregistered
+        ? "MapLibreのWebGL canvasに撮影providerが接続されていないため、スクリーンショット内の地図が白紙になる可能性があります。registerMapLibreMap(map)で地図を登録してください。"
+        : null;
+    },
+    subscribe(listener: () => void) {
+      captureDiagnosticListeners.add(listener);
+      return () => captureDiagnosticListeners.delete(listener);
+    }
+  };
+  const notifyCaptureDiagnostics = () => captureDiagnosticListeners.forEach((listener) => listener());
   const overlay = createRef<RedmineFeedbackOverlayHandle>();
   try {
     removeStyles = installRedmineFeedbackStyles(shadow);
@@ -57,15 +95,34 @@ export function createRedmineFeedbackPlugin(
     clientState = createBrowserClientState({
       onFallback: (error) => options.onUnavailable?.(error)
     });
+    const baseCapture = options.adapter.captureEvidence ?? createDomEvidenceProvider();
+    const captureEvidence = createMapLibreEvidenceProvider({
+      capture: baseCapture,
+      maps: () => Array.from(registeredMaps.keys())
+    });
+    const adapter: FeedbackRedmineHostAdapter = {
+      getContext: () => options.adapter.getContext(),
+      getLocation: () => options.adapter.getLocation(),
+      getResourceRef: () => options.adapter.getResourceRef(),
+      navigate: (location, threadId) => options.adapter.navigate(location, threadId),
+      captureEvidence,
+      ...(options.adapter.subscribe
+        ? { subscribe: (listener: () => void) => options.adapter.subscribe!(listener) }
+        : {}),
+      ...(options.adapter.getFeedbackThreadUrl
+        ? { getFeedbackThreadUrl: (threadId: string) => options.adapter.getFeedbackThreadUrl!(threadId) }
+        : {})
+    };
     root = createRoot(container);
     root.render(<RedmineFeedbackProvider runtime={{
       port: transport,
       clientState,
-      adapter: options.adapter,
+      adapter,
       profileId: options.profileId,
       contextMenu: options.contextMenu ?? false,
       targetResolver: options.targetResolver,
-      pinPositionProvider: options.pinPositionProvider
+      pinPositionProvider: options.pinPositionProvider,
+      captureDiagnostics
     }}>
       <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
     </RedmineFeedbackProvider>);
@@ -98,6 +155,21 @@ export function createRedmineFeedbackPlugin(
       active();
       await clientState.clearLocalState(options.profileId, principalScopeHash);
     },
+    registerMapLibreMap(map) {
+      active();
+      const validated = validateMapLibreEvidenceMap(map);
+      registeredMaps.set(validated, (registeredMaps.get(validated) ?? 0) + 1);
+      notifyCaptureDiagnostics();
+      let registered = true;
+      return () => {
+        if (!registered) return;
+        registered = false;
+        const count = registeredMaps.get(validated) ?? 0;
+        if (count <= 1) registeredMaps.delete(validated);
+        else registeredMaps.set(validated, count - 1);
+        notifyCaptureDiagnostics();
+      };
+    },
     downloadDiagnostics() {
       active();
       downloadDiagnosticJson(diagnostics, options.profileId);
@@ -105,6 +177,8 @@ export function createRedmineFeedbackPlugin(
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      registeredMaps.clear();
+      notifyCaptureDiagnostics();
       try {
         root.unmount();
       } catch (error) {
@@ -117,6 +191,7 @@ export function createRedmineFeedbackPlugin(
           try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
         }
         mounted.delete(options.mount);
+        captureDiagnosticListeners.clear();
       }
     }
   };

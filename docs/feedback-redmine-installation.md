@@ -360,9 +360,9 @@ Profileはapplication、environment、external workspaceの組を固定する。
 `externalWorkspaceKey`は閲覧共有範囲を分ける。`pageKey`は画面、`hostResourceKey`はレコード等の詳細取得境界である。
 「他の人の投稿を見る」は同じProfileのWorkspace全体を対象にするため、見せてはいけない集団は別Profileにする。
 
-issue descriptionへ保存するのは初回コメントと、`feedbackThread` queryを持つsame-origin URLだけである。Application、Environment、
+issue descriptionへ保存するのは初回コメントと、`feedbackThread` queryを持つsame-origin URLのMarkdown linkだけである。Application、Environment、
 Workspace、Page、Host resourceをdescriptionへ重複記載しない。一方、これらのcustom fieldは一覧のscope、API検索、冪等性、resource境界に使う
-構造化索引なので、遷移用URLだけでは代替しない。URLを押すとSPAのadapterが対象画面へ遷移し、該当threadを開く。
+構造化索引なので、遷移用URLだけでは代替しない。Redmine UIでlinkを押すと新しいtabでSPAのadapterが対象画面へ遷移し、該当threadを開く。
 
 screenshot取得は現在有効で、ローカルProfileも`capture.enabled=true`である。失敗時は画像なしで投稿できるが、CSP、cross-origin image、
 WebGL canvas、upload上限を調べる。MapLibre固有の地物解決と地図pinは自動ではなく、`@geibee/feedback-maplibre`のtarget resolverと

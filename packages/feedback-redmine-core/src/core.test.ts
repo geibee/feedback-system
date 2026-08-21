@@ -80,11 +80,19 @@ describe("Redmine core deterministic model", () => {
   it("新規descriptionは初回commentとthread URLだけを保存する", () => {
     const threadUrl = "https://inventory.example.invalid/orders/1?feedbackThread=00000000-0000-4000-8000-000000000001";
     const description = buildRedmineDescription("最初のコメント", threadUrl);
-    expect(description).toBe(`最初のコメント\n\n---\nアプリでこのフィードバックを開く\n${threadUrl}`);
+    expect(description).toBe(`最初のコメント\n\n---\nアプリでこのフィードバックを開く\n[${threadUrl}](${threadUrl})`);
     expect(initialCommentFromDescription(description)).toBe("最初のコメント");
     expect(parseFeedbackMetadata(description)).toBeNull();
     expect(description).not.toContain("Application:");
     expect(description).not.toContain("Host resource:");
+  });
+
+  it("thread URLのMarkdown区切り文字を壊さずclick可能なlinkへする", () => {
+    const threadUrl = "https://inventory.example.invalid/orders/(draft)[1]?feedbackThread=00000000-0000-4000-8000-000000000001";
+    expect(buildRedmineDescription("comment", threadUrl)).toContain(
+      "[https://inventory.example.invalid/orders/(draft)\\[1\\]?feedbackThread=00000000-0000-4000-8000-000000000001]" +
+      "(https://inventory.example.invalid/orders/%28draft%29[1]?feedbackThread=00000000-0000-4000-8000-000000000001)"
+    );
   });
 
   it("旧metadata blockを読取互換のため解析する", () => {

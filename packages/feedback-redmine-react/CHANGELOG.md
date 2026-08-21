@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Redmine認証失敗時にSPA利用者へgateway設定の管理者確認を案内するよう変更しました。
+- capture診断の警告表示を追加しました。
+
 - DOM captureを`@geibee/feedback-dom-capture`から再exportし、`@geibee/react`への依存を除去しました。
 - DOM/画面/地図target、任意capture preview、返信、自己編集、履歴、15秒同期、responsive drawerを追加しました。
 - 旧React版の2 launcher、対象選択bar、右クリックmenu、独立composer／Workspace一覧／drawer、pin外観と開閉操作を移植しました。

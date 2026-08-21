@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 新規issueのsame-origin thread URLをRedmine UIで開けるMarkdown linkとして保存するようにしました。
+
 - 初回投稿からextension由来の`submissionChannel` metadataを除去しました。
 - request JSONとevidenceを含む2-part multipartを正しく読み取れるようにしました。
 - 公開participant credential発行、message create/update、署名済み所有marker検証を追加しました。

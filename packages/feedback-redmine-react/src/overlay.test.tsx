@@ -212,7 +212,8 @@ afterEach(() => {
 describe("Redmine共通UI", () => {
   it("Redmine raw errorを表示せずerror codeを行動可能な日本語へ写像する", () => {
     const error = new RedmineFeedbackError("redmine.invalid_api_key", "raw upstream secret detail");
-    expect(feedbackErrorMessage(error, "接続")).toMatch(/API keyを再入力/u);
+    expect(feedbackErrorMessage(error, "接続")).toMatch(/gatewayのRedmine認証設定/u);
+    expect(feedbackErrorMessage(error, "接続")).not.toMatch(/options|API keyを再入力/u);
     expect(feedbackErrorMessage(error, "接続")).not.toMatch(/raw upstream/u);
   });
 

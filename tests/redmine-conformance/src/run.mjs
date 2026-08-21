@@ -110,7 +110,8 @@ async function createFixture() {
   assert.equal(initialEdited.initialComment, "最初のコメント\n再構築テスト（編集済み）");
   const rawDescription = (await issueDescription(created.issueId)).replace(/\r\n?/gu, "\n");
   assert.equal(rawDescription,
-    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n${input.threadUrl}`);
+    `最初のコメント\n再構築テスト（編集済み）\n\n---\nアプリでこのフィードバックを開く\n` +
+    `[${input.threadUrl}](${input.threadUrl})`);
   assert(!rawDescription.includes("Feedback metadata v1"));
   assert(!rawDescription.includes("Application:"));
 

@@ -1,6 +1,7 @@
 import { fireEvent, waitFor } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RedmineDiagnosticBuffer, type FeedbackRedmineHostAdapter, type RedmineThreadV1 } from "@geibee/feedback-redmine-core";
+import { findUnreadableMapCanvases } from "@geibee/feedback-maplibre";
 import { downloadDiagnosticJson } from "./diagnostic-download.js";
 import { GatewayRedmineFeedbackTransport } from "./gateway-transport.js";
 import { createRedmineFeedbackPlugin } from "./mount.js";
@@ -278,6 +279,53 @@ describe("gateway transport", () => {
 });
 
 describe("plugin lifecycleとstorage", () => {
+  it("capture有効時の未登録MapLibre canvasを警告し、遅延登録と解除へ追従する", async () => {
+    const captureProfile = { ...profile, capture: { ...profile.capture, enabled: true } };
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/participants")) return new Response(JSON.stringify({
+        participantId: "00000000-0000-4000-8000-000000000007",
+        credential: "signed-credential".repeat(4)
+      }), { status: 201, headers: { "content-type": "application/json" } });
+      if (url.endsWith("/me")) return new Response(JSON.stringify({
+        principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
+      }), { headers: { "content-type": "application/json" } });
+      if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], totalCount: 0, nextCursor: null }), {
+        headers: { "content-type": "application/json" }
+      });
+      return new Response(JSON.stringify({
+        profile: captureProfile,
+        capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
+      }), { headers: { "content-type": "application/json" } });
+    }));
+    const canvas = document.createElement("canvas");
+    canvas.className = "maplibregl-canvas";
+    Object.defineProperty(canvas, "getContext", {
+      configurable: true,
+      value: vi.fn((type: string) => type === "webgl2"
+        ? { getContextAttributes: () => ({ preserveDrawingBuffer: false }) }
+        : null)
+    });
+    document.body.append(canvas);
+    expect(findUnreadableMapCanvases(document)).toEqual([canvas]);
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const handle = createRedmineFeedbackPlugin({ mount, profileId: profile.id, adapter });
+
+    await waitFor(() => expect(mount.shadowRoot?.textContent).toMatch(/地図が白紙になる可能性/u));
+    const unregister = handle.registerMapLibreMap({
+      getCanvas: () => canvas,
+      on: () => undefined,
+      off: () => undefined,
+      triggerRepaint: () => undefined
+    });
+    await waitFor(() => expect(mount.shadowRoot?.textContent).not.toMatch(/地図が白紙になる可能性/u));
+
+    unregister();
+    await waitFor(() => expect(mount.shadowRoot?.textContent).toMatch(/地図が白紙になる可能性/u));
+    handle.destroy();
+  });
+
   it("Shadow DOMへmountし二重mountを拒否、destroyを冪等にする", async () => {
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>(async (input) => {
       const url = String(input);

@@ -23,7 +23,8 @@ version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thr
 hash不一致またはduplicate thread IDは409相当でfail-closedする。
 
 thread createの任意`threadUrl`は同一originかつ対象`threadId`を`feedbackThread` queryに持つURLだけを許可する。新規Redmine issueの
-descriptionは初回コメントとこのURLだけで、従来の`Feedback metadata v1`は書き込まない。旧descriptionは読取互換を維持し、
+descriptionは初回コメントと、このURLをlabel/destinationに持つMarkdown linkだけで、従来の`Feedback metadata v1`は書き込まない。
+Redmine UIでは外部linkとしてクリック可能にする。旧descriptionのURL文字列は読取・初回編集互換を維持し、
 初回自己編集の署名はcontext attachmentから復元する。
 
 thread一覧の`scope`省略は従来どおりresource scopeであり、resourceKind、resourceKey、pageKeyを必須とする。
@@ -70,12 +71,19 @@ runtime config取得は既定5秒でtimeoutし、`signal`でhost lifecycleから
 - `state`: `disabled | loading | enabled | destroyed`
 - `setEnabled(boolean)`: feature flagに追従し、同値の重複操作を冪等に扱う
 - `getHandle()`: enabled時だけ現在のplugin handleを返す
+- `registerMapLibreMap(map)`: 遅延生成されたMapLibre mapをWebGL証跡対象へ登録し、解除関数を返す。disabled中の登録は次のmountへ引き継ぐ
 - `purgeLocalState()`: 現在origin・profileの端末状態だけを明示削除する
 - `destroy()`: SPA teardown用の永久破棄。重複呼出しは安全
+
+enabled時のplugin handleも`registerMapLibreMap(map)`を持つ。controller版はdisable/enableをまたいで登録を保持し、
+handle版は現在のmountだけへ登録する。どちらも戻り値を複数回呼んでも安全に解除する。
 
 controller作成時やdisabled時にUI dynamic import、DOM、gateway通信、timer、router購読を開始しない。
 load中のdisable/destroy後に遅延mountしない。`setEnabled(false)`と`destroy()`はdraft、follow、pending intentを自動削除しない。
 これらの挙動を変える場合はminorな実装詳細ではなく公開lifecycle contract変更として扱う。
+
+標準gatewayはprofile fileと、`clientProfile`を埋め込んだenv-onlyのprofile JSONのどちらか一方を受け付ける。
+profile JSONは公開runtime configではなくserver-side設定であり、API keyやparticipant署名鍵を含めない。
 
 端末内follow stateの任意`seenJournalIds`は、非単調なjournal IDを既知集合で判定する後方互換fieldである。旧stateにない場合は
 `lastSeenJournalId`を使い、次回既読更新時に集合を保存する。pending intentは`clientDraftHash`と`prepared | uncertain`を必須とし、

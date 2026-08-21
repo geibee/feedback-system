@@ -31,7 +31,13 @@ const linkMarker = "---\nアプリでこのフィードバックを開く\n";
 
 export function buildRedmineDescription(comment: string, threadUrl: string | null = null): string {
   const body = comment.replace(/\r\n?/gu, "\n").trim();
-  return threadUrl ? `${body}\n\n${linkMarker}${threadUrl}` : body;
+  return threadUrl ? `${body}\n\n${linkMarker}${markdownLink(threadUrl)}` : body;
+}
+
+function markdownLink(url: string): string {
+  const label = url.replace(/([\\[\]])/gu, "\\$1");
+  const destination = url.replace(/\\/gu, "%5C").replace(/\(/gu, "%28").replace(/\)/gu, "%29");
+  return `[${label}](${destination})`;
 }
 
 const messageMarker = "---\nFeedback message v1\n";

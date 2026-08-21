@@ -14,6 +14,10 @@ export type RedmineFeedbackRuntime = {
   contextMenu?: boolean;
   targetResolver?: FeedbackTargetResolver<Element>;
   pinPositionProvider?: FeedbackPinPositionProvider;
+  captureDiagnostics?: {
+    getWarning(): string | null;
+    subscribe(listener: () => void): () => void;
+  };
 };
 
 const RuntimeContext = createContext<RedmineFeedbackRuntime | null>(null);

@@ -13,6 +13,7 @@ same-origin gateway pathを読み、host adapterはSPAの明示的なintegration
 ```text
 FEEDBACK_PUBLIC_ORIGIN
 FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
+FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON
 FEEDBACK_REDMINE_GATEWAY_API_KEY
 FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE
 FEEDBACK_PARTICIPANT_SIGNING_KEY
@@ -20,7 +21,8 @@ PORT
 ```
 
 `FEEDBACK_PUBLIC_ORIGIN`は利用者が開くSPAの正確なoriginで、本番ではHTTPSを必須とする。gatewayはHost headerからoriginを
-推測しない。profile fileはread-only server profile JSONへのabsolute pathである。API keyは値または`_FILE`のabsolute pathの
+推測しない。profileはread-only server profile JSONへのabsolute pathか、`clientProfile`を埋め込んだ最大64 KiBのJSON文字列を
+`FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON`へ指定する。両方の同時指定は拒否する。API keyは値または`_FILE`のabsolute pathの
 どちらか一方で指定する。API keyはFeedback専用integration user用、participant signing keyは
 browser profile用credentialとRedmine message markerのHMAC署名用で、いずれも必須かつ既定値を持たない。署名鍵は32 bytes以上とし、
 API keyとともにprofile file、image、SPAへ記載しない。鍵を変更すると既存localStorage credentialは無効になり、新participant採番が必要になる。

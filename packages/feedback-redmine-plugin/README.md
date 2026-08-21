@@ -61,8 +61,14 @@ React 18または19とReact DOMはpeer dependencyです。SPAが使用するReac
 self-hosted bundleは配布しません。配布buildはJavaScript source mapを含めず、Shadow DOM内へ共通styleを閉じ込めます。
 Profileでcaptureを有効にすると、Host Adapterに`captureEvidence`がなくても既定DOM providerを自動利用します。独自providerは
 MapLibre canvasなどhost固有の前処理が必要な場合だけ指定します。保存画像には選択位置のFeedbackピンを焼き込みます。
+遅延生成されたMapLibre mapは`controller.registerMapLibreMap(map)`またはhandleの同名methodへ登録し、map破棄前に戻り値を
+呼び出します。controllerは無効化中の登録を保持し、再有効化後のmountへ引き継ぎます。capture有効時に未登録の
+MapLibre WebGL canvasを検出すると、地図が白紙になる可能性をUIで通知します。
 handleの`downloadDiagnostics()`は、直近100 operationのrequest ID、operation、profile ID、HTTP status、duration、error codeだけを
 JSONとして明示downloadします。本文、thread ID、host principal、filename、API keyは収集しません。
 DOM画面だけで動作する完全なHost Adapter、runtime config、gateway配備を含む最短手順は
 [`README.md`](https://github.com/geibee/feedback-system/blob/main/README.md)を参照してください。
-MapLibreやcustom targetは基本導入に含めず、必要なHostだけが追加します。
+基本導入とCompose例は
+[`SPA導入ガイド`](https://github.com/geibee/feedback-system/blob/main/docs/spa-integration-guide.md)を参照してください。
+MapLibreやcustom targetは基本導入に含めず、必要なHostだけが
+[`MapLibre・地物連携ガイド`](https://github.com/geibee/feedback-system/blob/main/docs/maplibre-integration.md)に沿って追加します。

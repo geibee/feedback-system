@@ -1,7 +1,8 @@
 # React組み込み
 
 > **Legacy Feedback Service:** この文書は`@geibee/react`と`/feedback/v1`の従来組み込み向けです。
-> 新規SPAは`@geibee/feedback-redmine-plugin/loader`を使う[`README.md`](../README.md)を参照してください。
+> 新規SPAは`@geibee/feedback-redmine-plugin/loader`を使う[`SPA導入ガイド`](spa-integration-guide.md)を参照してください。
+> MapLibre固有の設定は基本導入と分けて[`MapLibre・地物連携ガイド`](maplibre-integration.md)にまとめています。
 
 React 18/19では `@geibee/feedback-core` のHostAdapterとtransportを作成し、`@geibee/react` の
 `FeedbackProvider` / `FeedbackErrorBoundary` / `FeedbackOverlay` を業務画面の一部へ配置する。

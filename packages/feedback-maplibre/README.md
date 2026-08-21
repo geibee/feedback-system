@@ -66,6 +66,12 @@ MapLibreの既定WebGL設定では描画後のbufferが保持されず、通常�
 あります。`createMapLibreEvidenceProvider`は撮影時の`render` event内でWebGL canvasを2D canvasへ退避し、
 地図、Marker、Popup、NavigationControl、ScaleControlなどをDOM全体と一緒に撮影します。
 
+`@geibee/feedback-redmine-plugin`ではproviderを手作業で配線せず、遅延生成後に
+`controller.registerMapLibreMap(map)`を呼べます。戻り値はmap破棄前に呼び出してください。未登録のWebGL canvasは
+capture有効時にpluginが自動検出して警告します。次のprovider直接指定はlegacy UIや独自Host Adapter向けです。
+pluginへの段階的な接続手順は
+[`MapLibre・地物連携ガイド`](https://github.com/geibee/feedback-system/blob/main/docs/maplibre-integration.md)を参照してください。
+
 ```ts
 import { createMapLibreEvidenceProvider } from "@geibee/feedback-maplibre";
 import { createDomEvidenceProvider } from "@geibee/react";

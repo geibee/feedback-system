@@ -1,4 +1,4 @@
-import { RedmineDiagnosticBuffer } from "@geibee/redmine-core";
+import { RedmineDiagnosticBuffer } from "@geibee/feedback-redmine-core";
 
 export function downloadDiagnosticJson(diagnostics: RedmineDiagnosticBuffer, profileId: string): void {
   const document = diagnostics.document();

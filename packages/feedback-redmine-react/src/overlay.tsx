@@ -22,9 +22,9 @@ import {
   type RedmineThreadSort,
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
-} from "@geibee/redmine-core";
-import type { FeedbackEvidencePayload, FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/core";
-import { resolveDomFeedbackTarget } from "@geibee/react-ui";
+} from "@geibee/feedback-redmine-core";
+import type { FeedbackEvidencePayload, FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/feedback-core";
+import { resolveDomFeedbackTarget } from "@geibee/feedback-react-ui";
 import { createDomEvidenceProvider } from "./capture.js";
 import { addFeedbackCaptureMarker, type FeedbackCaptureMarkerPosition } from "./capture-marker.js";
 import { useDismissiblePanel } from "./dismissible.js";

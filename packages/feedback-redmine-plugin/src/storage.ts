@@ -4,7 +4,7 @@ import {
   validateRedmineFollowState,
   validateRedminePendingIntent,
   type ClientStatePort
-} from "@geibee/redmine-core";
+} from "@geibee/feedback-redmine-core";
 
 export type PurgeBrowserClientStateOptions = {
   profileId: string;

@@ -1,5 +1,5 @@
 {
-  "name": "@geibee/redmine-ops",
+  "name": "@geibee/feedback-redmine-ops",
   "version": "1.0.0-alpha.3",
   "description": "Feedback Redmineの導入・診断・ローカル運用CLI",
   "private": true,
@@ -17,10 +17,10 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/make-cli-executable.mjs"
   },
   "dependencies": {
-    "@geibee/contracts": "1.0.0-alpha.3"
+    "@geibee/feedback-contracts": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

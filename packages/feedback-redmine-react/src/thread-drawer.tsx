@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { RedmineAttachmentContent, RedmineThreadV1 } from "@geibee/redmine-core";
+import type { RedmineAttachmentContent, RedmineThreadV1 } from "@geibee/feedback-redmine-core";
 import { useDismissiblePanel } from "./dismissible.js";
 import { feedbackErrorMessage } from "./error-message.js";
 

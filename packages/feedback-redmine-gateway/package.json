@@ -1,5 +1,5 @@
 {
-  "name": "@geibee/redmine-gateway",
+  "name": "@geibee/feedback-redmine-gateway",
   "version": "1.0.0-alpha.3",
   "description": "業務アプリ組込用stateless Feedback Redmine gateway handler",
   "private": true,
@@ -27,7 +27,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/redmine-core": "1.0.0-alpha.3"
+    "@geibee/feedback-redmine-core": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

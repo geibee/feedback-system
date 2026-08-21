@@ -1,18 +1,18 @@
-# `@geibee/redmine-ops`
+# `@geibee/feedback-redmine-ops`
 
 Feedback Redmineのローカル評価、既存Redmineの読取診断、gateway疎通確認、バックアップ・復元を行うCLIです。
 
 ```bash
-npx @geibee/redmine-ops@<version> local up
-npx @geibee/redmine-ops@<version> local credentials
-npx @geibee/redmine-ops@<version> doctor --origin https://app.example --profile inventory-production
+npx @geibee/feedback-redmine-ops@<version> local up
+npx @geibee/feedback-redmine-ops@<version> local credentials
+npx @geibee/feedback-redmine-ops@<version> doctor --origin https://app.example --profile inventory-production
 ```
 
 Rails runnerを利用できないmanaged Redmineでは、管理者が次の二段階inspectを行います。
 
 ```bash
 export FEEDBACK_REDMINE_INSPECT_API_KEY='<temporary-admin-key>'
-npx @geibee/redmine-ops@<version> inspect \
+npx @geibee/feedback-redmine-ops@<version> inspect \
   --manifest feedback-redmine-installation.json \
   --manual-checklist feedback-redmine-manual-checklist.md \
   --output feedback-redmine-inspection.json
@@ -20,7 +20,7 @@ unset FEEDBACK_REDMINE_INSPECT_API_KEY
 
 # checklistの15項目をRedmine管理画面で確認してから、inspectionに出力された同じdigestを指定する
 export FEEDBACK_REDMINE_INSPECT_API_KEY='<temporary-admin-key>'
-npx @geibee/redmine-ops@<version> inspect \
+npx @geibee/feedback-redmine-ops@<version> inspect \
   --manifest feedback-redmine-installation.json \
   --accept-manual-checks <manualCheckDigest> \
   --generated-dir feedback-redmine-generated \

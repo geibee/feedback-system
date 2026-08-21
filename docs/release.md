@@ -12,16 +12,16 @@ bash scripts/build-feedback-redmine-release.sh \
 
 生成物:
 
-- `@geibee/contracts`
-- `@geibee/core`
-- `@geibee/dom-capture`
-- `@geibee/react-ui`
-- `@geibee/maplibre`
-- `@geibee/redmine-core`
-- `@geibee/redmine-react`
-- `@geibee/redmine-plugin`
-- `@geibee/redmine-gateway`
-- `@geibee/redmine-ops`
+- `@geibee/feedback-contracts`
+- `@geibee/feedback-core`
+- `@geibee/feedback-dom-capture`
+- `@geibee/feedback-react-ui`
+- `@geibee/feedback-maplibre`
+- `@geibee/feedback-redmine-core`
+- `@geibee/feedback-redmine-react`
+- `@geibee/feedback-redmine-plugin`
+- `@geibee/feedback-redmine-gateway`
+- `@geibee/feedback-redmine-ops`
 - linux/amd64・linux/arm64の`feedback-redmine-gateway` OCI archive
 - linux/amd64・linux/arm64のローカル評価用`feedback-redmine-demo` OCI archive
 - imageごと・platformごとのCycloneDX SBOMとHIGH/CRITICAL vulnerability SARIF
@@ -35,6 +35,27 @@ HIGH/CRITICALを検出した場合はrelease生成を失敗させる。修正版
 
 ブラウザ拡張ZIPとReact runtime入りself-hosted bundleは標準releaseへ含めない。React 18/19はconsumer SPAのpeer dependencyを使う。
 `apps/feedback-redmine-gateway-reference`は標準gateway imageのsourceである。
+
+npmjsだけへ初回公開する場合は`--npm-only`でOCI生成を省略する。このmodeのtarballは
+`https://registry.npmjs.org`を公開先に持ち、公開scriptはGHCRへアクセスしない。
+
+```bash
+bash scripts/build-feedback-redmine-release.sh \
+  --output /tmp/feedback-redmine-npm-release \
+  --version 1.0.0-alpha.4 \
+  --npm-only
+
+bash scripts/publish-feedback-redmine-release.sh \
+  --input /tmp/feedback-redmine-npm-release \
+  --version 1.0.0-alpha.4 \
+  --npm-only \
+  --tag next
+```
+
+初回公開前に`npm whoami --registry=https://registry.npmjs.org`が`geibee`を返すことを確認する。公開scriptは
+同じversionが存在する場合にintegrityが一致すれば再利用し、不一致なら停止する。
+npmjsはpackage metadataに`latest`を必須とするため、新規packageの初回公開では`--tag next`でも`latest`が同じversionへ
+自動設定される。consumer手順ではプレリリースであることを明示するため、引き続き`@next`を指定する。
 
 release前にskip変数なしの`bash scripts/verify-feedback.sh`を実行し、次をすべて通す。
 
@@ -77,7 +98,7 @@ bash scripts/build-feedback-sdk-release.sh \
   --version 1.0.0-rc.1
 ```
 
-`@geibee/contracts`、`@geibee/core`、`@geibee/react-ui`、`@geibee/react`、`@geibee/maplibre`、`@geibee/admin-react`のtarball、
+`@geibee/feedback-contracts`、`@geibee/feedback-core`、`@geibee/feedback-react-ui`、`@geibee/react`、`@geibee/feedback-maplibre`、`@geibee/admin-react`のtarball、
 `release-manifest.json`、`SHA256SUMS`を生成する。
 
 ## Legacy Go Service・CLI

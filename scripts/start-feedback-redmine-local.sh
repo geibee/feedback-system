@@ -10,7 +10,7 @@ command -v npm >/dev/null 2>&1 || { echo "npmが必要です" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "Dockerが必要です" >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2が必要です" >&2; exit 1; }
 
-npm --workspace @geibee/redmine-ops run build
+npm --workspace @geibee/feedback-redmine-ops run build
 docker build --tag feedback-redmine-gateway:local --file apps/feedback-redmine-gateway-reference/Dockerfile .
 docker build --tag feedback-redmine-demo:local --file apps/feedback-redmine-demo/Dockerfile .
 node packages/feedback-redmine-ops/dist/cli.js local up \

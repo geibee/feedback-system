@@ -1,7 +1,7 @@
 # Legacy Feedback Service Quickstart
 
 > **Legacy Feedback Service:** この手順はPostgreSQLとobject storageを使う従来runtime向けです。新規導入の標準は
-> [`quickstart.md`](quickstart.md)のRedmine正本SPA構成です。
+> [`README.md`](../README.md)のRedmine正本SPA構成です。
 
 `npm ci` 後に `bash scripts/verify-feedback.sh` を実行する。Go 1.26.5だけでbackendを検証し、JDK/Gradleを要求しない。
 standalone composeは

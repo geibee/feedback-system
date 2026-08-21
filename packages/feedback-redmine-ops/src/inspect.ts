@@ -5,7 +5,7 @@ import type {
   RedmineInspectionCustomFieldIdsV1,
   RedmineInspectionReportV1,
   RedmineManualInspectionCheckV1
-} from "@geibee/contracts";
+} from "@geibee/feedback-contracts";
 import { redmineCustomFieldSpecs, validateInstallationManifest } from "./manifest.js";
 
 export type InspectionCheck = RedmineInspectionCheckV1;

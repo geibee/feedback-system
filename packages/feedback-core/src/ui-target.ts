@@ -1,4 +1,4 @@
-import type { FeedbackTargetV1 } from "@geibee/contracts";
+import type { FeedbackTargetV1 } from "@geibee/feedback-contracts";
 
 export type FeedbackTargetResolverInput<TElement = unknown> = {
   action: "pick" | "context-menu";

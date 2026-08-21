@@ -1,9 +1,9 @@
 # React組み込み
 
 > **Legacy Feedback Service:** この文書は`@geibee/react`と`/feedback/v1`の従来組み込み向けです。
-> 新規SPAは`@geibee/redmine-plugin/loader`を使う[`quickstart.md`](quickstart.md)を参照してください。
+> 新規SPAは`@geibee/feedback-redmine-plugin/loader`を使う[`README.md`](../README.md)を参照してください。
 
-React 18/19では `@geibee/core` のHostAdapterとtransportを作成し、`@geibee/react` の
+React 18/19では `@geibee/feedback-core` のHostAdapterとtransportを作成し、`@geibee/react` の
 `FeedbackProvider` / `FeedbackErrorBoundary` / `FeedbackOverlay` を業務画面の一部へ配置する。
 SDK全体でrouter、認証、workspace解決を所有せず、HostAdapterから受け取る。
 
@@ -23,7 +23,7 @@ const adapter: FeedbackHostAdapter = {
 
 Service障害時はErrorBoundaryと `FeedbackUnavailable` がFeedback subtreeだけを縮退させる。
 業務画面の描画やナビゲーションをtoken取得の完了へ依存させない。MapLibreを使う場合だけ
-`@geibee/maplibre` を追加する。他フレームワークは `@geibee/core` とHTTP契約を利用する。
+`@geibee/feedback-maplibre` を追加する。他フレームワークは `@geibee/feedback-core` とHTTP契約を利用する。
 
 Feedback Buttonは対象選択modeへ切り替わり、次にクリックした位置で投稿画面を開く。DOM部品へ安定して
 pinを追従させる場合は`data-feedback-key`へapplication内で一意なkeyを設定する。keyを持たない位置は
@@ -38,7 +38,7 @@ MapLibreの地理座標／地物をtargetへ保存する場合は`FeedbackOverla
 import {
   createMapLibreFeedbackPinPositionProvider,
   resolveMapLibreFeedbackTargetAtClientPoint
-} from "@geibee/maplibre";
+} from "@geibee/feedback-maplibre";
 
 const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
 
@@ -72,7 +72,7 @@ MapLibreのWebGL canvasは既定では描画bufferを保持しない。地図、
 ScaleControlを証跡へ含める場合は、撮影時の再描画だけを2D canvasへ退避するproviderを設定する。
 
 ```ts
-import { createMapLibreEvidenceProvider } from "@geibee/maplibre";
+import { createMapLibreEvidenceProvider } from "@geibee/feedback-maplibre";
 import { createDomEvidenceProvider } from "@geibee/react";
 
 adapter.captureEvidence = createMapLibreEvidenceProvider({

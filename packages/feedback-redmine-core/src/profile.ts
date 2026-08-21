@@ -1,4 +1,4 @@
-import type { RedmineClientProfileV1 } from "@geibee/contracts";
+import type { RedmineClientProfileV1 } from "@geibee/feedback-contracts";
 import { contractError } from "./errors.js";
 
 export const redmineCustomFieldKeys = [

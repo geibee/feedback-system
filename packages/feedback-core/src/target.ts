@@ -1,4 +1,4 @@
-import type { FeedbackTargetV1 } from "@geibee/contracts";
+import type { FeedbackTargetV1 } from "@geibee/feedback-contracts";
 
 export function parseFeedbackTarget(value: unknown): FeedbackTargetV1 | null {
   if (!isRecord(value) || value.schemaVersion !== "1" || typeof value.kind !== "string") return null;

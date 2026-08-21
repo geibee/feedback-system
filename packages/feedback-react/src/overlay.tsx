@@ -8,21 +8,21 @@ import {
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
-import type { components } from "@geibee/contracts";
+import type { components } from "@geibee/feedback-contracts";
 import type {
   FeedbackEvidencePayload,
   FeedbackPinPosition as CoreFeedbackPinPosition,
   FeedbackPinPositionProvider as CoreFeedbackPinPositionProvider,
   FeedbackTargetResolver as CoreFeedbackTargetResolver,
   FeedbackTargetResolverInput as CoreFeedbackTargetResolverInput
-} from "@geibee/core";
+} from "@geibee/feedback-core";
 import {
   feedbackElementKeyAttribute,
   feedbackExcludeAttribute,
   feedbackMapAttribute,
   feedbackMaskAttribute,
   resolveDomFeedbackTarget
-} from "@geibee/react-ui";
+} from "@geibee/feedback-react-ui";
 import { createDomEvidenceProvider } from "./capture.js";
 import { useFeedback } from "./index.js";
 
@@ -66,7 +66,7 @@ function reactionLabel(reaction: Schemas["FeedbackReactionKey"]): string {
   }
 }
 
-export { feedbackElementKeyAttribute, feedbackExcludeAttribute, feedbackMapAttribute, feedbackMaskAttribute } from "@geibee/react-ui";
+export { feedbackElementKeyAttribute, feedbackExcludeAttribute, feedbackMapAttribute, feedbackMaskAttribute } from "@geibee/feedback-react-ui";
 
 export type FeedbackOverlayProps = {
   deepLinkThreadId?: string | null;

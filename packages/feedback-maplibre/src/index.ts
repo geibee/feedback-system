@@ -1,6 +1,6 @@
 import type { MapGeoJSONFeature } from "maplibre-gl";
-import type { FeedbackTargetV1, FeedbackThreadV1 } from "@geibee/contracts";
-import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@geibee/core";
+import type { FeedbackTargetV1, FeedbackThreadV1 } from "@geibee/feedback-contracts";
+import type { FeedbackEvidenceProvider, FeedbackPinPositionProvider } from "@geibee/feedback-core";
 
 export const maplibreCanvasSelector = "canvas.maplibregl-canvas";
 export const captureReadyCanvasContextAttributes = { preserveDrawingBuffer: true } as const;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RedmineFetch } from "@geibee/redmine-core/trusted";
+import type { RedmineFetch } from "@geibee/feedback-redmine-core/trusted";
 import { createFeedbackRedmineGatewayHandler } from "./handler.js";
 import type { GatewayDependencies, GatewayServerProfile } from "./profile.js";
 

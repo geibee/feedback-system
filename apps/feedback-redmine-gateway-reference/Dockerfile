@@ -26,10 +26,10 @@ COPY packages/feedback-core packages/feedback-core
 COPY packages/feedback-redmine-core packages/feedback-redmine-core
 COPY packages/feedback-redmine-gateway packages/feedback-redmine-gateway
 COPY apps/feedback-redmine-gateway-reference apps/feedback-redmine-gateway-reference
-RUN npm --workspace @geibee/contracts run build \
-  && npm --workspace @geibee/core run build \
-  && npm --workspace @geibee/redmine-core run build \
-  && npm --workspace @geibee/redmine-gateway run build \
+RUN npm --workspace @geibee/feedback-contracts run build \
+  && npm --workspace @geibee/feedback-core run build \
+  && npm --workspace @geibee/feedback-redmine-core run build \
+  && npm --workspace @geibee/feedback-redmine-gateway run build \
   && npm --workspace @geibee/redmine-gateway-reference run build
 
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167

@@ -1,10 +1,10 @@
-# @geibee/core
+# @geibee/feedback-core
 
 React、DOM、MapLibre、特定routerに依存しない Feedback SDK の中核です。`FeedbackHostAdapter`、v1 fetch
 transport、manifest/location/target の解決・検証、capabilities negotiation を提供します。
 
 ```ts
-import { createFeedbackTransport, type FeedbackHostAdapter } from "@geibee/core";
+import { createFeedbackTransport, type FeedbackHostAdapter } from "@geibee/feedback-core";
 ```
 
 token は host adapter から受け取り、401 refresh は single-flight で実行します。書き込み時の

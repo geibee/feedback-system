@@ -1,8 +1,8 @@
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/feedback-redmine-plugin/loader";
 import type {
   RedmineFeedbackPluginController,
   RedmineFeedbackPluginControllerState
-} from "@geibee/redmine-plugin/loader";
+} from "@geibee/feedback-redmine-plugin/loader";
 import {
   createQuickstartAdapter,
   emitQuickstartLocationChange,

@@ -1,2 +1,2 @@
-export { createDomEvidenceProvider } from "@geibee/dom-capture";
-export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "@geibee/dom-capture";
+export { createDomEvidenceProvider } from "@geibee/feedback-dom-capture";
+export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "@geibee/feedback-dom-capture";

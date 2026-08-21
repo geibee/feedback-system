@@ -1,5 +1,5 @@
 {
-  "name": "@geibee/redmine-react",
+  "name": "@geibee/feedback-redmine-react",
   "version": "1.0.0-alpha.3",
   "description": "Redmineを正本とするFeedbackの投稿・会話UI",
   "private": true,
@@ -33,10 +33,10 @@
     "build": "npm run styles:check && tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@geibee/core": "1.0.0-alpha.3",
-    "@geibee/react-ui": "1.0.0-alpha.3",
-    "@geibee/dom-capture": "1.0.0-alpha.3",
-    "@geibee/redmine-core": "1.0.0-alpha.3"
+    "@geibee/feedback-core": "1.0.0-alpha.3",
+    "@geibee/feedback-react-ui": "1.0.0-alpha.3",
+    "@geibee/feedback-dom-capture": "1.0.0-alpha.3",
+    "@geibee/feedback-redmine-core": "1.0.0-alpha.3"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

@@ -2,8 +2,8 @@ import type {
   RedmineAttachmentV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
-} from "@geibee/contracts";
-import { parseFeedbackTarget } from "@geibee/core";
+} from "@geibee/feedback-contracts";
+import { parseFeedbackTarget } from "@geibee/feedback-core";
 import { contractError } from "./errors.js";
 import {
   initialCommentFromDescription,

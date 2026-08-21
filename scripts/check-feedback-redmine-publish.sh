@@ -26,6 +26,9 @@ cat >"$fake_bin/npm" <<'FAKE_NPM'
 set -euo pipefail
 
 case "${1:-}" in
+  whoami)
+    printf '%s\n' 'geibee'
+    ;;
   view)
     if [[ "${3:-}" == version ]]; then
       case "$FAKE_NPM_MODE" in
@@ -54,12 +57,23 @@ case "${1:-}" in
       esac
       exit 0
     fi
+    if [[ "${3:-}" == dist-tags ]]; then
+      if [[ -f "$FAKE_REGISTRY_STATE/npm-tag-next" ]]; then
+        printf '%s\n' '{"next":"1.2.3-test.1","latest":"1.2.3-test.1"}'
+      else
+        printf '%s\n' '{"latest":"1.2.3-test.1"}'
+      fi
+      exit 0
+    fi
     exit 2
     ;;
   publish)
     printf '%s\n' 'npm publish' >>"$FAKE_CALL_LOG"
+    if [[ " $* " == *' --tag next '* ]]; then
+      touch "$FAKE_REGISTRY_STATE/npm-tag-next"
+    fi
     touch "$FAKE_REGISTRY_STATE/npm-published"
-    printf '%s\n' '+ @geibee/core@1.2.3-test.1'
+    printf '%s\n' '+ @geibee/feedback-core@1.2.3-test.1'
     ;;
   *) exit 2 ;;
 esac
@@ -116,10 +130,10 @@ prepare_scenario() {
   "schemaVersion": "1",
   "product": "feedback-redmine",
   "version": "$version",
-  "publishOrder": ["@geibee/core"],
+  "publishOrder": ["@geibee/feedback-core"],
   "packages": [
     {
-      "name": "@geibee/core",
+      "name": "@geibee/feedback-core",
       "filename": "geibee-core-1.2.3-test.1.tgz"
     }
   ],
@@ -220,5 +234,53 @@ missing_status=$(run_scenario missing missing missing)
 [[ "$(rg -c '^skopeo copy$' "$test_tmp/missing/calls.log")" == 1 ]] || fail "skopeo copy回数が不正です"
 assert_tokens_hidden "$test_tmp/missing"
 rg -q '\[feedback-redmine-publish\] PASS' "$test_tmp/missing/output.log" || fail "初回公開結果がPASSではありません"
+
+prepare_npm_only_scenario() {
+  local scenario="$test_tmp/npm-only"
+  local release="$scenario/release"
+  mkdir -p "$release" "$scenario/state"
+  printf '%s\n' 'package artifact' >"$release/geibee-feedback-core-1.2.3-test.1.tgz"
+  cat >"$release/release-manifest.json" <<EOF
+{
+  "schemaVersion": "1",
+  "product": "feedback-redmine",
+  "version": "$version",
+  "publishOrder": ["@geibee/feedback-core"],
+  "packages": [
+    {
+      "name": "@geibee/feedback-core",
+      "filename": "geibee-feedback-core-1.2.3-test.1.tgz"
+    }
+  ],
+  "images": []
+}
+EOF
+  (
+    cd "$release"
+    sha256sum geibee-feedback-core-1.2.3-test.1.tgz release-manifest.json >SHA256SUMS
+  )
+  : >"$scenario/calls.log"
+}
+
+prepare_npm_only_scenario
+npm_only_scenario="$test_tmp/npm-only"
+npm_only_package="$npm_only_scenario/release/geibee-feedback-core-1.2.3-test.1.tgz"
+npm_only_integrity=$(PACKAGE_FILE="$npm_only_package" node -e '
+  const { createHash } = require("node:crypto");
+  const { readFileSync } = require("node:fs");
+  process.stdout.write(`sha512-${createHash("sha512").update(readFileSync(process.env.PACKAGE_FILE)).digest("base64")}`);
+')
+PATH="$fake_bin:$PATH" \
+  FAKE_NPM_MODE=missing \
+  FAKE_REGISTRY_STATE="$npm_only_scenario/state" \
+  FAKE_CALL_LOG="$npm_only_scenario/calls.log" \
+  FAKE_EXPECTED_NPM_INTEGRITY="$npm_only_integrity" \
+  bash scripts/publish-feedback-redmine-release.sh \
+    --input "$npm_only_scenario/release" --version "$version" --npm-only --tag next \
+    >"$npm_only_scenario/output.log" 2>&1 || fail "npm-only公開検証が失敗しました"
+[[ "$(rg -c '^npm publish$' "$npm_only_scenario/calls.log")" == 1 ]] || fail "npm-only publish回数が不正です"
+test -f "$npm_only_scenario/state/npm-tag-next" || fail "npm-only公開へnext tagが指定されていません"
+if rg -q '^skopeo ' "$npm_only_scenario/calls.log"; then fail "npm-only公開がOCI registryへアクセスしました"; fi
+rg -q '\[feedback-redmine-publish\] PASS' "$npm_only_scenario/output.log" || fail "npm-only公開結果がPASSではありません"
 
 echo "[feedback-redmine-publish-check] PASS"

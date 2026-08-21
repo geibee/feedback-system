@@ -19,12 +19,12 @@ vite_version=8.2.1
 vite_react_plugin_version=6.0.5
 mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
-  @geibee/contracts
-  @geibee/core
-  @geibee/dom-capture
-  @geibee/react-ui
+  @geibee/feedback-contracts
+  @geibee/feedback-core
+  @geibee/feedback-dom-capture
+  @geibee/feedback-react-ui
   @geibee/react
-  @geibee/maplibre
+  @geibee/feedback-maplibre
   @geibee/admin-react
 )
 declare -A tarballs
@@ -49,7 +49,7 @@ for package_name in "${packages[@]}"; do
     const files = new Set(result.files.map((file) => file.path));
     const required = ["dist/index.js", "dist/index.d.ts", "package.json", "README.md", "CHANGELOG.md"];
     if (["@geibee/react", "@geibee/admin-react"].includes(process.env.PACKAGE_NAME)) required.push("dist/styles.css");
-    if (process.env.PACKAGE_NAME === "@geibee/contracts") {
+    if (process.env.PACKAGE_NAME === "@geibee/feedback-contracts") {
       required.push("openapi.yaml", "token-exchange.openapi.yaml", "schemas/application-manifest.schema.json", "schemas/installation-manifest.schema.json", "schemas/location.schema.json", "schemas/target.schema.json", "schemas/webhook-event.schema.json", "schemas/token-exchange-jwt.schema.json");
     }
     if (required.some((path) => !files.has(path))) process.exit(1);
@@ -79,9 +79,9 @@ node -e '
   ]);
   for (const value of [contracts, core, capture, reactUi]) {
     const names = dependencyNames(value);
-    if (["react", "react-dom", "maplibre-gl", "@geibee/react", "@geibee/maplibre", "@geibee/admin-react"].some((name) => names.has(name))) process.exit(1);
+    if (["react", "react-dom", "maplibre-gl", "@geibee/react", "@geibee/feedback-maplibre", "@geibee/admin-react"].some((name) => names.has(name))) process.exit(1);
   }
-  if (dependencyNames(react).has("maplibre-gl") || dependencyNames(react).has("@geibee/maplibre")) process.exit(1);
+  if (dependencyNames(react).has("maplibre-gl") || dependencyNames(react).has("@geibee/feedback-maplibre")) process.exit(1);
   if (Object.keys(maplibre.peerDependencies || {}).join(",") !== "maplibre-gl") process.exit(1);
   if (![contracts, core, capture, reactUi, react, maplibre, admin].every((value) => value.private === true && value.version === "1.0.0-alpha.3")) process.exit(1);
 ' || {
@@ -107,8 +107,9 @@ for index in "${!react_versions[@]}"; do
       "@vitejs/plugin-react@$vite_react_plugin_version" \
       vitest@4.1.9 jsdom@29.1.1 @testing-library/react@16.3.2 react-router-dom@6.30.1
     npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
-      "${tarballs[contracts]}" "${tarballs[core]}" "${tarballs["dom-capture"]}" "${tarballs["react-ui"]}" "${tarballs[react]}"
-    test ! -d node_modules/@geibee/maplibre
+      "${tarballs[feedback-contracts]}" "${tarballs[feedback-core]}" \
+      "${tarballs["feedback-dom-capture"]}" "${tarballs["feedback-react-ui"]}" "${tarballs[react]}"
+    test ! -d node_modules/@geibee/feedback-maplibre
     test ! -d node_modules/@geibee/admin-react
     test ! -d node_modules/maplibre-gl
     test -f node_modules/@geibee/react/dist/styles.css
@@ -117,9 +118,9 @@ for index in "${!react_versions[@]}"; do
     npm run test
 
     if [[ "$react_version" == 19.* ]]; then
-      npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund maplibre-gl@5.24.0 "${tarballs[maplibre]}"
+      npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund maplibre-gl@5.24.0 "${tarballs[feedback-maplibre]}"
       npm run typecheck:maplibre
-      node --input-type=module -e 'await import("@geibee/maplibre")'
+      node --input-type=module -e 'await import("@geibee/feedback-maplibre")'
       npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund "${tarballs["admin-react"]}"
       npm run typecheck:admin
       test -f node_modules/@geibee/admin-react/dist/styles.css
@@ -166,9 +167,9 @@ cp -R tests/fixtures/feedback-sdk-vite "$stable_fixture"
     vitest@4.1.9 jsdom@29.1.1 \
     @testing-library/react@16.3.2 react-router-dom@6.30.1 maplibre-gl@5.24.0
   npm_config_cache="$feedback_npm_cache" npm install --ignore-scripts --no-audit --no-fund \
-    "${stable_tarballs[contracts]}" "${stable_tarballs[core]}" "${stable_tarballs["dom-capture"]}" \
-    "${stable_tarballs["react-ui"]}" "${stable_tarballs[react]}" \
-    "${stable_tarballs[maplibre]}" "${stable_tarballs[admin-react]}"
+    "${stable_tarballs[feedback-contracts]}" "${stable_tarballs[feedback-core]}" \
+    "${stable_tarballs["feedback-dom-capture"]}" "${stable_tarballs["feedback-react-ui"]}" \
+    "${stable_tarballs[react]}" "${stable_tarballs[feedback-maplibre]}" "${stable_tarballs[admin-react]}"
   npm run typecheck
   npm run typecheck:maplibre
   npm run typecheck:admin

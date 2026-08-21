@@ -4,7 +4,7 @@
 
 Redmine正本経路は独立した`contracts/feedback/redmine-gateway.openapi.yaml`と、保持対象の`redmine-*.schema.json`を
 公開契約とする。gateway base pathは`/internal/feedback-redmine/v1`で、業務SPAと同一originに置く。
-`@geibee/contracts`、`@geibee/core`、`@geibee/dom-capture`、`@geibee/react-ui`、`@geibee/maplibre`、Redmine core/UI/plugin/gatewayは同じversionを使用する。
+`@geibee/feedback-contracts`、`@geibee/feedback-core`、`@geibee/feedback-dom-capture`、`@geibee/feedback-react-ui`、`@geibee/feedback-maplibre`、Redmine core/UI/plugin/gatewayは同じversionを使用する。
 
 `1.0.0-alpha.3`では`FeedbackTargetV1`へ後方互換な`custom` variantを追加した。Canvas、Three.js、独自chartなどのhostは、
 既存`FeedbackTargetResolver`から名前空間付き`provider`、安定した`targetKey`、必須のviewport相対fallback座標を返す。
@@ -42,7 +42,7 @@ alpha.2で廃止した。導入評価段階のalpha.1 clientとの互換性は�
 APIまたはDTOを変更するときは、同じ変更で次を更新する。
 
 1. `redmine-gateway.openapi.yaml`または該当JSON Schema
-2. `@geibee/contracts`の生成TypeScript型
+2. `@geibee/feedback-contracts`の生成TypeScript型
 3. gateway、core、consumerのcontract test
 4. この互換性文書と各package CHANGELOG
 
@@ -50,7 +50,7 @@ gatewayは`GET /health/live`と`GET /health/ready`を公開する。両endpoint�
 Redmine業務データを返さない。readyはprocessと起動時設定の判定であり、Redmineまでの疎通契約はops CLIの`doctor`が担う。
 
 配備時設定`redmine-runtime-config.v1`は`schemaVersion`、`enabled`、`profileId`、root-relativeな`gatewayBasePath`だけを許可する。
-`@geibee/redmine-plugin/loader`のruntime loaderは同一originから`no-store`で取得し、unknown propertyや外部URLをfail-closedで拒否する。
+`@geibee/feedback-redmine-plugin/loader`のruntime loaderは同一originから`no-store`で取得し、unknown propertyや外部URLをfail-closedで拒否する。
 このschemaへsecretまたはRedmine数値IDを追加する変更は許可しない。
 
 repository内のSPAとclean consumer検証はVite 8.2を標準とする。公開`@geibee/*` packageはViteをruntime依存または
@@ -62,7 +62,7 @@ provisionerのapplyは同じplan digestを必須にする。
 
 ### SPA loader contract
 
-標準入口は`@geibee/redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`である。
+標準入口は`@geibee/feedback-redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`である。
 host feature flagを直接制御する場合は`createRedmineFeedbackPluginController()`も維持する。公開controllerは次を持つ。
 runtime config取得は既定5秒でtimeoutし、`signal`でhost lifecycleから中止できる。callerによる中止はavailability errorとして
 `onUnavailable`へ通知せず、timeoutと取得失敗だけを通知する。
@@ -93,7 +93,7 @@ Redmine UIはlegacy `@geibee/react`へ依存せず、同版のlauncher、対象�
 
 > **Legacy Feedback Service:** `/feedback/v1`と`@geibee/react`を使う従来runtime向けで、新規導入の既定ではない。
 
-`/feedback/v1`とlegacy `@geibee/*` 1.xは後方互換を維持する。React以外の公式境界は`@geibee/core`、OpenAPI、JSON Schemaで、
+`/feedback/v1`とlegacy `@geibee/*` 1.xは後方互換を維持する。React以外の公式境界は`@geibee/feedback-core`、OpenAPI、JSON Schemaで、
 MapLibreとAdmin UIは任意packageである。
 
 v1は1つの組織またはtrust domainごとにServiceを配備し、`applicationKey`をService全体で一意とする。共有マルチテナント化で

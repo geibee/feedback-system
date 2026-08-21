@@ -45,12 +45,12 @@ cleanup() {
 trap cleanup EXIT
 
 packages=(
-  @geibee/contracts
-  @geibee/core
-  @geibee/dom-capture
-  @geibee/react-ui
+  @geibee/feedback-contracts
+  @geibee/feedback-core
+  @geibee/feedback-dom-capture
+  @geibee/feedback-react-ui
   @geibee/react
-  @geibee/maplibre
+  @geibee/feedback-maplibre
   @geibee/admin-react
 )
 

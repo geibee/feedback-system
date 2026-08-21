@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-alpha.4
+
+- npm tarball内の`feedback-redmine` CLIへ実行権限を付与し、`npm exec`／`npx`から直接起動できるようにした。
+
 ## 1.0.0-alpha.2
 
 - 一コマンドのローカル評価、既存Redmineのrole／membershipを含むread-only診断、digest確認型provisioner、doctor、

@@ -9,8 +9,8 @@ import {
   type FormEvent,
   type ReactNode
 } from "react";
-import type { components } from "@geibee/contracts";
-import { FeedbackTransportError, type FeedbackTransport } from "@geibee/core";
+import type { components } from "@geibee/feedback-contracts";
+import { FeedbackTransportError, type FeedbackTransport } from "@geibee/feedback-core";
 
 type Schemas = components["schemas"];
 type Session = Schemas["FeedbackSessionV1"];
@@ -1188,4 +1188,4 @@ function openPendingWindow(): Window | null {
 function versionEtag(version: number): string { return `"v${version}"`; }
 function messageOf(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 
-export type { FeedbackTransport } from "@geibee/core";
+export type { FeedbackTransport } from "@geibee/feedback-core";

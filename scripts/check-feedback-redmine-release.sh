@@ -6,14 +6,19 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 release_tmp=$(mktemp -d -t feedback-redmine-release-check.XXXXXX)
+npm_release_tmp=$(mktemp -d -t feedback-redmine-npm-release-check.XXXXXX)
 cleanup() {
   if [[ -d "$release_tmp" && "$(basename "$release_tmp")" == feedback-redmine-release-check.?????? ]]; then
     rm -rf -- "$release_tmp"
+  fi
+  if [[ -d "$npm_release_tmp" && "$(basename "$npm_release_tmp")" == feedback-redmine-npm-release-check.?????? ]]; then
+    rm -rf -- "$npm_release_tmp"
   fi
 }
 trap cleanup EXIT
 
 bash scripts/build-feedback-redmine-release.sh --output "$release_tmp" --version 1.0.0-release-check.1
+bash scripts/build-feedback-redmine-release.sh --output "$npm_release_tmp" --version 1.0.0-release-check.1 --npm-only
 
 RELEASE_DIRECTORY="$release_tmp" node <<'NODE'
 const fs = require("node:fs");
@@ -21,16 +26,16 @@ const path = require("node:path");
 const directory = process.env.RELEASE_DIRECTORY;
 const manifest = JSON.parse(fs.readFileSync(path.join(directory, "release-manifest.json"), "utf8"));
 const expected = [
-  "@geibee/contracts",
-  "@geibee/core",
-  "@geibee/dom-capture",
-  "@geibee/react-ui",
-  "@geibee/maplibre",
-  "@geibee/redmine-core",
-  "@geibee/redmine-react",
-  "@geibee/redmine-plugin",
-  "@geibee/redmine-gateway",
-  "@geibee/redmine-ops"
+  "@geibee/feedback-contracts",
+  "@geibee/feedback-core",
+  "@geibee/feedback-dom-capture",
+  "@geibee/feedback-react-ui",
+  "@geibee/feedback-maplibre",
+  "@geibee/feedback-redmine-core",
+  "@geibee/feedback-redmine-react",
+  "@geibee/feedback-redmine-plugin",
+  "@geibee/feedback-redmine-gateway",
+  "@geibee/feedback-redmine-ops"
 ];
 if (manifest.schemaVersion !== "1" || manifest.product !== "feedback-redmine" ||
     manifest.version !== "1.0.0-release-check.1" || JSON.stringify(manifest.publishOrder) !== JSON.stringify(expected)) {
@@ -55,6 +60,27 @@ NODE
 
 (
   cd "$release_tmp"
+  sha256sum --check SHA256SUMS >/dev/null
+)
+
+[[ "$(jq '.images | length' "$npm_release_tmp/release-manifest.json")" == 0 ]] || {
+  echo "[feedback-redmine-release-check] FAIL: npm-only releaseへOCI imageが含まれています" >&2
+  exit 1
+}
+while IFS= read -r filename; do
+  tar -xOf "$npm_release_tmp/$filename" package/package.json | jq -e '
+    .private != true and
+    .publishConfig.access == "public" and
+    .publishConfig.registry == "https://registry.npmjs.org"
+  ' >/dev/null
+done < <(jq -r '.packages[].filename' "$npm_release_tmp/release-manifest.json")
+ops_filename=$(jq -r '.packages[] | select(.name == "@geibee/feedback-redmine-ops") | .filename' "$npm_release_tmp/release-manifest.json")
+[[ "$(tar -tvf "$npm_release_tmp/$ops_filename" package/dist/cli.js | awk '{print $1}')" == "-rwxr-xr-x" ]] || {
+  echo "[feedback-redmine-release-check] FAIL: feedback-redmine-ops CLIに実行権限がありません" >&2
+  exit 1
+}
+(
+  cd "$npm_release_tmp"
   sha256sum --check SHA256SUMS >/dev/null
 )
 

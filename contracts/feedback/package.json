@@ -1,5 +1,5 @@
 {
-  "name": "@geibee/contracts",
+  "name": "@geibee/feedback-contracts",
   "version": "1.0.0-alpha.3",
   "description": "フィードバックサービス v1 の OpenAPI、JSON Schema、TypeScript 契約",
   "private": true,

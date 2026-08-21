@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Readable } from "node:stream";
 import {
   createFeedbackRedmineGatewayHandler
-} from "@geibee/redmine-gateway";
-import type { RedmineFetch } from "@geibee/redmine-core/trusted";
+} from "@geibee/feedback-redmine-gateway";
+import type { RedmineFetch } from "@geibee/feedback-redmine-core/trusted";
 import { loadReferenceGatewayConfig, type ReferenceGatewayConfig } from "./config.js";
 
 export function createReferenceGatewayServer(

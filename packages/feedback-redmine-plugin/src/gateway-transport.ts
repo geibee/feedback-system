@@ -13,7 +13,7 @@ import type {
   RedmineThreadListResult,
   RedmineThreadLookupInput,
   RedmineThreadV1
-} from "@geibee/redmine-core";
+} from "@geibee/feedback-redmine-core";
 import {
   RedmineFeedbackError,
   RedmineDiagnosticBuffer,
@@ -23,7 +23,7 @@ import {
   parseThreadListResult,
   parseThreadResult,
   sha256Hex
-} from "@geibee/redmine-core";
+} from "@geibee/feedback-redmine-core";
 import { validateGatewayBasePath } from "./validation.js";
 
 export type GatewayTransportOptions = {

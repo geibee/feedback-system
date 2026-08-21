@@ -1,8 +1,8 @@
 # @geibee/react
 
 React 18/19 用の `FeedbackProvider`、`FeedbackOverlay`、DOM/screen／host解決pin、Thread Drawer、DOM capture provider
-を提供します。利用側は `@geibee/react/styles.css` を読み込み、`@geibee/core` の host adapter と transport
-を渡します。DOM captureは`@geibee/dom-capture`のAPIを後方互換のため再exportします。MapLibre は依存に含まれません。
+を提供します。利用側は `@geibee/react/styles.css` を読み込み、`@geibee/feedback-core` の host adapter と transport
+を渡します。DOM captureは`@geibee/feedback-dom-capture`のAPIを後方互換のため再exportします。MapLibre は依存に含まれません。
 
 ```tsx
 import { FeedbackOverlay, FeedbackProvider } from "@geibee/react";
@@ -39,7 +39,7 @@ Feedback Buttonを押すと対象選択modeになり、次にクリックした�
 Feedback Service、証跡previewを使う場合だけ `img-src blob:` を許可してください。
 
 `data-feedback-map`配下の操作も除外せず、`targetResolver`未指定時は画面座標targetとして投稿できます。
-MapLibreの地理座標／地物targetへ変換する場合は`@geibee/maplibre`の
+MapLibreの地理座標／地物targetへ変換する場合は`@geibee/feedback-maplibre`の
 `resolveMapLibreFeedbackTargetAtClientPoint`を`targetResolver`から呼び出します。
 
 保存済みの`map-position`／`map-feature`をOverlayの番号付きpinとして表示する場合は、host固有の
@@ -49,7 +49,7 @@ MapLibreの地理座標／地物targetへ変換する場合は`@geibee/maplibre`
 import {
   createMapLibreFeedbackPinPositionProvider,
   resolveMapLibreFeedbackTargetAtClientPoint
-} from "@geibee/maplibre";
+} from "@geibee/feedback-maplibre";
 
 const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
 
@@ -86,7 +86,7 @@ Thread Drawerで別のthreadへ切り替えると以前の証跡previewを破棄
 window focus時、非表示tabの再表示時に更新し、スレッドを開くと最新メッセージまで既読にします。コメントには
 👍、✅、👀、❓の固定リアクションを付けられます。
 
-MapLibreの地図を証跡へ含める場合は`@geibee/maplibre`の`createMapLibreEvidenceProvider`で既定DOM captureを
+MapLibreの地図を証跡へ含める場合は`@geibee/feedback-maplibre`の`createMapLibreEvidenceProvider`で既定DOM captureを
 包み、`adapter.captureEvidence`へ指定してください。MapLibreを使わないconsumerには追加依存は入りません。
 
 自己申告名が必要なparticipant policyでは`adapter.getParticipantName`／`setParticipantName`を使います。

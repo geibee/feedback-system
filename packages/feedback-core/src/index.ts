@@ -49,4 +49,4 @@ export type {
   FeedbackProblem,
   FeedbackReviewContextV1,
   FeedbackTargetV1
-} from "@geibee/contracts";
+} from "@geibee/feedback-contracts";

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDomEvidenceProvider as createSharedDomEvidenceProvider } from "@geibee/dom-capture";
+import { createDomEvidenceProvider as createSharedDomEvidenceProvider } from "@geibee/feedback-dom-capture";
 import { createDomEvidenceProvider } from "./capture";
 
 describe("DOM evidence provider", () => {

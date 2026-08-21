@@ -6,7 +6,7 @@ COPY apps/feedback-admin/package.json apps/feedback-admin/package.json
 COPY contracts/feedback/package.json contracts/feedback/package.json
 COPY packages/feedback-core/package.json packages/feedback-core/package.json
 COPY packages/feedback-admin-react/package.json packages/feedback-admin-react/package.json
-RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @geibee/contracts --workspace @geibee/core \
+RUN npm ci --ignore-scripts --no-audit --no-fund --workspace @geibee/feedback-contracts --workspace @geibee/feedback-core \
     --workspace @geibee/admin-react --workspace @geibee/admin-console \
     --include-workspace-root=false
 COPY apps/feedback-admin apps/feedback-admin
@@ -30,8 +30,8 @@ RUN sed -i "s|__CSP_CONNECT_SRC_EXTRA__|${CSP_CONNECT_SRC_EXTRA}|g" /tmp/default
 RUN export VITE_FEEDBACK_ADMIN_APPLICATION_KEY="$FEEDBACK_ADMIN_APPLICATION" \
     VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY="$FEEDBACK_ADMIN_ENVIRONMENT" \
     VITE_FEEDBACK_ADMIN_WORKSPACE_KEY="$FEEDBACK_ADMIN_WORKSPACE" \
-    && npm --workspace @geibee/contracts run build \
-    && npm --workspace @geibee/core run build \
+    && npm --workspace @geibee/feedback-contracts run build \
+    && npm --workspace @geibee/feedback-core run build \
     && npm --workspace @geibee/admin-react run build \
     && npm --workspace @geibee/admin-console run build
 

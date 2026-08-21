@@ -31,8 +31,8 @@
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@geibee/contracts": "1.0.0-alpha.3",
-    "@geibee/core": "1.0.0-alpha.3"
+    "@geibee/feedback-contracts": "1.0.0-alpha.3",
+    "@geibee/feedback-core": "1.0.0-alpha.3"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

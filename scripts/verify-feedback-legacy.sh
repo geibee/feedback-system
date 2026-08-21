@@ -29,7 +29,7 @@ if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   npm ci --ignore-scripts --no-audit --no-fund
 fi
 if [[ "${FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES:-0}" != "1" ]]; then
-  for package_name in @geibee/contracts @geibee/core; do
+  for package_name in @geibee/feedback-contracts @geibee/feedback-core; do
     log "$package_name"
     npm --workspace "$package_name" run typecheck
     npm --workspace "$package_name" run test
@@ -41,7 +41,7 @@ bash scripts/check-feedback-legacy-contracts.sh
 bash scripts/check-feedback-legacy-container-platforms.sh
 bash scripts/verify-feedback-go.sh
 
-for package_name in @geibee/react @geibee/maplibre @geibee/admin-react; do
+for package_name in @geibee/react @geibee/feedback-maplibre @geibee/admin-react; do
   log "$package_name"
   npm --workspace "$package_name" run typecheck
   npm --workspace "$package_name" run test

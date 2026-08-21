@@ -1,4 +1,4 @@
-import type { FeedbackEvidencePayload } from "@geibee/core";
+import type { FeedbackEvidencePayload } from "@geibee/feedback-core";
 
 export type FeedbackCaptureMarkerPosition = { x: number; y: number };
 

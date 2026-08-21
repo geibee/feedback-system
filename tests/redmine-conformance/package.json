@@ -10,8 +10,8 @@
     "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@geibee/redmine-core": "1.0.0-alpha.3",
-    "@geibee/redmine-gateway": "1.0.0-alpha.3"
+    "@geibee/feedback-redmine-core": "1.0.0-alpha.3",
+    "@geibee/feedback-redmine-gateway": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

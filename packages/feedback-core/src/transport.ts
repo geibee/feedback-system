@@ -5,7 +5,7 @@ import {
   type FeedbackLocationV1,
   type FeedbackProblem,
   type FeedbackReviewContextV1
-} from "@geibee/contracts";
+} from "@geibee/feedback-contracts";
 
 export type FeedbackTokenGetter = () => string | null | Promise<string | null>;
 export type FeedbackTokenRefresher = () => Promise<string | null>;

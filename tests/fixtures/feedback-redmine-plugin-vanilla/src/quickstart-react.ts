@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/feedback-redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/feedback-redmine-plugin/loader";
 import { createQuickstartAdapter } from "./quickstart-adapter.js";
 
 const adapter = createQuickstartAdapter();

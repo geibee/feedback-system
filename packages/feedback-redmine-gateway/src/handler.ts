@@ -2,10 +2,10 @@ import {
   decodeListCursor,
   encodeListCursor,
   RedmineFeedbackError
-} from "@geibee/redmine-core";
+} from "@geibee/feedback-redmine-core";
 import {
   validateConnectorProfile
-} from "@geibee/redmine-core/trusted";
+} from "@geibee/feedback-redmine-core/trusted";
 import { validateSameOriginRequest } from "./csrf.js";
 import { readCreateMultipart } from "./multipart.js";
 import { GatewayHttpError, jsonResponse, problemResponse } from "./problem.js";

@@ -10,7 +10,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@geibee/redmine-plugin": "1.0.0-alpha.3",
+    "@geibee/feedback-redmine-plugin": "1.0.0-alpha.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

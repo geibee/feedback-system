@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FeedbackRedmineHostAdapter } from "@geibee/redmine-core";
+import type { FeedbackRedmineHostAdapter } from "@geibee/feedback-redmine-core";
 import {
   createRedmineFeedbackPluginControllerInternal,
   type RedmineFeedbackPluginControllerOptions

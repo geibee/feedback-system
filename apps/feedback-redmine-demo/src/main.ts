@@ -1,4 +1,4 @@
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/feedback-redmine-plugin/loader";
 
 const subscribers = new Set<() => void>();
 const adapter = {

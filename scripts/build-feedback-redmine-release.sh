@@ -7,9 +7,11 @@ cd "$ROOT"
 
 output=""
 version=${FEEDBACK_RELEASE_VERSION:-}
+npm_only=false
+npm_registry=https://npm.pkg.github.com
 
 usage() {
-  echo "usage: scripts/build-feedback-redmine-release.sh --output <empty-directory> --version <semver>" >&2
+  echo "usage: scripts/build-feedback-redmine-release.sh --output <empty-directory> --version <semver> [--npm-only]" >&2
   exit 2
 }
 
@@ -17,12 +19,20 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) [[ $# -ge 2 ]] || usage; output=$2; shift 2 ;;
     --version) [[ $# -ge 2 ]] || usage; version=$2; shift 2 ;;
+    --npm-only) npm_only=true; shift ;;
     *) usage ;;
   esac
 done
 
 [[ -n "$output" && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || usage
-for command in node npm tar sha256sum docker jq stat trivy; do
+if [[ "$npm_only" == true ]]; then
+  npm_registry=https://registry.npmjs.org
+fi
+commands=(node npm tar sha256sum jq)
+if [[ "$npm_only" != true ]]; then
+  commands+=(docker stat trivy)
+fi
+for command in "${commands[@]}"; do
   command -v "$command" >/dev/null 2>&1 || { echo "$command が必要です" >&2; exit 1; }
 done
 
@@ -47,28 +57,30 @@ cleanup() {
 trap cleanup EXIT
 
 packages=(
-  @geibee/contracts
-  @geibee/core
-  @geibee/dom-capture
-  @geibee/react-ui
-  @geibee/maplibre
-  @geibee/redmine-core
-  @geibee/redmine-react
-  @geibee/redmine-plugin
-  @geibee/redmine-gateway
-  @geibee/redmine-ops
+  @geibee/feedback-contracts
+  @geibee/feedback-core
+  @geibee/feedback-dom-capture
+  @geibee/feedback-react-ui
+  @geibee/feedback-maplibre
+  @geibee/feedback-redmine-core
+  @geibee/feedback-redmine-react
+  @geibee/feedback-redmine-plugin
+  @geibee/feedback-redmine-gateway
+  @geibee/feedback-redmine-ops
 )
 
 npm run build:redmine
 
-release_builder=${FEEDBACK_REDMINE_RELEASE_BUILDER:-feedback-redmine-release-$$}
-oci_root="$release_root/oci"
-mkdir -p "$oci_root"
-docker buildx create --driver docker-container --name "$release_builder" >/dev/null
-cleanup_builder() {
-  docker buildx rm "$release_builder" >/dev/null 2>&1 || true
-}
-trap 'cleanup_builder; cleanup' EXIT
+if [[ "$npm_only" != true ]]; then
+  release_builder=${FEEDBACK_REDMINE_RELEASE_BUILDER:-feedback-redmine-release-$$}
+  oci_root="$release_root/oci"
+  mkdir -p "$oci_root"
+  docker buildx create --driver docker-container --name "$release_builder" >/dev/null
+  cleanup_builder() {
+    docker buildx rm "$release_builder" >/dev/null 2>&1 || true
+  }
+  trap 'cleanup_builder; cleanup' EXIT
+fi
 
 artifacts_file="$release_root/artifacts.tsv"
 : >"$artifacts_file"
@@ -85,20 +97,20 @@ for package_name in "${packages[@]}"; do
   ')
   tar -xzf "$source_dir/$source_tarball" -C "$stage_dir" --strip-components=1
 
-  RELEASE_PACKAGE_VERSION="$version" node -e '
+  RELEASE_PACKAGE_VERSION="$version" NPM_RELEASE_REGISTRY="$npm_registry" node -e '
     const fs = require("node:fs");
     const file = process.argv[1];
     const value = JSON.parse(fs.readFileSync(file, "utf8"));
     delete value.private;
     value.version = process.env.RELEASE_PACKAGE_VERSION;
-    value.publishConfig = { registry: "https://npm.pkg.github.com", access: "public" };
+    value.publishConfig = { registry: process.env.NPM_RELEASE_REGISTRY, access: "public" };
     value.repository = {
       type: "git",
       url: "git+https://github.com/geibee/feedback-system.git"
     };
     for (const section of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
       for (const name of Object.keys(value[section] || {})) {
-        if (name.startsWith("@geibee/")) value[section][name] = process.env.RELEASE_PACKAGE_VERSION;
+        if (name.startsWith("@geibee/feedback-")) value[section][name] = process.env.RELEASE_PACKAGE_VERSION;
       }
     }
     fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
@@ -110,12 +122,12 @@ for package_name in "${packages[@]}"; do
     process.stdout.write(result.filename);
   ')
   tar -xOf "$output/$release_tarball" package/package.json | \
-    EXPECTED_NAME="$package_name" EXPECTED_VERSION="$version" node -e '
+    EXPECTED_NAME="$package_name" EXPECTED_VERSION="$version" EXPECTED_REGISTRY="$npm_registry" node -e '
       const fs = require("node:fs");
       const value = JSON.parse(fs.readFileSync(0, "utf8"));
       if (value.name !== process.env.EXPECTED_NAME || value.version !== process.env.EXPECTED_VERSION ||
           value.private === true || value.publishConfig?.access !== "public" ||
-          value.publishConfig?.registry !== "https://npm.pkg.github.com" ||
+          value.publishConfig?.registry !== process.env.EXPECTED_REGISTRY ||
           value.repository?.url !== "git+https://github.com/geibee/feedback-system.git") process.exit(1);
       if (value.exports?.["./self-hosted"]) process.exit(1);
     '
@@ -166,8 +178,10 @@ build_image() {
   mv "$images_file.next" "$images_file"
 }
 
-build_image feedback-redmine-gateway apps/feedback-redmine-gateway-reference/Dockerfile
-build_image feedback-redmine-demo apps/feedback-redmine-demo/Dockerfile
+if [[ "$npm_only" != true ]]; then
+  build_image feedback-redmine-gateway apps/feedback-redmine-gateway-reference/Dockerfile
+  build_image feedback-redmine-demo apps/feedback-redmine-demo/Dockerfile
+fi
 
 RELEASE_PACKAGE_VERSION="$version" node -e '
   const fs = require("node:fs");

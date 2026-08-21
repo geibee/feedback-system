@@ -1,4 +1,4 @@
-import { RedmineFeedbackError } from "@geibee/redmine-core";
+import { RedmineFeedbackError } from "@geibee/feedback-redmine-core";
 
 export class GatewayHttpError extends Error {
   constructor(

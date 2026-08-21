@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createInMemoryFeedbackTelemetry, type FeedbackHostAdapter, type FeedbackTransport } from "@geibee/core";
-import type { FeedbackTargetV1 } from "@geibee/contracts";
+import { createInMemoryFeedbackTelemetry, type FeedbackHostAdapter, type FeedbackTransport } from "@geibee/feedback-core";
+import type { FeedbackTargetV1 } from "@geibee/feedback-contracts";
 import {
   FeedbackOverlay,
   createLocalStorageParticipantAdapter,

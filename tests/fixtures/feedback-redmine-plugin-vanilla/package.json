@@ -9,7 +9,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@geibee/redmine-plugin": "1.0.0-alpha.3"
+    "@geibee/feedback-redmine-plugin": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

@@ -1,7 +1,7 @@
 # 宣言的インストール
 
 > **Legacy Feedback Service:** この文書は従来Feedback Serviceのtenant/application/workspace同期向けです。
-> Redmine正本SPAの導入は[`quickstart.md`](quickstart.md)を参照してください。
+> Redmine正本SPAの導入は[`README.md`](../README.md)を参照してください。
 
 Feedback Service v1は、1つの組織またはtrust domainごとにServiceを配備する。`tenantKey`は認証・監査・rate limitの
 境界だが、公開APIのnamespaceではない。したがって`applicationKey`は1つのService全体で一意であり、異なるtenantで

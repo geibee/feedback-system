@@ -1,5 +1,5 @@
-import type { FeedbackRedmineHostAdapter } from "@geibee/redmine-core";
-import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@geibee/core";
+import type { FeedbackRedmineHostAdapter } from "@geibee/feedback-redmine-core";
+import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@geibee/feedback-core";
 
 export type RedmineFeedbackPluginOptions = {
   mount: Element;

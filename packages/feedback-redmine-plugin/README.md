@@ -1,14 +1,14 @@
-# @geibee/redmine-plugin
+# @geibee/feedback-redmine-plugin
 
 業務アプリケーションのSPA bundleへ組み込むFeedback pluginです。標準入口は
-`@geibee/redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`です。最初に公開runtime configだけを取得し、
+`@geibee/feedback-redmine-plugin/loader`の`createRedmineFeedbackPluginControllerFromRuntimeConfig()`です。最初に公開runtime configだけを取得し、
 `enabled:false`ではReact UI、DOM、gateway通信、購読、timerを作成しません。有効時だけUIをdynamic importして
 Shadow DOMへmountします。
 
 ```ts
 import { useEffect } from "react";
-import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/redmine-plugin/loader";
-import type { RedmineFeedbackPluginController } from "@geibee/redmine-plugin/loader";
+import { createRedmineFeedbackPluginControllerFromRuntimeConfig } from "@geibee/feedback-redmine-plugin/loader";
+import type { RedmineFeedbackPluginController } from "@geibee/feedback-redmine-plugin/loader";
 import { createQuickstartAdapter } from "./quickstart-adapter.js";
 
 const adapter = createQuickstartAdapter();
@@ -63,6 +63,6 @@ Profileでcaptureを有効にすると、Host Adapterに`captureEvidence`がな�
 MapLibre canvasなどhost固有の前処理が必要な場合だけ指定します。保存画像には選択位置のFeedbackピンを焼き込みます。
 handleの`downloadDiagnostics()`は、直近100 operationのrequest ID、operation、profile ID、HTTP status、duration、error codeだけを
 JSONとして明示downloadします。本文、thread ID、host principal、filename、API keyは収集しません。
-DOM画面だけで動作する完全なHost Adapter、GitHub Packagesの設定、gateway配備を含む手順は
-[`docs/quickstart.md`](https://github.com/geibee/feedback-system/blob/main/docs/quickstart.md)を参照してください。
+DOM画面だけで動作する完全なHost Adapter、runtime config、gateway配備を含む最短手順は
+[`README.md`](https://github.com/geibee/feedback-system/blob/main/README.md)を参照してください。
 MapLibreやcustom targetは基本導入に含めず、必要なHostだけが追加します。

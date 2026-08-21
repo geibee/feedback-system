@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@geibee/admin-react": "1.0.0-alpha.3",
-    "@geibee/core": "1.0.0-alpha.3",
+    "@geibee/feedback-core": "1.0.0-alpha.3",
     "oidc-client-ts": "3.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

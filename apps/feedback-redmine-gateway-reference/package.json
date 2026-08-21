@@ -14,8 +14,8 @@
     "build": "tsc -p tsconfig.build.json && esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js"
   },
   "dependencies": {
-    "@geibee/redmine-gateway": "1.0.0-alpha.3",
-    "@geibee/redmine-core": "1.0.0-alpha.3"
+    "@geibee/feedback-redmine-gateway": "1.0.0-alpha.3",
+    "@geibee/feedback-redmine-core": "1.0.0-alpha.3"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

@@ -1,5 +1,5 @@
 import { toBlob } from "html-to-image";
-import type { FeedbackEvidenceProvider } from "@geibee/core";
+import type { FeedbackEvidenceProvider } from "@geibee/feedback-core";
 
 export type DomEvidenceProviderOptions = {
   root?: () => HTMLElement;

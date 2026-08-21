@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useMemo, useRef } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { FeedbackOverlay, FeedbackProvider } from "@geibee/react";
-import type { FeedbackHostAdapter, FeedbackTransport } from "@geibee/core";
+import type { FeedbackHostAdapter, FeedbackTransport } from "@geibee/feedback-core";
 
 const session = {
   id: "10000000-0000-4000-8000-000000000001",

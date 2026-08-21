@@ -9,7 +9,7 @@ test("plugin consumerは単一integration moduleからloaderを使う", () => {
     "utf8"
   );
   assert.match(main, /from\s+["']\.\/feedback-redmine\.js["']/u);
-  assert.match(integration, /from\s+["']@geibee\/redmine-plugin\/loader["']/u);
+  assert.match(integration, /from\s+["']@geibee\/feedback-redmine-plugin\/loader["']/u);
   assert.match(integration, /createRedmineFeedbackPluginControllerFromRuntimeConfig/u);
   assert.match(integration, /AbortController/u);
   assert.doesNotMatch(integration, /=\s*await\s+createRedmineFeedbackPluginControllerFromRuntimeConfig/u);

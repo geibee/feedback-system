@@ -14,12 +14,12 @@ import type {
   FeedbackHostAdapter,
   FeedbackTelemetry,
   FeedbackTransport
-} from "@geibee/core";
+} from "@geibee/feedback-core";
 import type {
   FeedbackHostContextV1,
   FeedbackLocationV1,
   FeedbackReviewContextV1
-} from "@geibee/contracts";
+} from "@geibee/feedback-contracts";
 
 export type FeedbackFeatureFlags = {
   contextMenu?: boolean;
@@ -306,13 +306,13 @@ export type {
   FeedbackHostAdapter,
   FeedbackTelemetry,
   FeedbackTransport
-} from "@geibee/core";
+} from "@geibee/feedback-core";
 export type {
   FeedbackHostContextV1,
   FeedbackLocationV1,
   FeedbackReviewContextV1,
   FeedbackTargetV1
-} from "@geibee/contracts";
+} from "@geibee/feedback-contracts";
 export { createDomEvidenceProvider } from "./capture.js";
 export type { DomCaptureRenderOptions, DomEvidenceProviderOptions } from "./capture.js";
 export { FeedbackOverlay, createLocalStorageParticipantAdapter, feedbackThreadMatchesLocation } from "./overlay.js";

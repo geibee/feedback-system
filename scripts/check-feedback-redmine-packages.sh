@@ -6,14 +6,14 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 packages=(
-  @geibee/dom-capture
-  @geibee/react-ui
-  @geibee/maplibre
-  @geibee/redmine-core
-  @geibee/redmine-react
-  @geibee/redmine-plugin
-  @geibee/redmine-gateway
-  @geibee/redmine-ops
+  @geibee/feedback-dom-capture
+  @geibee/feedback-react-ui
+  @geibee/feedback-maplibre
+  @geibee/feedback-redmine-core
+  @geibee/feedback-redmine-react
+  @geibee/feedback-redmine-plugin
+  @geibee/feedback-redmine-gateway
+  @geibee/feedback-redmine-ops
   @geibee/redmine-gateway-reference
   @geibee/redmine-demo
   feedback-redmine-plugin-vanilla-fixture

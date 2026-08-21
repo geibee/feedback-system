@@ -1,4 +1,4 @@
-import type { RedmineConnectorProfile, RedmineFetch } from "@geibee/redmine-core/trusted";
+import type { RedmineConnectorProfile, RedmineFetch } from "@geibee/feedback-redmine-core/trusted";
 
 export type GatewayServerProfile = RedmineConnectorProfile & {
   authorizationMode: "resource-scoped";

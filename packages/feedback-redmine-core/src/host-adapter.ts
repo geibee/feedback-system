@@ -1,4 +1,4 @@
-import type { FeedbackHostAdapter } from "@geibee/core";
+import type { FeedbackHostAdapter } from "@geibee/feedback-core";
 import type { FeedbackHostResourceRefV1 } from "./model.js";
 
 export type FeedbackRedmineHostAdapter = Pick<

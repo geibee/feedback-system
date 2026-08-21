@@ -4,8 +4,8 @@ import {
   parseThreadListResult,
   parseThreadResult,
   sha256Hex
-} from "@geibee/redmine-core";
-import { createFeedbackRedmineGatewayHandler } from "@geibee/redmine-gateway";
+} from "@geibee/feedback-redmine-core";
+import { createFeedbackRedmineGatewayHandler } from "@geibee/feedback-redmine-gateway";
 
 const [commandArg, endpointArg, seedPathArg, statePathArg] = process.argv.slice(2);
 if (!commandArg || !endpointArg || !seedPathArg || !statePathArg) throw new Error("command/endpoint/seed path/state pathは必須です");
@@ -30,10 +30,10 @@ async function createFixture() {
     "base64"
   ));
   const capturedAt = new Date().toISOString();
-  /** @type {import("@geibee/redmine-core").FeedbackHostResourceRefV1} */
+  /** @type {import("@geibee/feedback-redmine-core").FeedbackHostResourceRefV1} */
   const resourceRef = { schemaVersion: "1", kind: "record", key: "conformance-resource" };
   const hostResourceKey = resourceRef.key;
-  /** @type {NonNullable<import("@geibee/redmine-core").RedmineThreadCreateInput["evidence"]>} */
+  /** @type {NonNullable<import("@geibee/feedback-redmine-core").RedmineThreadCreateInput["evidence"]>} */
   const evidence = {
     filename: `feedback-${threadId}.png`,
     contentType: "image/png",
@@ -51,7 +51,7 @@ async function createFixture() {
   }));
   assert.equal(currentUserResponse.status, 200, await currentUserResponse.clone().text());
 
-  /** @type {import("@geibee/redmine-core").RedmineThreadCreateInput} */
+  /** @type {import("@geibee/feedback-redmine-core").RedmineThreadCreateInput} */
   const input = {
     profileId: profile.profileId,
     resourceRef,
@@ -208,7 +208,7 @@ async function verifyFixture() {
   assert.equal(await sha256Hex(downloaded), state.evidenceSha256);
   assert.equal(downloaded.byteLength, state.screenshotByteSize);
 
-  /** @type {import("@geibee/redmine-core").RedmineThreadSort[]} */
+  /** @type {import("@geibee/feedback-redmine-core").RedmineThreadSort[]} */
   const sorts = ["created_desc", "created_asc", "updated_desc"];
   for (const sort of sorts) {
     const query = new URLSearchParams({
@@ -235,7 +235,7 @@ function profilePath() {
 }
 
 /**
- * @param {import("@geibee/redmine-core/trusted").RedmineFetch} [redmineFetch]
+ * @param {import("@geibee/feedback-redmine-core/trusted").RedmineFetch} [redmineFetch]
  */
 function gatewayHandler(redmineFetch = globalThis.fetch) {
   return createFeedbackRedmineGatewayHandler({
@@ -301,7 +301,7 @@ async function issueDescription(issueId) {
 /**
  * @param {string} baseUrl
  * @param {any} fixture
- * @returns {import("@geibee/redmine-core/trusted").RedmineConnectorProfile}
+ * @returns {import("@geibee/feedback-redmine-core/trusted").RedmineConnectorProfile}
  */
 function connectorProfile(baseUrl, fixture) {
   return {

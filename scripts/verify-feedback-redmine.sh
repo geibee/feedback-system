@@ -16,6 +16,7 @@ node_supported=$(node -p '
 ')
 [[ "$node_supported" == "true" ]] || fail "Node.js 22.12以上25未満が必要です"
 bash -n scripts/build-feedback-redmine-release.sh
+bash -n scripts/publish-feedback-redmine-release.sh
 bash -n scripts/smoke-feedback-redmine.sh
 
 if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
@@ -23,7 +24,7 @@ if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   npm ci --ignore-scripts --no-audit --no-fund
 fi
 
-for package_name in @geibee/contracts @geibee/core; do
+for package_name in @geibee/feedback-contracts @geibee/feedback-core; do
   log "$package_name"
   npm --workspace "$package_name" run typecheck
   npm --workspace "$package_name" run test

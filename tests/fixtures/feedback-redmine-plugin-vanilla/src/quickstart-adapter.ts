@@ -1,4 +1,4 @@
-import type { RedmineFeedbackRuntimeOptions } from "@geibee/redmine-plugin/loader";
+import type { RedmineFeedbackRuntimeOptions } from "@geibee/feedback-redmine-plugin/loader";
 
 const locationSubscribers = new Set<() => void>();
 

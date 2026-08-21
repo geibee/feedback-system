@@ -18,13 +18,13 @@ feedback_npm_cache="$consumer_tmp/npm-cache"
 vite_version=8.2.1
 mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
-  @geibee/contracts
-  @geibee/core
-  @geibee/dom-capture
-  @geibee/react-ui
-  @geibee/redmine-core
-  @geibee/redmine-react
-  @geibee/redmine-plugin
+  @geibee/feedback-contracts
+  @geibee/feedback-core
+  @geibee/feedback-dom-capture
+  @geibee/feedback-react-ui
+  @geibee/feedback-redmine-core
+  @geibee/feedback-redmine-react
+  @geibee/feedback-redmine-plugin
 )
 declare -a tarballs=()
 
@@ -34,7 +34,7 @@ for package_name in "${packages[@]}"; do
     const [result] = JSON.parse(process.env.PACK_RESULT);
     const files = new Set(result.files.map((file) => file.path));
     const required = ["dist/index.js", "dist/index.d.ts", "package.json", "README.md"];
-    if (process.env.PACKAGE_NAME === "@geibee/contracts") {
+    if (process.env.PACKAGE_NAME === "@geibee/feedback-contracts") {
       required.push(
         "redmine-gateway.openapi.yaml",
         "schemas/redmine-model.schema.json",
@@ -42,11 +42,11 @@ for package_name in "${packages[@]}"; do
         "dist/redmine-gateway.generated.d.ts"
       );
     }
-    if (process.env.PACKAGE_NAME === "@geibee/redmine-core") {
+    if (process.env.PACKAGE_NAME === "@geibee/feedback-redmine-core") {
       required.push("dist/trusted.js", "dist/trusted.d.ts");
     }
-    if (process.env.PACKAGE_NAME === "@geibee/redmine-react") required.push("dist/styles.css");
-    if (process.env.PACKAGE_NAME === "@geibee/redmine-plugin") {
+    if (process.env.PACKAGE_NAME === "@geibee/feedback-redmine-react") required.push("dist/styles.css");
+    if (process.env.PACKAGE_NAME === "@geibee/feedback-redmine-plugin") {
       required.push("dist/loader.js", "dist/loader.d.ts");
       if (files.has("dist/feedback-redmine-plugin-with-react.es.js")) process.exit(1);
     }
@@ -81,9 +81,9 @@ for index in "${!react_versions[@]}"; do
     npm run typecheck
     npm run test
     npm run build
-    node --input-type=module -e 'await import("@geibee/redmine-plugin/loader")'
-    test -f node_modules/@geibee/redmine-react/dist/styles.css
-    test -f node_modules/@geibee/redmine-core/dist/trusted.js
+    node --input-type=module -e 'await import("@geibee/feedback-redmine-plugin/loader")'
+    test -f node_modules/@geibee/feedback-redmine-react/dist/styles.css
+    test -f node_modules/@geibee/feedback-redmine-core/dist/trusted.js
   )
   echo "[feedback-redmine-consumer] PASS: clean Vite $vite_version / React $react_version fixture"
 done

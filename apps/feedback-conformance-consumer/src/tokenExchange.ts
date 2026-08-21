@@ -1,4 +1,4 @@
-import type { FeedbackParticipant } from "@geibee/core";
+import type { FeedbackParticipant } from "@geibee/feedback-core";
 
 export type FeedbackExchangeScope = {
   applicationKey: string;

@@ -13,7 +13,7 @@ generated=contracts/feedback/src/generated.ts
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 npx --no-install openapi-typescript "$openapi" -o "$tmp" >/dev/null
-diff -u "$generated" "$tmp" || fail "@geibee/contractsの共有生成型がOpenAPIと同期していません"
+diff -u "$generated" "$tmp" || fail "@geibee/feedback-contractsの共有生成型がOpenAPIと同期していません"
 npx --no-install spectral lint --ruleset .spectral.yaml "$openapi"
 
 grep -qE '^  /api/' "$openapi" && fail "専用契約にWeb GISの/api pathが混入しています"
@@ -26,13 +26,13 @@ for schema in contracts/feedback/schemas/*.json; do
 done
 
 if rg -n "from ['\"](react|react-dom|@tanstack/|maplibre-gl)|document\\.|window\\." packages/feedback-core/src; then
-  fail "@geibee/coreにUI/runtime固有依存が混入しています"
+  fail "@geibee/feedback-coreにUI/runtime固有依存が混入しています"
 fi
 node -e '
   const value = require("./packages/feedback-core/package.json");
   const forbidden = ["react", "react-dom", "@tanstack/react-query", "maplibre-gl"];
   if (forbidden.some((name) => value.dependencies?.[name] || value.peerDependencies?.[name])) process.exit(1);
-' || fail "@geibee/coreのpackage dependency境界が不正です"
+' || fail "@geibee/feedback-coreのpackage dependency境界が不正です"
 
 undocumented_feedback_variables=$(comm -23 \
   <(rg --no-messages -o -P --no-filename '(?<![A-Z0-9_])FEEDBACK_[A-Z][A-Z0-9_]+' \

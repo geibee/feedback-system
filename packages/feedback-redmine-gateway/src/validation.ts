@@ -6,7 +6,7 @@ import type {
   RedmineThreadCreateInput,
   RedmineThreadFilter,
   RedmineThreadSort
-} from "@geibee/redmine-core";
+} from "@geibee/feedback-redmine-core";
 import { GatewayHttpError } from "./problem.js";
 
 export function parseResourceQuery(query: URLSearchParams, allowedExtra: readonly string[]): FeedbackHostResourceRefV1 {

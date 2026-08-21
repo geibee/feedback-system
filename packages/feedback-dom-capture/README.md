@@ -1,10 +1,10 @@
-# @geibee/dom-capture
+# @geibee/feedback-dom-capture
 
 Feedback UIで共有するDOMスクリーンショット取得providerです。Reactへ依存せず、現在のviewport、
 `data-feedback-exclude`相当の除外selector、`data-feedback-mask`相当のmask selectorを扱います。
 
 ```ts
-import { createDomEvidenceProvider } from "@geibee/dom-capture";
+import { createDomEvidenceProvider } from "@geibee/feedback-dom-capture";
 
 const captureEvidence = createDomEvidenceProvider({
   maxPixelRatio: 2,
@@ -12,7 +12,7 @@ const captureEvidence = createDomEvidenceProvider({
 });
 ```
 
-既存consumerは`@geibee/react`または`@geibee/redmine-react`から同じAPIを引き続き利用できます。
+既存consumerは`@geibee/react`または`@geibee/feedback-redmine-react`から同じAPIを引き続き利用できます。
 cross-origin画像やfontを含める場合は対象resourceのCORSを設定するか、capture対象から除外してください。
 mask selectorに一致する要素は、画像化後の最終PNG上で不透明な黒色に塗りつぶします。
 マスク画像のデコードまたは再生成に失敗した場合は、秘匿前の画像を返さずcapture全体を失敗させます。

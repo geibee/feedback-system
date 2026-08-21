@@ -23,8 +23,9 @@ version 1ではunknown propertyを拒否し、`ThreadSummary.latestReply`、`Thr
 hash不一致またはduplicate thread IDは409相当でfail-closedする。
 
 thread createの任意`threadUrl`は同一originかつ対象`threadId`を`feedbackThread` queryに持つURLだけを許可する。新規Redmine issueの
-descriptionは初回コメントと、CommonMarkとTextileの双方で自動linkになるURLだけで、従来の`Feedback metadata v1`は書き込まない。
-Redmine UIではクリック可能にする。旧descriptionのURL文字列は読取・初回編集互換を維持し、
+descriptionは初回コメント、添付したprimary evidenceを表示するRedmine標準thumbnail macro、CommonMarkとTextileの双方で
+自動linkになるURLで構成し、従来の`Feedback metadata v1`は書き込まない。Redmine UIでは画像とURLをクリック可能にする。
+旧descriptionのURL文字列は読取・初回編集互換を維持し、
 初回自己編集の署名はcontext attachmentから復元する。
 
 thread一覧の`scope`省略は従来どおりresource scopeであり、resourceKind、resourceKey、pageKeyを必須とする。

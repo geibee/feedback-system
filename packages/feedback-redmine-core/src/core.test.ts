@@ -10,6 +10,7 @@ import {
   initialCommentFromDescription,
   parseCurrentUserResult,
   parseFeedbackMetadata,
+  replaceInitialCommentInDescription,
   serializeFeedbackContext,
   validateClientProfile
 } from "./index.js";
@@ -85,6 +86,21 @@ describe("Redmine core deterministic model", () => {
     expect(parseFeedbackMetadata(description)).toBeNull();
     expect(description).not.toContain("Application:");
     expect(description).not.toContain("Host resource:");
+  });
+
+  it("証跡画像を添付filenameのthumbnailとして表示し、初回編集後も保持する", () => {
+    const threadUrl = "https://inventory.example.invalid/orders/1?feedbackThread=00000000-0000-4000-8000-000000000001";
+    const filename = "feedback-00000000-0000-4000-8000-000000000001.png";
+    const description = buildRedmineDescription("最初のコメント", threadUrl, filename);
+    expect(description).toBe(
+      `最初のコメント\n\n---\n証跡画像\n{{thumbnail(${filename}, size=800)}}\n\n` +
+      `---\nアプリでこのフィードバックを開く\n${threadUrl}`
+    );
+    expect(initialCommentFromDescription(description)).toBe("最初のコメント");
+    expect(replaceInitialCommentInDescription(description, "編集後のコメント")).toBe(
+      `編集後のコメント\n\n---\n証跡画像\n{{thumbnail(${filename}, size=800)}}\n\n` +
+      `---\nアプリでこのフィードバックを開く\n${threadUrl}`
+    );
   });
 
   it("CommonMarkとTextileの自動linkを壊さないthread URLへする", () => {

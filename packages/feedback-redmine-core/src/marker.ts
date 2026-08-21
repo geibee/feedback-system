@@ -28,10 +28,21 @@ export type FeedbackMessageMetadataV1 = {
 
 const marker = "---\nFeedback metadata v1\n";
 const linkMarker = "---\nアプリでこのフィードバックを開く\n";
+const evidenceMarker = "---\n証跡画像\n";
 
-export function buildRedmineDescription(comment: string, threadUrl: string | null = null): string {
+export function buildRedmineDescription(
+  comment: string,
+  threadUrl: string | null = null,
+  primaryEvidenceFilename: string | null = null
+): string {
   const body = comment.replace(/\r\n?/gu, "\n").trim();
-  return threadUrl ? `${body}\n\n${linkMarker}${redmineAutoLinkUrl(threadUrl)}` : body;
+  const suffixes = [
+    ...(primaryEvidenceFilename
+      ? [`${evidenceMarker}{{thumbnail(${primaryEvidenceFilename}, size=800)}}`]
+      : []),
+    ...(threadUrl ? [`${linkMarker}${redmineAutoLinkUrl(threadUrl)}`] : [])
+  ];
+  return suffixes.length > 0 ? `${body}\n\n${suffixes.join("\n\n")}` : body;
 }
 
 /** CommonMarkとTextileのbare URL自動linkが構文文字で途切れない形式へ正規化する。 */
@@ -119,7 +130,8 @@ export function parseFeedbackMetadata(description: string): Partial<FeedbackMeta
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function descriptionSuffixIndex(description: string): number {
-  const legacy = description.lastIndexOf(`\n\n${marker}`);
-  const link = description.lastIndexOf(`\n\n${linkMarker}`);
-  return Math.max(legacy, link);
+  const indexes = [marker, evidenceMarker, linkMarker]
+    .map((suffixMarker) => description.lastIndexOf(`\n\n${suffixMarker}`))
+    .filter((index) => index >= 0);
+  return indexes.length > 0 ? Math.min(...indexes) : -1;
 }

@@ -306,7 +306,11 @@ export class RedmineTrustedClient {
         description: "Feedback primary evidence"
       });
     }
-    const description = buildRedmineDescription(input.comment, input.threadUrl ?? null);
+    const description = buildRedmineDescription(
+      input.comment,
+      input.threadUrl ?? null,
+      input.evidence?.filename ?? null
+    );
     const issue = {
       project_id: this.profile.projectId,
       tracker_id: this.profile.trackerId,

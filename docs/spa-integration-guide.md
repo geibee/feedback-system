@@ -112,7 +112,7 @@ services:
       retries: 60
 
   feedback-redmine-gateway:
-    image: feedback-redmine-gateway:${FEEDBACK_REDMINE_GATEWAY_VERSION}
+    image: ghcr.io/geibee/feedback-redmine-gateway:${FEEDBACK_REDMINE_GATEWAY_VERSION}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=16m
@@ -172,7 +172,7 @@ Redmine API keyとparticipant署名鍵はprofile JSONへ入れず、別のsecret
 ```yaml
 services:
   feedback-redmine-gateway:
-    image: feedback-redmine-gateway:${FEEDBACK_REDMINE_GATEWAY_VERSION}
+    image: ghcr.io/geibee/feedback-redmine-gateway:${FEEDBACK_REDMINE_GATEWAY_VERSION}
     environment:
       FEEDBACK_PUBLIC_ORIGIN: https://app.example.com
       FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON: ${FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON}

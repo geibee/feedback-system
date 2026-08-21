@@ -1,9 +1,9 @@
 # Feedback System
 
-既存のReact SPAにフィードバックUIを追加し、投稿・返信・証跡を既存Redmineへ保存します。
+既存のReact SPAへフィードバックUIを追加し、投稿・返信・スクリーンショットをRedmineへ保存します。
 Feedback専用DBやobject storageは不要です。
 
-## まずローカルで確認する
+## ローカルで試す
 
 Node.js 22.12以上25未満、npm、Docker Engine、Docker Compose v2が必要です。
 
@@ -23,64 +23,33 @@ node packages/feedback-redmine-ops/dist/cli.js local credentials
 node packages/feedback-redmine-ops/dist/cli.js local down
 ```
 
-このコマンドは評価専用Redmineを新規作成します。既存Redmineには実行しないでください。
+この手順は評価専用Redmineを新規作成します。既存Redmineには実行しないでください。
 
 ## 既存のReactとRedmineへ導入する
 
-前提はReact 18または19、検証済みRedmine（5.1.12、6.0.10、6.1.3、7.0.0）、
-HTTPSで公開できるsame-origin gatewayです。
-
-標準導入ではHost Adapterとplugin controllerを接続します。capture providerを指定しなくても通常のDOM画面を撮影できます。
-設定の違い、既存Composeへの追加、env-only gateway構成は
-[`SPA導入ガイド`](docs/spa-integration-guide.md)へまとめています。
-
 ### 1. Redmineを準備する
 
-Feedback専用project、tracker、integration user、role、status、workflow、11個のcustom fieldを作成します。
-Rails runnerを利用できる場合は、CLIが変更内容をplanし、承認したdigestだけをapplyできます。
+Feedback専用project、tracker、integration user、role、workflow、custom fieldを作成します。
+Rails runnerを利用できる場合は、CLIで安全にplan／applyできます。
 
 ```bash
 npx @geibee/feedback-redmine-ops@next provision extract \
   --output /secure/feedback-redmine/provision.rb
 ```
 
-manifestの例とplan／applyのコマンドは
-[`Feedback Redmine導入・運用手順`](docs/feedback-redmine-installation.md#3-既存redmineの準備)にあります。
-managed Redmineでは、同じ手順書のREST inspect経路を使用します。
+manifestと実行手順は[`Feedback Redmine導入・運用手順`](docs/feedback-redmine-installation.md#3-既存redmineの準備)を参照してください。
 
-### 2. gatewayとruntime configを配備する
+### 2. gatewayを配備する
 
-標準gateway imageをbuildし、8080番portをSPAと同じoriginの
-`/internal/feedback-redmine/v1`へproxyします。
+公開済みの標準イメージを使用します。ソースからのbuildは不要です。
 
 ```bash
-docker build \
-  --file apps/feedback-redmine-gateway-reference/Dockerfile \
-  --tag feedback-redmine-gateway .
+docker pull ghcr.io/geibee/feedback-redmine-gateway:1.0.0-alpha.6
 ```
 
-gatewayには次の値だけをserver-sideで設定します。
-
-- `FEEDBACK_PUBLIC_ORIGIN`: SPAの公開origin
-- `FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE`: 生成済み`server-profile.json`
-- または`FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON`: `clientProfile`を含むenv-only profile JSON
-- `FEEDBACK_REDMINE_GATEWAY_API_KEY`または`_FILE`: integration userのAPI key
-- `FEEDBACK_PARTICIPANT_SIGNING_KEY`: 32 bytes以上のランダムな秘密値
-
-AWSではCloudFront → ALB、AzureではFront Door → Application Gatewayの内側へSPAとgatewayを配置し、
-browserから見えるscheme・host・portを同一にします。gatewayの8080番portは直接公開しません。
-
-SPAと同じoriginの`/.well-known/feedback-redmine.json`から、次を
-`Content-Type: application/json`、`Cache-Control: no-store`で返します。
-
-```json
-{
-  "schemaVersion": "1",
-  "enabled": true,
-  "profileId": "inventory-production",
-  "gatewayBasePath": "/internal/feedback-redmine/v1"
-}
-```
+gatewayをSPAと同じoriginの`/internal/feedback-redmine/v1`へreverse proxyします。
+8080番portを利用者へ直接公開せず、Redmine API keyと署名鍵はserver-side secretとして渡してください。
+Compose例、profile、runtime config、環境変数は[`SPA導入ガイド`](docs/spa-integration-guide.md)にまとめています。
 
 ### 3. Reactへ組み込む
 
@@ -88,45 +57,8 @@ SPAと同じoriginの`/.well-known/feedback-redmine.json`から、次を
 npm install @geibee/feedback-redmine-plugin@next
 ```
 
-[`Host Adapterの最小例`](tests/fixtures/feedback-redmine-plugin-vanilla/src/quickstart-adapter.ts)をアプリ用の値とrouterへ接続し、
-次のcomponentをアプリケーションrootで一度renderします。
-
-```tsx
-import { useEffect } from "react";
-import {
-  createRedmineFeedbackPluginControllerFromRuntimeConfig,
-  type RedmineFeedbackPluginController
-} from "@geibee/feedback-redmine-plugin/loader";
-import { createQuickstartAdapter } from "./feedback-adapter.js";
-
-const adapter = createQuickstartAdapter();
-
-export function FeedbackIntegration(): null {
-  useEffect(() => {
-    const abort = new AbortController();
-    let controller: RedmineFeedbackPluginController | null = null;
-
-    void createRedmineFeedbackPluginControllerFromRuntimeConfig({
-      adapter,
-      contextMenu: true,
-      signal: abort.signal,
-      onUnavailable: (error) => console.error("Feedbackを利用できません", error)
-    }).then((created) => {
-      if (abort.signal.aborted) created?.destroy();
-      else controller = created;
-    });
-
-    return () => {
-      abort.abort();
-      controller?.destroy();
-    };
-  }, []);
-
-  return null;
-}
-```
-
-Redmine URL、API key、custom field ID、署名鍵をSPAやruntime configへ含めないでください。
+[`Host Adapterの最小例`](tests/fixtures/feedback-redmine-plugin-vanilla/src/quickstart-adapter.ts)をアプリのrouterへ接続し、
+plugin controllerをアプリケーションrootで一度作成します。Redmine URLやsecretをSPAへ含めないでください。
 
 ### 4. 接続を確認する
 
@@ -136,22 +68,19 @@ npx @geibee/feedback-redmine-ops@next doctor \
   --profile inventory-production
 ```
 
-最後にSPAから1件投稿し、Redmineへのissue作成、双方からの返信、添付画像を確認すれば導入完了です。
-停止するときはruntime configの`enabled`を`false`にします。
-これはplugin全体のfeature flagです。スクリーンショットだけの有効・無効はgatewayのclient profileにある
-`capture.enabled`で制御します。
+最後にSPAから投稿し、Redmineでissue、返信、添付画像、説明欄の画像とリンクを確認すれば完了です。
 
 ## 詳細資料
 
 - 本番配備、backup、upgrade、障害調査: [`docs/feedback-redmine-installation.md`](docs/feedback-redmine-installation.md)
-- SPAへの標準導入とgateway構成: [`docs/spa-integration-guide.md`](docs/spa-integration-guide.md)
-- MapLibre／地物単位の任意連携: [`docs/maplibre-integration.md`](docs/maplibre-integration.md)
+- SPA、gateway、runtime config: [`docs/spa-integration-guide.md`](docs/spa-integration-guide.md)
+- MapLibre／地物連携: [`docs/maplibre-integration.md`](docs/maplibre-integration.md)
 - 環境変数とsecret: [`docs/environment-variables.md`](docs/environment-variables.md)
 - APIとpackageの互換性: [`docs/api-compatibility.md`](docs/api-compatibility.md)
-- 開発者向けrelease手順: [`docs/release.md`](docs/release.md)
-- 従来Feedback Serviceの保守: [`docs/legacy-quickstart.md`](docs/legacy-quickstart.md)
+- release手順: [`docs/release.md`](docs/release.md)
+- 従来Feedback Service: [`docs/legacy-quickstart.md`](docs/legacy-quickstart.md)
 
-変更後の検証入口は`bash scripts/verify-feedback.sh`です。
+開発時の検証入口は`bash scripts/verify-feedback.sh`です。
 
 ## License
 

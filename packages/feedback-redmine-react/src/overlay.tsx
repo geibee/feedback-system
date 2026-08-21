@@ -391,9 +391,10 @@ export const RedmineFeedbackOverlay = forwardRef<
     replaceCapture({ kind: "capturing" });
     try {
       setCaptureWarning(runtime.captureDiagnostics?.getWarning() ?? null);
-      const provider = runtime.adapter.captureEvidence ?? createDomEvidenceProvider({
+      const baseProvider = runtime.adapter.captureEvidence ?? createDomEvidenceProvider({
         maxBytes: profile.capture.maximumUploadBytes
       });
+      const provider = runtime.captureDiagnostics?.wrapProvider?.(baseProvider) ?? baseProvider;
       let payload = await provider({
         context: runtime.adapter.getContext(),
         location,

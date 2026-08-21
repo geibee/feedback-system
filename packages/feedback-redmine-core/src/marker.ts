@@ -31,13 +31,14 @@ const linkMarker = "---\nアプリでこのフィードバックを開く\n";
 
 export function buildRedmineDescription(comment: string, threadUrl: string | null = null): string {
   const body = comment.replace(/\r\n?/gu, "\n").trim();
-  return threadUrl ? `${body}\n\n${linkMarker}${markdownLink(threadUrl)}` : body;
+  return threadUrl ? `${body}\n\n${linkMarker}${redmineAutoLinkUrl(threadUrl)}` : body;
 }
 
-function markdownLink(url: string): string {
-  const label = url.replace(/([\\[\]])/gu, "\\$1");
-  const destination = url.replace(/\\/gu, "%5C").replace(/\(/gu, "%28").replace(/\)/gu, "%29");
-  return `[${label}](${destination})`;
+/** CommonMarkとTextileのbare URL自動linkが構文文字で途切れない形式へ正規化する。 */
+function redmineAutoLinkUrl(url: string): string {
+  return url.replace(/[\\()[\]]/gu, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
 }
 
 const messageMarker = "---\nFeedback message v1\n";

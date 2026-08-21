@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 新規Redmine issueのSPA URLを、URL文字列をlabelにしたクリック可能なMarkdown linkとして保存するようにしました。
+- 新規Redmine issueのSPA URLを、CommonMarkとTextileの双方で自動linkになる安全な形式で保存するようにしました。
 
 - browser profile UUIDを参加者IDとするcontext、participant message marker、返信journal、追記型編集、version fold、終了status判定を追加。
 - Profile内Workspace一覧、一覧総件数、scopeへ束縛したcursor v2を追加し、既存resource cursor v1を維持。

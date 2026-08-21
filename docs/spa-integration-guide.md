@@ -196,7 +196,7 @@ jq -c --slurpfile client ./client-profile.json \
 1. runtime configを`enabled=false`にするとplugin DOMとgateway通信が発生しない。
 2. `enabled=true`で通常DOMの投稿、一覧、返信が動く。
 3. profileの`capture.enabled=true`で画像が添付され、`false`でコメントだけが投稿される。
-4. 新規Redmine issueの説明にSPA URLがMarkdown linkとして表示され、新しいtabで開く。
+4. 新規Redmine issueの説明にクリック可能なSPA URLが表示され、該当画面を開く。
 5. `doctor`が同一origin gatewayとprofileを正常と判定する。
 
 ```bash

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 新規issueのsame-origin thread URLをRedmine UIで開けるMarkdown linkとして保存するようにしました。
+- 新規issueのsame-origin thread URLをRedmine UIで開ける自動linkとして保存するようにしました。
 
 - 初回投稿からextension由来の`submissionChannel` metadataを除去しました。
 - request JSONとevidenceを含む2-part multipartを正しく読み取れるようにしました。

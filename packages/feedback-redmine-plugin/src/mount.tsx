@@ -2,7 +2,6 @@ import { createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { RedmineDiagnosticBuffer } from "@geibee/feedback-redmine-core";
 import {
-  createDomEvidenceProvider,
   RedmineFeedbackOverlay,
   RedmineFeedbackProvider,
   installRedmineFeedbackStyles,
@@ -13,7 +12,7 @@ import {
   findUnreadableMapCanvases,
   isMapLibreEvidenceProvider
 } from "@geibee/feedback-maplibre";
-import type { FeedbackRedmineHostAdapter } from "@geibee/feedback-redmine-core";
+import type { FeedbackEvidenceProvider } from "@geibee/feedback-core";
 import { GatewayRedmineFeedbackTransport } from "./gateway-transport.js";
 import { createBrowserClientState } from "./storage.js";
 import { downloadDiagnosticJson } from "./diagnostic-download.js";
@@ -57,6 +56,12 @@ export function createRedmineFeedbackPlugin(
   const registeredMaps = new Map<FeedbackMapLibreEvidenceMap, number>();
   const captureDiagnosticListeners = new Set<() => void>();
   const captureDiagnostics = {
+    wrapProvider(provider: FeedbackEvidenceProvider) {
+      return createMapLibreEvidenceProvider({
+        capture: provider,
+        maps: () => Array.from(registeredMaps.keys())
+      });
+    },
     getWarning() {
       if (isMapLibreEvidenceProvider(options.adapter.captureEvidence)) return null;
       const registeredCanvases = new Set(Array.from(registeredMaps.keys()).flatMap((map) => {
@@ -95,29 +100,11 @@ export function createRedmineFeedbackPlugin(
     clientState = createBrowserClientState({
       onFallback: (error) => options.onUnavailable?.(error)
     });
-    const baseCapture = options.adapter.captureEvidence ?? createDomEvidenceProvider();
-    const captureEvidence = createMapLibreEvidenceProvider({
-      capture: baseCapture,
-      maps: () => Array.from(registeredMaps.keys())
-    });
-    const adapter: FeedbackRedmineHostAdapter = {
-      getContext: () => options.adapter.getContext(),
-      getLocation: () => options.adapter.getLocation(),
-      getResourceRef: () => options.adapter.getResourceRef(),
-      navigate: (location, threadId) => options.adapter.navigate(location, threadId),
-      captureEvidence,
-      ...(options.adapter.subscribe
-        ? { subscribe: (listener: () => void) => options.adapter.subscribe!(listener) }
-        : {}),
-      ...(options.adapter.getFeedbackThreadUrl
-        ? { getFeedbackThreadUrl: (threadId: string) => options.adapter.getFeedbackThreadUrl!(threadId) }
-        : {})
-    };
     root = createRoot(container);
     root.render(<RedmineFeedbackProvider runtime={{
       port: transport,
       clientState,
-      adapter,
+      adapter: options.adapter,
       profileId: options.profileId,
       contextMenu: options.contextMenu ?? false,
       targetResolver: options.targetResolver,

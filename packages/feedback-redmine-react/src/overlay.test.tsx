@@ -12,10 +12,22 @@ import {
   type RedmineThreadV1
 } from "@geibee/feedback-redmine-core";
 import type { FeedbackLocationV1, FeedbackTargetResolver } from "@geibee/feedback-core";
+import { createDomEvidenceProvider } from "./capture.js";
 import { feedbackErrorMessage } from "./error-message.js";
 import { addFeedbackCaptureMarker } from "./capture-marker.js";
 import { RedmineFeedbackOverlay } from "./overlay.js";
-import { RedmineFeedbackProvider } from "./provider.js";
+import { RedmineFeedbackProvider, type RedmineFeedbackRuntime } from "./provider.js";
+
+vi.mock("./capture.js", () => ({
+  createDomEvidenceProvider: vi.fn(() => async () => ({
+    bytes: new Uint8Array([1, 2, 3, 4]),
+    contentType: "image/png",
+    viewportWidth: 1,
+    viewportHeight: 1,
+    pixelRatio: 1,
+    capturedAt: "2026-08-19T00:00:00Z"
+  }))
+}));
 
 vi.mock("./capture-marker.js", () => ({
   addFeedbackCaptureMarker: vi.fn(async (payload) => payload)
@@ -122,6 +134,7 @@ type SetupOptions = {
   createError?: unknown;
   contextMenu?: boolean;
   targetResolver?: FeedbackTargetResolver<Element>;
+  captureDiagnostics?: RedmineFeedbackRuntime["captureDiagnostics"];
 };
 
 function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {}) {
@@ -176,7 +189,8 @@ function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {
     adapter: hostAdapter,
     profileId: clientProfile.id,
     contextMenu: options.contextMenu,
-    targetResolver: options.targetResolver
+    targetResolver: options.targetResolver,
+    captureDiagnostics: options.captureDiagnostics
   }}><RedmineFeedbackOverlay /></RedmineFeedbackProvider>);
   return { port, clientState, listThreads, getThread, createThread, hostAdapter };
 }
@@ -353,6 +367,27 @@ describe("Redmine共通UI", () => {
       expect.objectContaining({ contentType: "image/png" }),
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })
     );
+  });
+
+  it("既定captureへProfile上限を設定してからMapLibre providerで包む", async () => {
+    const captureProfile = {
+      ...profile,
+      capture: { ...profile.capture, enabled: true, maximumUploadBytes: 1_048_576 }
+    };
+    const wrapProvider = vi.fn((provider) => provider);
+    setup(detail, {
+      clientProfile: captureProfile,
+      captureDiagnostics: {
+        wrapProvider,
+        getWarning: () => null,
+        subscribe: () => () => undefined
+      }
+    });
+
+    const composer = await startComposer();
+    expect(await within(composer).findByRole("img", { name: "証跡プレビュー" })).toBeTruthy();
+    expect(createDomEvidenceProvider).toHaveBeenCalledWith({ maxBytes: 1_048_576 });
+    expect(wrapProvider).toHaveBeenCalledWith(vi.mocked(createDomEvidenceProvider).mock.results[0]?.value);
   });
 
   it("別locationの投稿はnavigate完了とlocation一致後に詳細を取得する", async () => {

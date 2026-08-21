@@ -56,9 +56,12 @@ function runImage(image) {
       String(state.issueId)], environment);
     const rendered = parseLastJson(renderedOutput);
     const expectedHref = `http://app.example/orders/%28draft%29%5B1%5D?feedbackThread=${state.threadId}`;
+    const evidenceFilename = `feedback-${state.threadId}.png`;
     for (const format of ["common_mark", "textile"]) {
       const html = String(rendered[format]);
       assert(html.includes(`href="${expectedHref}"`), `${format}でthread URLがlinkになっていません: ${html}`);
+      assert(html.includes(`alt="${evidenceFilename}"`), `${format}で証跡画像がdescription内に表示されていません: ${html}`);
+      assert(html.includes('class="thumbnail"'), `${format}で証跡画像がclick可能なthumbnailになっていません: ${html}`);
     }
     run("docker", ["cp", "tests/redmine-conformance/seed/journals.rb", `${container}:/usr/src/redmine/tmp/feedback-redmine-journals.rb`], environment);
     run("docker", ["exec", "-e", `SECRET_KEY_BASE=${conformanceSecret}`, container,

@@ -96,6 +96,7 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
     }
   };
   const messages = props.thread ? conversationMessages(props.thread) : [];
+  const activities = props.thread?.timeline.filter((item) => item.kind !== "reply") ?? [];
   return <aside
     ref={panelRef}
     role="dialog"
@@ -148,12 +149,15 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
           </article>
         </li>)}
       </ol>
-      <ol className="feedback-redmine-timeline feedback-redmine-activities" aria-label="Redmine更新履歴">
-        {props.thread.timeline.map((item, index) => <li key={`${item.kind}-${item.journalId ?? "invalid"}-${index}`}>
-          {item.kind === "activity" && <p>{item.author.name}: {item.field}を変更（{item.oldValue ?? "なし"} → {item.newValue ?? "なし"}）</p>}
-          {item.kind === "diagnostic" && <p role="note">{item.message}</p>}
-        </li>)}
-      </ol>
+      {activities.length > 0 && <details className="feedback-redmine-history">
+        <summary>Redmineの変更履歴（{activities.length}件）</summary>
+        <ol className="feedback-redmine-timeline feedback-redmine-activities" aria-label="Redmineの変更履歴">
+          {activities.map((item, index) => <li key={`${item.kind}-${item.journalId ?? "invalid"}-${index}`}>
+            {item.kind === "activity" && <p>{item.author.name}: {item.field}を変更（{item.oldValue ?? "なし"} → {item.newValue ?? "なし"}）</p>}
+            {item.kind === "diagnostic" && <p role="note">{item.message}</p>}
+          </li>)}
+        </ol>
+      </details>}
       {props.canReply && !props.thread.closed ? <section className="feedback-redmine-reply" aria-label="返信">
         <label>返信
           <textarea maxLength={20_000} value={reply} onChange={(event) => setReply(event.target.value)} />
@@ -171,9 +175,9 @@ export function ThreadDrawer(props: ThreadDrawerProps) {
               type="button"
               className={attachment.primaryEvidence && attachment.inlinePreview ? "feedback-redmine-button-primary" : "feedback-redmine-button-secondary"}
               onClick={() => void download(attachment.id)}
-            >{attachment.primaryEvidence && attachment.inlinePreview ? "証跡" : "安全に取得"}</button>
+            >{attachment.primaryEvidence && attachment.inlinePreview ? "画面キャプチャを表示" : "安全に取得"}</button>
             {preview && attachment.inlinePreview && (preview.contentType === "image/png" || preview.contentType === "image/webp") &&
-              <img src={preview.url} alt={attachment.primaryEvidence ? "証跡画像" : preview.filename} />}
+              <img src={preview.url} alt={attachment.primaryEvidence ? "画面キャプチャ" : preview.filename} />}
             {preview && (!attachment.inlinePreview || (preview.contentType !== "image/png" && preview.contentType !== "image/webp")) &&
               <a href={preview.url} download={preview.filename}>ダウンロード</a>}
           </li>;

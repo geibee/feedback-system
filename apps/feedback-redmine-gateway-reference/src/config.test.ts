@@ -54,6 +54,28 @@ describe("standard gateway config", () => {
     expect(config.profiles.get("inventory-production")?.redmineBaseUrl).toBe("https://redmine.example.invalid/redmine");
   });
 
+  it("任意issue項目は明示した重複なしsubsetだけを有効にする", () => {
+    const directory = createProfileFiles();
+    const base = {
+      FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test",
+      FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: join(directory, "server.json"),
+      FEEDBACK_REDMINE_GATEWAY_API_KEY: "integration-test-key",
+      FEEDBACK_PARTICIPANT_SIGNING_KEY: "participant-signing-test-secret-at-least-32-bytes"
+    };
+    expect(loadReferenceGatewayConfig({
+      ...base,
+      FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS: "parent_issue,due_date,priority"
+    }).profiles.get("inventory-production")?.optionalIssueFields).toEqual(["parent_issue", "due_date", "priority"]);
+    expect(() => loadReferenceGatewayConfig({
+      ...base,
+      FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS: "priority,priority"
+    })).toThrow(/重複しないsubset/u);
+    expect(() => loadReferenceGatewayConfig({
+      ...base,
+      FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS: "tracker"
+    })).toThrow(/subset/u);
+  });
+
   it.each([
     ["public origin", { FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: "/not-used", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],
     ["profile file", { FEEDBACK_PUBLIC_ORIGIN: "https://app.example.test", FEEDBACK_REDMINE_GATEWAY_API_KEY: "key", FEEDBACK_PARTICIPANT_SIGNING_KEY: "x".repeat(32) }],

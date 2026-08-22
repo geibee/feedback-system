@@ -27,6 +27,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@geibee/feedback-contracts": "1.0.0-alpha.3",
     "@geibee/feedback-redmine-core": "1.0.0-alpha.3"
   },
   "devDependencies": {

@@ -109,7 +109,8 @@ export function createRedmineFeedbackPlugin(
       contextMenu: options.contextMenu ?? false,
       targetResolver: options.targetResolver,
       pinPositionProvider: options.pinPositionProvider,
-      captureDiagnostics
+      captureDiagnostics,
+      submissionNotice: options.submissionNotice
     }}>
       <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
     </RedmineFeedbackProvider>);

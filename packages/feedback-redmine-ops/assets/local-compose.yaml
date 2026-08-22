@@ -78,6 +78,7 @@ services:
       FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE: /state/server-profile.json
       FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE: /state/redmine-api-key
       FEEDBACK_PARTICIPANT_SIGNING_KEY: ${FEEDBACK_PARTICIPANT_SIGNING_KEY}
+      FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS: ${FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS:-}
     volumes:
       - "${FEEDBACK_REDMINE_STATE_DIR}:/state:ro"
     depends_on:
@@ -101,6 +102,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "127.0.0.1:${FEEDBACK_REDMINE_DEMO_PORT}:8080"
+    volumes:
+      - "${FEEDBACK_REDMINE_STATE_DIR}/public:/usr/share/nginx/html/.well-known:ro"
     depends_on:
       feedback-redmine-gateway:
         condition: service_healthy

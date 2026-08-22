@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- runtime configへplain textの管理者案内、installation manifestへ任意のレビュー観点を後方互換で追加。
+- Redmine投稿option取得endpointと、任意の親チケット・期限・重要度をcreate契約へ追加。
+
 ## 2026-08-21
 
 - `FeedbackTargetV1`へ名前空間付きprovider、安定target key、画面fallback座標、scalar metadataを持つ

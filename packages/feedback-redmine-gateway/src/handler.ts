@@ -27,10 +27,12 @@ import {
   parseUpdateMessageRequest
 } from "./validation.js";
 
+type OptionalIssueFields = NonNullable<GatewayServerProfile["optionalIssueFields"]>;
+
 type Route = {
   operation: string;
   profileId: string;
-  kind: "participant" | "profile" | "me" | "list" | "create" | "detail" | "reply" | "edit" | "attachment";
+  kind: "participant" | "profile" | "creation-options" | "me" | "list" | "create" | "detail" | "reply" | "edit" | "attachment";
   threadId?: string;
   messageId?: string;
   attachmentId?: number;
@@ -47,7 +49,7 @@ export function createFeedbackRedmineGatewayHandler(dependencies: GatewayDepende
       route = parseRoute(request, basePath);
       validateSameOriginRequest(request);
       const routeUrl = new URL(request.url);
-      if (["participant", "profile", "me", "create", "reply", "edit"].includes(route.kind) && routeUrl.search) {
+      if (["participant", "profile", "creation-options", "me", "create", "reply", "edit"].includes(route.kind) && routeUrl.search) {
         throw new GatewayHttpError(400, "redmine.contract_invalid", "unknown query parameterがあります");
       }
       const response = await handlePublicRoute(request, route, dependencies);
@@ -97,6 +99,13 @@ async function handlePublicRoute(
       profile: { ...profile.clientProfile, showRedmineLink: profile.showRedmineLink },
       capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
     });
+  }
+  if (route.kind === "creation-options") {
+    const optionalIssueFields = profile.optionalIssueFields ?? [];
+    const priorities = optionalIssueFields.includes("priority")
+      ? await (await loadGatewayRedmineClient(dependencies, profile)).listIssuePriorities(request.signal)
+      : [];
+    return jsonResponse({ optionalIssueFields, priorities });
   }
   const participantRequired = route.kind === "me" || route.kind === "create" || route.kind === "reply" || route.kind === "edit";
   const participant = participantRequired || request.headers.has("X-Feedback-Participant-Credential")
@@ -161,9 +170,17 @@ async function handlePublicRoute(
     );
     const multipart = await readCreateMultipart(request, maximum);
     const input = parseCreateRequest(multipart.request, route.profileId, requestOrigin);
+    assertEnabledIssueFields(input, profile.optionalIssueFields ?? []);
     assertEvidencePart(input.evidence, multipart.evidence);
     if (request.headers.get("Idempotency-Key") !== input.intentId) {
       throw new GatewayHttpError(400, "redmine.contract_invalid", "Idempotency-Keyとintent IDが一致しません");
+    }
+    if (input.parentIssueId !== undefined) await client.validateParentIssue(input.parentIssueId, request.signal);
+    if (input.priorityId !== undefined) {
+      const priorities = await client.listIssuePriorities(request.signal);
+      if (!priorities.some((priority) => priority.id === input.priorityId)) {
+        throw new GatewayHttpError(422, "redmine.validation_failed", "指定したpriorityを利用できません");
+      }
     }
     const markerSignature = await signMessageMarker({
       signingKey,
@@ -331,6 +348,9 @@ function parseRoute(request: Request, basePath: string): Route {
     return { operation: "redmine.participant.create.v1", profileId, kind: "participant" };
   }
   if (request.method === "GET" && parts.length === 2) return { operation: "redmine.profile.get.v1", profileId, kind: "profile" };
+  if (request.method === "GET" && parts.length === 3 && parts[2] === "creation-options") {
+    return { operation: "redmine.creation-options.get.v1", profileId, kind: "creation-options" };
+  }
   if (request.method === "GET" && parts.length === 3 && parts[2] === "me") {
     return { operation: "redmine.current-user.get.v1", profileId, kind: "me" };
   }
@@ -378,11 +398,32 @@ async function loadProfile(dependencies: GatewayDependencies, profileId: string)
     return {
       ...validateConnectorProfile(profile, { allowHttpDevelopment: dependencies.allowHttpDevelopment ?? false }),
       authorizationMode: "resource-scoped",
-      secretRef: profile.secretRef
+      secretRef: profile.secretRef,
+      optionalIssueFields: validateOptionalIssueFields(profile.optionalIssueFields ?? [])
     };
   } catch {
     throw new GatewayHttpError(503, "redmine.unavailable", "gateway profile設定が不正です");
   }
+}
+
+function validateOptionalIssueFields(value: unknown): OptionalIssueFields {
+  const allowed = ["parent_issue", "due_date", "priority"] as const;
+  if (!Array.isArray(value) || value.length > allowed.length || new Set(value).size !== value.length ||
+    value.some((field) => !(allowed as readonly unknown[]).includes(field))) throw new Error("optional issue fieldsが不正です");
+  return value as OptionalIssueFields;
+}
+
+function assertEnabledIssueFields(
+  input: { parentIssueId?: number; dueDate?: string; priorityId?: number },
+  enabled: OptionalIssueFields
+): void {
+  const supplied = [
+    ["parent_issue", input.parentIssueId],
+    ["due_date", input.dueDate],
+    ["priority", input.priorityId]
+  ] as const;
+  const disabled = supplied.find(([field, value]) => value !== undefined && !enabled.includes(field));
+  if (disabled) throw new GatewayHttpError(400, "redmine.contract_invalid", `${disabled[0]}はこのprofileで有効ではありません`);
 }
 
 function contentDisposition(filename: string): string {

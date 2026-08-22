@@ -52,7 +52,10 @@
         { "$ref": "#/$defs/evidence" },
         { "type": "null" }
       ]
-    }
+    },
+    "parentIssueId": { "type": "integer", "minimum": 1 },
+    "dueDate": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "priorityId": { "type": "integer", "minimum": 1 }
   },
   "$defs": {
     "author": {

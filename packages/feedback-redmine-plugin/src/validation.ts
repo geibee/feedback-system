@@ -1,4 +1,5 @@
 import type { FeedbackRedmineHostAdapter } from "@geibee/feedback-redmine-core";
+import type { FeedbackSubmissionNoticeV1 } from "@geibee/feedback-contracts";
 import type { FeedbackPinPositionProvider, FeedbackTargetResolver } from "@geibee/feedback-core";
 
 export type RedmineFeedbackPluginOptions = {
@@ -11,15 +12,16 @@ export type RedmineFeedbackPluginOptions = {
   pinPositionProvider?: FeedbackPinPositionProvider;
   messages?: Partial<Record<"unavailable" | "retry", string>>;
   onUnavailable?: (error: unknown) => void;
+  submissionNotice?: FeedbackSubmissionNoticeV1;
 };
 
 const profileIdPattern = /^[a-z0-9][a-z0-9._-]{0,99}$/u;
 
 export function validatePluginOptions(value: RedmineFeedbackPluginOptions): Required<
   Pick<RedmineFeedbackPluginOptions, "mount" | "profileId" | "gatewayBasePath" | "adapter">
-> & Pick<RedmineFeedbackPluginOptions, "contextMenu" | "targetResolver" | "pinPositionProvider" | "messages" | "onUnavailable"> {
+> & Pick<RedmineFeedbackPluginOptions, "contextMenu" | "targetResolver" | "pinPositionProvider" | "messages" | "onUnavailable" | "submissionNotice"> {
   if (!value || typeof value !== "object") throw new Error("plugin optionsはobjectである必要があります");
-  const allowed = new Set(["mount", "profileId", "gatewayBasePath", "adapter", "contextMenu", "targetResolver", "pinPositionProvider", "messages", "onUnavailable"]);
+  const allowed = new Set(["mount", "profileId", "gatewayBasePath", "adapter", "contextMenu", "targetResolver", "pinPositionProvider", "messages", "onUnavailable", "submissionNotice"]);
   const unknown = Object.keys(value).find((key) => !allowed.has(key));
   if (unknown) throw new Error(`plugin optionsにunknown propertyがあります: ${unknown}`);
   if (!(value.mount instanceof Element)) throw new Error("mountはElementである必要があります");
@@ -35,7 +37,35 @@ export function validatePluginOptions(value: RedmineFeedbackPluginOptions): Requ
   if (value.onUnavailable !== undefined && typeof value.onUnavailable !== "function") {
     throw new Error("onUnavailableがfunctionではありません");
   }
-  return { ...value, gatewayBasePath: validateGatewayBasePath(value.gatewayBasePath ?? "/internal/feedback-redmine/v1") };
+  return {
+    ...value,
+    gatewayBasePath: validateGatewayBasePath(value.gatewayBasePath ?? "/internal/feedback-redmine/v1"),
+    ...(value.submissionNotice === undefined ? {} : { submissionNotice: validateSubmissionNotice(value.submissionNotice) })
+  };
+}
+
+export function validateSubmissionNotice(value: unknown): FeedbackSubmissionNoticeV1 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("submissionNoticeはobjectである必要があります");
+  const item = value as Record<string, unknown>;
+  const unknown = Object.keys(item).find((key) => key !== "message" && key !== "link");
+  if (unknown) throw new Error(`submissionNoticeにunknown propertyがあります: ${unknown}`);
+  if (typeof item.message !== "string" || item.message.length < 1 || item.message.length > 2_000) {
+    throw new Error("submissionNotice.messageは1〜2000文字である必要があります");
+  }
+  if (item.link === undefined) return { message: item.message };
+  if (!item.link || typeof item.link !== "object" || Array.isArray(item.link)) throw new Error("submissionNotice.linkが不正です");
+  const link = item.link as Record<string, unknown>;
+  if (Object.keys(link).some((key) => key !== "url" && key !== "label") ||
+    typeof link.url !== "string" || link.url.length > 2_048 ||
+    typeof link.label !== "string" || link.label.length < 1 || link.label.length > 200) {
+    throw new Error("submissionNotice.linkが不正です");
+  }
+  let url: URL;
+  try { url = new URL(link.url); } catch { throw new Error("submissionNotice.link.urlがURLではありません"); }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("submissionNotice.link.urlはuserinfoを含まないHTTPS URLである必要があります");
+  }
+  return { message: item.message, link: { url: url.toString(), label: link.label } };
 }
 
 export function validateGatewayBasePath(value: string): string {

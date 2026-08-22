@@ -95,6 +95,30 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/creation-options:
+    get:
+      operationId: getRedmineCreationOptions
+      x-feedback-operation: redmine.creation-options.get.v1
+      tags: [Redmine feedback]
+      summary: 投稿画面で有効な任意issue項目と選択肢を取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/OriginRead'
+        - $ref: '#/components/parameters/SecFetchSite'
+      responses:
+        '200':
+          description: 任意issue項目と選択肢
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            X-Content-Type-Options: { $ref: '#/components/headers/NoSniff' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreationOptions' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/me:
     get:
       operationId: getRedmineCurrentUser
@@ -598,6 +622,23 @@ components:
       properties:
         id: { type: integer, minimum: 1 }
         name: { type: string, minLength: 1, maxLength: 255 }
+    OptionalIssueField:
+      type: string
+      enum: [parent_issue, due_date, priority]
+    CreationOptions:
+      type: object
+      additionalProperties: false
+      required: [optionalIssueFields, priorities]
+      properties:
+        optionalIssueFields:
+          type: array
+          maxItems: 3
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/OptionalIssueField' }
+        priorities:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NamedValue' }
     Locator:
       type: object
       additionalProperties: false
@@ -926,6 +967,9 @@ components:
             - $ref: '#/components/schemas/EvidenceMetadata'
             - { type: 'null' }
         participantName: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        parentIssueId: { type: integer, minimum: 1 }
+        dueDate: { type: string, format: date, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        priorityId: { type: integer, minimum: 1 }
     CreateMessageRequest:
       type: object
       additionalProperties: false

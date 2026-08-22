@@ -15,6 +15,7 @@ import {
   sha256Hex,
   type RedmineCapabilitiesV1,
   type RedmineClientProfileV1,
+  type RedmineCreationOptionsV1,
   type RedmineEvidenceMetadata,
   type RedmineFollowStateV1,
   type RedminePendingIntentV1,
@@ -29,7 +30,7 @@ import { createDomEvidenceProvider } from "./capture.js";
 import { addFeedbackCaptureMarker, type FeedbackCaptureMarkerPosition } from "./capture-marker.js";
 import { useDismissiblePanel } from "./dismissible.js";
 import { feedbackErrorMessage } from "./error-message.js";
-import { useRedmineFeedbackRuntime } from "./provider.js";
+import { useRedmineFeedbackRuntime, type RedmineFeedbackRuntime } from "./provider.js";
 import { useVisiblePolling } from "./storage.js";
 import { ThreadDrawer } from "./thread-drawer.js";
 import { ThreadList } from "./thread-list.js";
@@ -91,6 +92,10 @@ export const RedmineFeedbackOverlay = forwardRef<
   const [comment, setComment] = useState("");
   const [participantName, setParticipantName] = useState("");
   const [perspectiveCode, setPerspectiveCode] = useState("");
+  const [creationOptions, setCreationOptions] = useState<RedmineCreationOptionsV1>({ optionalIssueFields: [], priorities: [] });
+  const [parentIssueId, setParentIssueId] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priorityId, setPriorityId] = useState("");
   const [capture, setCapture] = useState<CaptureState>({ kind: "disabled", reason: "profile" });
   const [captureWarning, setCaptureWarning] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -120,8 +125,9 @@ export const RedmineFeedbackOverlay = forwardRef<
     let active = true;
     void Promise.all([
       runtime.port.getCapabilities(runtime.profileId, controller.signal),
-      runtime.port.getCurrentUser(runtime.profileId, controller.signal)
-    ]).then(async ([result, current]) => {
+      runtime.port.getCurrentUser(runtime.profileId, controller.signal),
+      loadCreationOptions(runtime, controller.signal)
+    ]).then(async ([result, current, options]) => {
       if (!active) return;
       assertProfileMatchesHost(result.profile, runtime.adapter.getContext());
       const scopeHash = await sha256Hex(new TextEncoder().encode(`${runtime.profileId}\n${current.participantId}`));
@@ -129,6 +135,7 @@ export const RedmineFeedbackOverlay = forwardRef<
       if (!active) return;
       setProfile(result.profile);
       setCapabilities(result.capabilities);
+      setCreationOptions(options);
       setPerspectiveCode(result.profile.perspectives[0]?.code ?? "");
       setPrincipal(current);
       setPrincipalScopeHash(scopeHash);
@@ -420,7 +427,7 @@ export const RedmineFeedbackOverlay = forwardRef<
       if (generation === captureGeneration.current) {
         replaceCapture({
           kind: "failed",
-          message: `証跡の取得に失敗しました（${reason instanceof Error ? reason.message : "原因不明"}）。コメントのみ投稿します。`
+          message: `画面キャプチャの取得に失敗しました（${reason instanceof Error ? reason.message : "原因不明"}）。コメントのみ投稿します。`
         });
       }
     }
@@ -480,17 +487,22 @@ export const RedmineFeedbackOverlay = forwardRef<
 
   const submit = async () => {
     if (!profile || !principalScopeHash || !comment.trim() || comment.trim().length > 20_000 ||
-      !perspectiveCode || submissionInFlight.current || !submissionTarget) return;
+      !perspectiveCode || submissionInFlight.current || !submissionTarget ||
+      (parentIssueId !== "" && !/^[1-9][0-9]*$/u.test(parentIssueId)) ||
+      (priorityId !== "" && !/^[1-9][0-9]*$/u.test(priorityId))) return;
     const location = runtime.adapter.getLocation();
     if (!location) return;
     setSubmitting(true);
     submissionInFlight.current = true;
     let pendingIntent: RedminePendingIntentV1 | null = null;
     try {
+      const selectedParentIssueId = parentIssueId ? Number(parentIssueId) : undefined;
+      const selectedPriorityId = priorityId ? Number(priorityId) : undefined;
       const attachedCapture = capture.kind === "ready" ? capture : null;
       const evidenceSha256 = attachedCapture ? await sha256Hex(attachedCapture.payload.bytes) : null;
       const localHash = await sha256Hex(new TextEncoder().encode(canonicalJson({
-        comment: comment.trim(), perspectiveCode, location, evidenceSha256
+        comment: comment.trim(), perspectiveCode, location, evidenceSha256,
+        parentIssueId: selectedParentIssueId, dueDate: dueDate || undefined, priorityId: selectedPriorityId
       })));
       const existing = await runtime.clientState.getPendingIntent(runtime.profileId, principalScopeHash);
       const threadId = existing?.clientDraftHash === localHash ? existing.threadId : crypto.randomUUID();
@@ -532,12 +544,18 @@ export const RedmineFeedbackOverlay = forwardRef<
         threadUrl,
         capturedAt: new Date().toISOString(),
         evidence,
-        participantName: participantName.trim() || null
+        participantName: participantName.trim() || null,
+        ...(selectedParentIssueId === undefined ? {} : { parentIssueId: selectedParentIssueId }),
+        ...(dueDate ? { dueDate } : {}),
+        ...(selectedPriorityId === undefined ? {} : { priorityId: selectedPriorityId })
       }, attachedCapture?.payload.bytes ?? null, controller.signal);
       await runtime.clientState.setPendingIntent(runtime.profileId, principalScopeHash, null);
       await runtime.clientState.setDraft(runtime.profileId, principalScopeHash, null);
       await runtime.clientState.setFollowState(readState(created, runtime.profileId, principalScopeHash, true));
       setComment("");
+      setParentIssueId("");
+      setDueDate("");
+      setPriorityId("");
       writeParticipantName(runtime.profileId, participantName);
       closeComposer();
       await refresh();
@@ -601,6 +619,11 @@ export const RedmineFeedbackOverlay = forwardRef<
       participantName={participantName}
       perspectiveCode={perspectiveCode}
       comment={comment}
+      creationOptions={creationOptions}
+      submissionNotice={runtime.submissionNotice}
+      parentIssueId={parentIssueId}
+      dueDate={dueDate}
+      priorityId={priorityId}
       submitting={submitting}
       onParticipantNameChange={setParticipantName}
       onPerspectiveChange={setPerspectiveCode}
@@ -608,6 +631,9 @@ export const RedmineFeedbackOverlay = forwardRef<
         setComment(value);
         if (principalScopeHash) void runtime.clientState.setDraft(runtime.profileId, principalScopeHash, value || null);
       }}
+      onParentIssueIdChange={setParentIssueId}
+      onDueDateChange={setDueDate}
+      onPriorityIdChange={setPriorityId}
       onRecapture={() => void captureEvidence(submissionTarget, submissionPosition)}
       onBrowse={() => {
         closeComposer();
@@ -691,6 +717,22 @@ export const RedmineFeedbackOverlay = forwardRef<
   </div>;
 });
 
+async function loadCreationOptions(
+  runtime: RedmineFeedbackRuntime,
+  signal: AbortSignal
+): Promise<RedmineCreationOptionsV1> {
+  if (!runtime.port.getCreationOptions) return { optionalIssueFields: [], priorities: [] };
+  try {
+    return await runtime.port.getCreationOptions(runtime.profileId, signal);
+  } catch (error) {
+    if (error instanceof RedmineFeedbackError &&
+      (error.code === "redmine.not_found" || error.upstreamStatus === 404)) {
+      return { optionalIssueFields: [], priorities: [] };
+    }
+    throw error;
+  }
+}
+
 function canvasMutationMayChangeDiagnostic(record: MutationRecord): boolean {
   if (record.type === "attributes") return record.target instanceof HTMLCanvasElement;
   return [...record.addedNodes, ...record.removedNodes].some((node) =>
@@ -706,10 +748,18 @@ function Composer(props: {
   participantName: string;
   perspectiveCode: string;
   comment: string;
+  creationOptions: RedmineCreationOptionsV1;
+  submissionNotice: RedmineFeedbackRuntime["submissionNotice"];
+  parentIssueId: string;
+  dueDate: string;
+  priorityId: string;
   submitting: boolean;
   onParticipantNameChange(value: string): void;
   onPerspectiveChange(value: string): void;
   onCommentChange(value: string): void;
+  onParentIssueIdChange(value: string): void;
+  onDueDateChange(value: string): void;
+  onPriorityIdChange(value: string): void;
   onRecapture(): void;
   onBrowse(): void;
   onClose(): void;
@@ -736,8 +786,8 @@ function Composer(props: {
       {props.captureWarning && <p className="feedback-redmine-warning" role="status">{props.captureWarning}</p>}
       {props.capture.kind === "capturing" && <p role="status">投稿時点の画面を取得しています…</p>}
       {props.capture.kind === "ready" && <>
-        <p>投稿時点の画面を証跡として自動添付します（{props.capture.payload.viewportWidth}×{props.capture.payload.viewportHeight}）</p>
-        <img src={props.capture.url} alt="証跡プレビュー" />
+        <p>投稿時点の画面キャプチャを自動添付します（{props.capture.payload.viewportWidth}×{props.capture.payload.viewportHeight}）</p>
+        <img src={props.capture.url} alt="画面キャプチャのプレビュー" />
       </>}
       {props.capture.kind === "failed" && <p className="feedback-redmine-error" role="alert">{props.capture.message}</p>}
       {props.capture.kind === "disabled" && <p className="feedback-redmine-note">このProfileではスクリーンショット保存が無効です。</p>}
@@ -769,6 +819,33 @@ function Composer(props: {
         onChange={(event) => props.onParticipantNameChange(event.target.value)}
       />
     </label>
+    {props.creationOptions.optionalIssueFields.includes("parent_issue") && <label className="feedback-redmine-field">親チケットID
+      <input
+        type="number"
+        min={1}
+        step={1}
+        value={props.parentIssueId}
+        onChange={(event) => props.onParentIssueIdChange(event.target.value)}
+      />
+    </label>}
+    {props.creationOptions.optionalIssueFields.includes("due_date") && <label className="feedback-redmine-field">期限
+      <input type="date" value={props.dueDate} onChange={(event) => props.onDueDateChange(event.target.value)} />
+    </label>}
+    {props.creationOptions.optionalIssueFields.includes("priority") && <label className="feedback-redmine-field">重要度
+      <select value={props.priorityId} onChange={(event) => props.onPriorityIdChange(event.target.value)}>
+        <option value="">デフォルト</option>
+        {props.creationOptions.priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
+      </select>
+    </label>}
+    {props.submissionNotice && <aside className="feedback-redmine-submission-notice">
+      <h3>管理者からの案内</h3>
+      <p>{props.submissionNotice.message}</p>
+      {props.submissionNotice.link && <p><a
+        href={props.submissionNotice.link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+      >{props.submissionNotice.link.label}</a></p>}
+    </aside>}
     <label className="feedback-redmine-field">最初のコメント
       <textarea
         rows={5}

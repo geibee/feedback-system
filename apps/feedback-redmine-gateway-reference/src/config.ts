@@ -28,12 +28,14 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
     throw new Error("FEEDBACK_PARTICIPANT_SIGNING_KEYは32 bytes以上必要です");
   }
   const connector = loadConnectorProfile(environment);
+  const optionalIssueFields = parseOptionalIssueFields(environment.FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS);
   const profiles = new Map<string, GatewayServerProfile>();
   const secrets = new Map<string, string>();
   profiles.set(connector.profileId, {
     ...connector,
     authorizationMode: "resource-scoped",
-    secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY"
+    secretRef: "FEEDBACK_REDMINE_GATEWAY_API_KEY",
+    optionalIssueFields
   });
   secrets.set("FEEDBACK_REDMINE_GATEWAY_API_KEY", apiKey);
   const port = Number(environment.PORT ?? "8080");
@@ -46,6 +48,16 @@ export function loadReferenceGatewayConfig(environment: NodeJS.ProcessEnv = proc
     secrets,
     participantSigningKey
   };
+}
+
+function parseOptionalIssueFields(value: string | undefined): Array<"parent_issue" | "due_date" | "priority"> {
+  if (!value) return [];
+  const fields = value.split(",").map((field) => field.trim());
+  const allowed = new Set(["parent_issue", "due_date", "priority"]);
+  if (fields.some((field) => !allowed.has(field)) || new Set(fields).size !== fields.length) {
+    throw new Error("FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDSはparent_issue,due_date,priorityの重複しないsubsetで指定してください");
+  }
+  return fields as Array<"parent_issue" | "due_date" | "priority">;
 }
 
 function loadConnectorProfile(environment: NodeJS.ProcessEnv) {

@@ -27,6 +27,7 @@ export {
 export { validateClientProfile, validateHostOrigin } from "./profile.js";
 export {
   parseCurrentUserResult,
+  parseCreationOptions,
   parseProfileResult,
   parseThreadListResult,
   parseThreadResult,
@@ -68,6 +69,7 @@ export type {
   RedmineAttachmentV1,
   RedmineCapabilitiesV1,
   RedmineClientProfileV1,
+  RedmineCreationOptionsV1,
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1

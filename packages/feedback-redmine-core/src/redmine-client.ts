@@ -139,6 +139,43 @@ export class RedmineTrustedClient {
     return { id, name };
   }
 
+  async listIssuePriorities(signal?: AbortSignal): Promise<Array<{ id: number; name: string }>> {
+    const response = object(
+      await this.#json("GET", "enumerations/issue_priorities.json", undefined, signal, 15_000),
+      "issue priorities response"
+    );
+    const priorities = array(response.issue_priorities, "issue_priorities");
+    if (priorities.length > 100) throw contractError("Redmine priorityが100件を超えています");
+    return priorities
+      .map((value) => object(value, "issue priority"))
+      .filter((priority) => priority.active !== false)
+      .map((priority) => ({
+        id: positiveInteger(priority.id, "issue priority ID"),
+        name: boundedString(priority.name, "issue priority name", 255)
+      }));
+  }
+
+  async validateParentIssue(issueId: number, signal?: AbortSignal): Promise<void> {
+    if (!Number.isSafeInteger(issueId) || issueId < 1) throw contractError("parent issue IDが不正です");
+    try {
+      const response = object(
+        await this.#json("GET", `issues/${issueId}.json`, undefined, signal, 15_000),
+        "parent issue response"
+      );
+      const issue = object(response.issue, "parent issue");
+      const project = object(issue.project, "parent issue project");
+      if (positiveInteger(project.id, "parent issue project ID") !== this.profile.projectId) {
+        throw new RedmineFeedbackError("redmine.validation_failed", "親チケットを指定できません", { upstreamStatus: 422 });
+      }
+    } catch (error) {
+      if (error instanceof RedmineFeedbackError &&
+        (error.code === "redmine.unavailable" || error.code === "redmine.rate_limited" || error.code === "redmine.invalid_api_key")) {
+        throw error;
+      }
+      throw new RedmineFeedbackError("redmine.validation_failed", "親チケットを指定できません", { upstreamStatus: 422 });
+    }
+  }
+
   async validateConnection(signal?: AbortSignal): Promise<TrustedConnectionValidation> {
     const user = await this.getCurrentUser(signal);
     const projectResponse = object(
@@ -290,7 +327,10 @@ export class RedmineTrustedClient {
       author: input.author,
       initialMessageSignature: input.markerSignature ?? null,
       capturedAt: input.capturedAt,
-      primaryEvidence: input.evidence
+      primaryEvidence: input.evidence,
+      ...(input.parentIssueId === undefined ? {} : { parentIssueId: input.parentIssueId }),
+      ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
+      ...(input.priorityId === undefined ? {} : { priorityId: input.priorityId })
     };
     const uploads = [{
       token: await this.#upload("feedback-context-v1.json", "application/json", serializeFeedbackContext(context), signal),
@@ -317,7 +357,11 @@ export class RedmineTrustedClient {
       subject: buildRedmineSubject(input),
       description,
       is_private: this.profile.isPrivate,
-      ...(this.profile.defaultPriorityId === null ? {} : { priority_id: this.profile.defaultPriorityId }),
+      ...(input.parentIssueId === undefined ? {} : { parent_issue_id: input.parentIssueId }),
+      ...(input.dueDate === undefined ? {} : { due_date: input.dueDate }),
+      ...(input.priorityId !== undefined
+        ? { priority_id: input.priorityId }
+        : this.profile.defaultPriorityId === null ? {} : { priority_id: this.profile.defaultPriorityId }),
       custom_fields: this.#customFields(input, requestHash),
       uploads
     };
@@ -927,6 +971,12 @@ function nonnegativeInteger(value: unknown, name: string): number {
 function string(value: unknown, name: string): string {
   if (typeof value !== "string" || !value) throw contractError(`${name}がstringではありません`);
   return value;
+}
+
+function boundedString(value: unknown, name: string, maximum: number): string {
+  const result = string(value, name);
+  if (result.length > maximum) throw contractError(`${name}が長すぎます`);
+  return result;
 }
 
 function validateUuid(value: string, name: string): void {

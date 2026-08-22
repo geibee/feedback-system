@@ -51,7 +51,8 @@ APIまたはDTOを変更するときは、同じ変更で次を更新する。
 gatewayは`GET /health/live`と`GET /health/ready`を公開する。両endpointの成功bodyは`{"status":"ok"}`で、認証や
 Redmine業務データを返さない。readyはprocessと起動時設定の判定であり、Redmineまでの疎通契約はops CLIの`doctor`が担う。
 
-配備時設定`redmine-runtime-config.v1`は`schemaVersion`、`enabled`、`profileId`、root-relativeな`gatewayBasePath`だけを許可する。
+配備時設定`redmine-runtime-config.v1`は`schemaVersion`、`enabled`、`profileId`、root-relativeな`gatewayBasePath`と任意の
+`submissionNotice`だけを許可する。案内はplain textと、任意のuserinfoなしHTTPS linkで構成する。
 `@geibee/feedback-redmine-plugin/loader`のruntime loaderは同一originから`no-store`で取得し、unknown propertyや外部URLをfail-closedで拒否する。
 このschemaへsecretまたはRedmine数値IDを追加する変更は許可しない。
 
@@ -86,11 +87,15 @@ load中のdisable/destroy後に遅延mountしない。`setEnabled(false)`と`des
 標準gatewayはprofile fileと、`clientProfile`を埋め込んだenv-onlyのprofile JSONのどちらか一方を受け付ける。
 profile JSONは公開runtime configではなくserver-side設定であり、API keyやparticipant署名鍵を含めない。
 
+`GET /profiles/{profileId}/creation-options`は既存profile responseを変更しない加算endpointである。旧gatewayの404はUIで全項目無効として扱う。
+`CreateThreadRequest`の`parentIssueId`、`dueDate`、`priorityId`は任意の加算fieldであり、gateway設定で有効なfieldだけを受理する。
+installation manifestの任意`perspectives`は新規投稿のレビュー観点を生成し、省略時は従来の`general`を維持する。
+
 端末内follow stateの任意`seenJournalIds`は、非単調なjournal IDを既知集合で判定する後方互換fieldである。旧stateにない場合は
 `lastSeenJournalId`を使い、次回既読更新時に集合を保存する。pending intentは`clientDraftHash`と`prepared | uncertain`を必須とし、
 principal scopeで共有端末の利用者間を分離して7日超を削除する。
 
-返信と自己編集はFeedback UIから行える。状態、担当者、優先度はRedmine UIだけで変更し、Feedback UIはそのjournalを表示する。
+返信と自己編集はFeedback UIから行える。状態、担当者、優先度はRedmine UIだけで変更し、Feedback UIはそのjournalを既定で折りたたんで表示する。
 Redmine UIはlegacy `@geibee/react`へ依存せず、同版のlauncher、対象選択、右クリックmenu、独立composer／一覧／drawer、pin、
 明示的な証跡表示のUXをRedmine port上で実装する。レビュー導入、投稿warn/deny、reaction、UIからの状態変更は移植対象外である。
 検証対象はRedmine 5.1.12、

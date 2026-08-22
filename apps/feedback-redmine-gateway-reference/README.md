@@ -13,6 +13,9 @@
 `FEEDBACK_PARTICIPANT_SIGNING_KEY`へ32 bytes以上のparticipant/message署名鍵を設定します。いずれのsecretも既定値はなく、未設定時は
 起動前にfail-fastします。
 
+`FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS`は任意で、`parent_issue`、`due_date`、`priority`から重複しないcomma区切りsubsetを
+指定します。未設定または空文字ではすべて無効です。指定したprofileを使う全利用者へ同じ投稿項目が表示されます。
+
 participant credentialは同一origin・profile・browser profileの自己編集所有確認にだけ使います。読み取り、新規投稿、返信を制限する
 authenticationではありません。公開範囲を限定する場合は、このreference serverの外側へアクセス制御を追加してください。
 

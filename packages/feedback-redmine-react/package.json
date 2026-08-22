@@ -33,6 +33,7 @@
     "build": "npm run styles:check && tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
+    "@geibee/feedback-contracts": "1.0.0-alpha.3",
     "@geibee/feedback-core": "1.0.0-alpha.3",
     "@geibee/feedback-react-ui": "1.0.0-alpha.3",
     "@geibee/feedback-dom-capture": "1.0.0-alpha.3",

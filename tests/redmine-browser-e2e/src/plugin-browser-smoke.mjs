@@ -109,6 +109,9 @@ const server = createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === `${base}/me`) return respondJson(response, {
     principal: { participantId: browserParticipantId, displayName: "利用者", source: "participant-credential" }
   });
+  if (request.method === "GET" && url.pathname === `${base}/creation-options`) {
+    return respondJson(response, { optionalIssueFields: [], priorities: [] });
+  }
   if (request.method === "GET" && url.pathname === `${base}/threads`) {
     return respondJson(response, { threads: created ? [threadSummary] : [], totalCount: created ? 1 : 0, nextCursor: null });
   }
@@ -247,21 +250,21 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("フィードバックする場所をクリックしてください"));
   await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
-  const preview = page.getByRole("img", { name: "証跡プレビュー" });
+  const preview = page.getByRole("img", { name: "画面キャプチャのプレビュー" });
   try {
     await preview.waitFor();
   } catch {
     const shadowText = await page.locator("[data-feedback-redmine-host]").evaluate((element) => element.shadowRoot?.textContent ?? "");
-    throw new Error(`証跡previewがtimeoutしました: errors=${JSON.stringify(errors)} shadow=${JSON.stringify(shadowText)}`);
+    throw new Error(`画面キャプチャpreviewがtimeoutしました: errors=${JSON.stringify(errors)} shadow=${JSON.stringify(shadowText)}`);
   }
   const redMarkerPixels = await preview.evaluate(async (element) => {
-    if (!(element instanceof HTMLImageElement)) throw new Error("証跡previewが画像ではありません");
+    if (!(element instanceof HTMLImageElement)) throw new Error("画面キャプチャpreviewが画像ではありません");
     await element.decode();
     const canvas = document.createElement("canvas");
     canvas.width = element.naturalWidth;
     canvas.height = element.naturalHeight;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("証跡previewを検査できません");
+    if (!context) throw new Error("画面キャプチャpreviewを検査できません");
     context.drawImage(element, 0, 0);
     const scaleX = element.naturalWidth / window.innerWidth;
     const scaleY = element.naturalHeight / window.innerHeight;
@@ -278,13 +281,13 @@ try {
   });
   assert(redMarkerPixels > 20, "スクリーンショットへFeedback位置ピンを焼き込む必要があります");
   const maskedPixelRatios = await preview.evaluate(async (element, rectangles) => {
-    if (!(element instanceof HTMLImageElement)) throw new Error("証跡previewが画像ではありません");
+    if (!(element instanceof HTMLImageElement)) throw new Error("画面キャプチャpreviewが画像ではありません");
     await element.decode();
     const canvas = document.createElement("canvas");
     canvas.width = element.naturalWidth;
     canvas.height = element.naturalHeight;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("証跡previewを検査できません");
+    if (!context) throw new Error("画面キャプチャpreviewを検査できません");
     context.drawImage(element, 0, 0);
     const scaleX = element.naturalWidth / window.innerWidth;
     const scaleY = element.naturalHeight / window.innerHeight;

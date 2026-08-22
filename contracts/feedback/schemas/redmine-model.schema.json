@@ -48,6 +48,24 @@
         "capabilities": { "$ref": "#/$defs/capabilities" }
       }
     },
+    "creationOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["optionalIssueFields", "priorities"],
+      "properties": {
+        "optionalIssueFields": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["parent_issue", "due_date", "priority"] }
+        },
+        "priorities": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/namedValue" }
+        }
+      }
+    },
     "principal": {
       "type": "object",
       "additionalProperties": false,

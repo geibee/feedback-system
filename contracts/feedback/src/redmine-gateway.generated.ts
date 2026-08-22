@@ -75,6 +75,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{profileId}/creation-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 投稿画面で有効な任意issue項目と選択肢を取得する */
+        get: operations["getRedmineCreationOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileId}/me": {
         parameters: {
             query?: never;
@@ -258,6 +275,12 @@ export interface components {
         NamedValue: {
             id: number;
             name: string;
+        };
+        /** @enum {string} */
+        OptionalIssueField: "parent_issue" | "due_date" | "priority";
+        CreationOptions: {
+            optionalIssueFields: components["schemas"]["OptionalIssueField"][];
+            priorities: components["schemas"]["NamedValue"][];
         };
         Locator: {
             /** @constant */
@@ -480,6 +503,10 @@ export interface components {
             capturedAt: string;
             evidence: components["schemas"]["EvidenceMetadata"] | null;
             participantName?: string | null;
+            parentIssueId?: number;
+            /** Format: date */
+            dueDate?: string;
+            priorityId?: number;
         };
         CreateMessageRequest: {
             /** Format: uuid */
@@ -673,6 +700,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getRedmineCreationOptions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description browserがGETへ付与した場合だけsame-origin一致を検証する */
+                Origin?: components["parameters"]["OriginRead"];
+                "Sec-Fetch-Site": components["parameters"]["SecFetchSite"];
+            };
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任意issue項目と選択肢 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    "X-Content-Type-Options": components["headers"]["NoSniff"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationOptions"];
                 };
             };
             400: components["responses"]["Problem"];

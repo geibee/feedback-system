@@ -4,14 +4,14 @@ import {
   type RedmineFeedbackPluginController,
   type RedmineFeedbackPluginControllerOptions
 } from "./loader-controller.js";
-import { validateGatewayBasePath } from "./validation.js";
+import { validateGatewayBasePath, validateSubmissionNotice } from "./validation.js";
 
 export const defaultRedmineRuntimeConfigPath = "/.well-known/feedback-redmine.json";
 export const defaultRedmineRuntimeConfigTimeoutMs = 5_000;
 
 export type RedmineFeedbackRuntimeOptions = Omit<
   RedmineFeedbackPluginControllerOptions,
-  "profileId" | "gatewayBasePath"
+  "profileId" | "gatewayBasePath" | "submissionNotice"
 > & {
   /** 既定pathを使えないsubpath配備向けの同一origin root-relative path。 */
   configPath?: string;
@@ -64,7 +64,8 @@ export async function createRedmineFeedbackPluginControllerFromRuntimeConfig(
       {
         ...controllerOptions,
         profileId: config.profileId,
-        gatewayBasePath: config.gatewayBasePath
+        gatewayBasePath: config.gatewayBasePath,
+        ...(config.submissionNotice === undefined ? {} : { submissionNotice: config.submissionNotice })
       },
       () => import("./mount.js"),
       () => import("./storage.js")
@@ -97,7 +98,7 @@ export function validateRuntimeConfig(value: unknown): RedmineRuntimeConfigV1 {
     throw new Error("runtime configがobjectではありません");
   }
   const item = value as Record<string, unknown>;
-  const allowed = new Set(["schemaVersion", "enabled", "profileId", "gatewayBasePath"]);
+  const allowed = new Set(["schemaVersion", "enabled", "profileId", "gatewayBasePath", "submissionNotice"]);
   const unknown = Object.keys(item).find((key) => !allowed.has(key));
   if (unknown) throw new Error(`runtime configにunknown propertyがあります: ${unknown}`);
   if (item.schemaVersion !== "1") throw new Error("runtime config schemaVersionは1である必要があります");
@@ -110,7 +111,8 @@ export function validateRuntimeConfig(value: unknown): RedmineRuntimeConfigV1 {
     schemaVersion: "1",
     enabled: item.enabled,
     profileId: item.profileId,
-    gatewayBasePath: validateGatewayBasePath(item.gatewayBasePath)
+    gatewayBasePath: validateGatewayBasePath(item.gatewayBasePath),
+    ...(item.submissionNotice === undefined ? {} : { submissionNotice: validateSubmissionNotice(item.submissionNotice) })
   };
 }
 

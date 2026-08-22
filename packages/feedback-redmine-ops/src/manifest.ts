@@ -20,8 +20,8 @@ export function validateInstallationManifest(value: unknown, options: { allowHtt
   const item = exact(value, [
     "schemaVersion", "profileId", "displayName", "applicationKey", "environmentKey", "externalWorkspaceKey",
     "redmineBaseUrl", "project", "trackerName", "openStatusName", "closedStatusName", "defaultPriorityName",
-    "roleName", "integrationUser", "isPrivate", "captureEnabled", "showRedmineLink"
-  ], "installation manifest");
+    "roleName", "integrationUser", "isPrivate", "captureEnabled", "showRedmineLink", "perspectives"
+  ], "installation manifest", ["perspectives"]);
   if (item.schemaVersion !== "1") invalid("schemaVersionは1である必要があります");
   const profileId = key(item.profileId, "profileId");
   const applicationKey = key(item.applicationKey, "applicationKey");
@@ -47,6 +47,9 @@ export function validateInstallationManifest(value: unknown, options: { allowHtt
   for (const flag of ["isPrivate", "captureEnabled", "showRedmineLink"] as const) {
     if (typeof item[flag] !== "boolean") invalid(`${flag}はbooleanである必要があります`);
   }
+  const perspectives = item.perspectives === undefined
+    ? undefined
+    : parsePerspectives(item.perspectives);
   return {
     schemaVersion: "1",
     profileId,
@@ -69,7 +72,8 @@ export function validateInstallationManifest(value: unknown, options: { allowHtt
     },
     isPrivate: item.isPrivate as boolean,
     captureEnabled: item.captureEnabled as boolean,
-    showRedmineLink: item.showRedmineLink as boolean
+    showRedmineLink: item.showRedmineLink as boolean,
+    ...(perspectives === undefined ? {} : { perspectives })
   };
 }
 
@@ -100,13 +104,25 @@ export function defaultLocalManifest(): RedmineInstallationManifestV1 {
   };
 }
 
-function exact(value: unknown, keys: readonly string[], name: string): Record<string, unknown> {
+function parsePerspectives(value: unknown): Array<{ code: string; label: string }> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) invalid("perspectivesは1〜100件で指定してください");
+  const perspectives = value.map((entry) => {
+    const perspective = exact(entry, ["code", "label"], "perspective");
+    return { code: key(perspective.code, "perspective.code"), label: string(perspective.label, "perspective.label", 200) };
+  });
+  if (new Set(perspectives.map((perspective) => perspective.code)).size !== perspectives.length) {
+    invalid("perspective.codeが重複しています");
+  }
+  return perspectives;
+}
+
+function exact(value: unknown, keys: readonly string[], name: string, optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid(`${name}がobjectではありません`);
   const item = value as Record<string, unknown>;
   const allowed = new Set(keys);
   const unknown = Object.keys(item).find((candidate) => !allowed.has(candidate));
   if (unknown) invalid(`${name}にunknown propertyがあります: ${unknown}`);
-  const missing = keys.find((candidate) => !(candidate in item));
+  const missing = keys.find((candidate) => !optional.includes(candidate) && !(candidate in item));
   if (missing) invalid(`${name}に必須propertyがありません: ${missing}`);
   return item;
 }

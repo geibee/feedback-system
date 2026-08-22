@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- installation manifestの任意レビュー観点をclient profile生成へ反映するようにしました。
+- ローカルdemoへsecretと分離した公開runtime config directoryをread-only mountし、ブラウザ再読み込みだけで案内を変更できるようにしました。
+
 ## 1.0.0-alpha.4
 
 - npm tarball内の`feedback-redmine` CLIへ実行権限を付与し、`npm exec`／`npx`から直接起動できるようにした。

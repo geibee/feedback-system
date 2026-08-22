@@ -7,11 +7,20 @@ export const feedbackManifestSchemaVersion = "1" as const;
 export const feedbackTargetSchemaVersion = "1" as const;
 export const feedbackRedmineContractVersion = "1" as const;
 
+export type FeedbackSubmissionNoticeV1 = {
+  message: string;
+  link?: {
+    url: string;
+    label: string;
+  };
+};
+
 export type RedmineRuntimeConfigV1 = {
   schemaVersion: "1";
   enabled: boolean;
   profileId: string;
   gatewayBasePath: string;
+  submissionNotice?: FeedbackSubmissionNoticeV1;
 };
 
 export type RedmineInstallationManifestV1 = {
@@ -32,6 +41,7 @@ export type RedmineInstallationManifestV1 = {
   isPrivate: boolean;
   captureEnabled: boolean;
   showRedmineLink: boolean;
+  perspectives?: Array<{ code: string; label: string }>;
 };
 
 export type RedmineProvisionResultV1 = {
@@ -159,6 +169,7 @@ export type RedmineAttachmentV1 = redmineComponents["schemas"]["Attachment"];
 export type RedmineConversationMessageV1 = redmineComponents["schemas"]["ConversationMessage"];
 export type RedmineParticipantResultV1 = redmineComponents["schemas"]["ParticipantResult"];
 export type RedmineCreateThreadRequestV1 = redmineComponents["schemas"]["CreateThreadRequest"];
+export type RedmineCreationOptionsV1 = redmineComponents["schemas"]["CreationOptions"];
 export type RedmineCreateMessageRequestV1 = redmineComponents["schemas"]["CreateMessageRequest"];
 export type RedmineUpdateMessageRequestV1 = redmineComponents["schemas"]["UpdateMessageRequest"];
 export type RedmineProblemV1 = redmineComponents["schemas"]["Problem"];

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- runtime JSONまたは直接integration optionから管理者案内を表示できるようにし、runtime loaderではJSONを唯一の設定源にしました。
+- Gatewayの任意issue項目・priority選択肢を取得して投稿payloadへ渡すtransportを追加しました。
+
 - SPA/gatewayの認証失敗案内を管理者向けgateway確認へ変更し、旧browser extensionのoptions案内を除去した。
 - capture有効時の未登録MapLibre WebGL canvas診断と、controller/handleの`registerMapLibreMap(map)`遅延登録・解除APIを追加した。
 

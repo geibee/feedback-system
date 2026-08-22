@@ -290,6 +290,9 @@ describe("plugin lifecycleとstorage", () => {
       if (url.endsWith("/me")) return new Response(JSON.stringify({
         principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
+      if (url.endsWith("/creation-options")) return new Response(JSON.stringify({ optionalIssueFields: [], priorities: [] }), {
+        headers: { "content-type": "application/json" }
+      });
       if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], totalCount: 0, nextCursor: null }), {
         headers: { "content-type": "application/json" }
       });
@@ -336,6 +339,9 @@ describe("plugin lifecycleとstorage", () => {
       if (url.endsWith("/me")) return new Response(JSON.stringify({
         principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
+      if (url.endsWith("/creation-options")) return new Response(JSON.stringify({ optionalIssueFields: [], priorities: [] }), {
+        headers: { "content-type": "application/json" }
+      });
       return new Response(JSON.stringify({
         profile,
         capabilities: { canRead: true, canCreate: true, canReply: true, canEditOwn: true, stateReadOnly: true }
@@ -381,6 +387,9 @@ describe("plugin lifecycleとstorage", () => {
       if (url.endsWith("/me")) return new Response(JSON.stringify({
         principal: { participantId: "00000000-0000-4000-8000-000000000007", displayName: "利用者", source: "participant-credential" }
       }), { headers: { "content-type": "application/json" } });
+      if (url.endsWith("/creation-options")) return new Response(JSON.stringify({ optionalIssueFields: [], priorities: [] }), {
+        headers: { "content-type": "application/json" }
+      });
       if (url.includes("/threads?")) return new Response(JSON.stringify({ threads: [], totalCount: 0, nextCursor: null }), {
         headers: { "content-type": "application/json" }
       });

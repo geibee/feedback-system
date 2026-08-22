@@ -4,6 +4,7 @@ import type {
   RedmineAttachmentV1,
   RedmineCapabilitiesV1,
   RedmineClientProfileV1,
+  RedmineCreationOptionsV1,
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
@@ -13,6 +14,7 @@ export type {
   RedmineAttachmentV1,
   RedmineCapabilitiesV1,
   RedmineClientProfileV1,
+  RedmineCreationOptionsV1,
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
@@ -84,6 +86,9 @@ export type RedmineThreadCreateInput = RedmineThreadLookupInput & {
   capturedAt: string;
   evidence: RedmineEvidenceMetadata | null;
   participantName?: string | null;
+  parentIssueId?: number;
+  dueDate?: string;
+  priorityId?: number;
 };
 
 export type RedmineMessageCreateInput = RedmineThreadLookupInput & {

@@ -74,8 +74,8 @@ export function parseListQuery(query: URLSearchParams): {
 export function parseCreateRequest(value: unknown, profileId: string, requestOrigin: string): RedmineThreadCreateInput {
   const item = exact(value, [
     "resourceRef", "threadId", "intentId", "comment", "perspectiveCode", "location", "target", "release", "locale",
-    "threadUrl", "capturedAt", "evidence", "participantName"
-  ], "create request", ["threadUrl", "participantName"]);
+    "threadUrl", "capturedAt", "evidence", "participantName", "parentIssueId", "dueDate", "priorityId"
+  ], "create request", ["threadUrl", "participantName", "parentIssueId", "dueDate", "priorityId"]);
   const location = exact(item.location, ["schemaVersion", "pageKey", "routeTemplate", "pathParameters", "queryParameters"], "location", ["queryParameters"]);
   if (location.schemaVersion !== "1") invalid("location schemaVersionが不正です");
   stringMap(location.pathParameters, "pathParameters");
@@ -106,7 +106,14 @@ export function parseCreateRequest(value: unknown, profileId: string, requestOri
     threadUrl: parseThreadUrl(item.threadUrl, threadId, requestOrigin),
     capturedAt: dateTime(item.capturedAt, "capturedAt"),
     evidence,
-    participantName: participantName(item.participantName)
+    participantName: participantName(item.participantName),
+    ...(item.parentIssueId === undefined ? {} : {
+      parentIssueId: integer(item.parentIssueId, "parentIssueId", 1, Number.MAX_SAFE_INTEGER)
+    }),
+    ...(item.dueDate === undefined ? {} : { dueDate: calendarDate(item.dueDate, "dueDate") }),
+    ...(item.priorityId === undefined ? {} : {
+      priorityId: integer(item.priorityId, "priorityId", 1, Number.MAX_SAFE_INTEGER)
+    })
   };
 }
 
@@ -347,6 +354,20 @@ function relative(value: unknown): number {
 function dateTime(value: unknown, name: string): string {
   const result = bounded(value, name, 100);
   if (!Number.isFinite(Date.parse(result))) invalid(`${name}がdate-timeではありません`);
+  return result;
+}
+
+function calendarDate(value: unknown, name: string): string {
+  const result = bounded(value, name, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(result);
+  if (!match) invalid(`${name}がYYYY-MM-DDではありません`);
+  const year = Number(match![1]);
+  const month = Number(match![2]);
+  const day = Number(match![3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    invalid(`${name}が実在する日付ではありません`);
+  }
   return result;
 }
 

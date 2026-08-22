@@ -34,5 +34,8 @@ inspection、checklist、profileへ保存しません。Redmineまたはmanifest
 Redmineを変更するRails runnerは既定でplanだけを出力し、同じplan digestを明示したapplyだけを許可します。詳しい手順は
 `docs/feedback-redmine-installation.md`を参照してください。
 
+ローカルdemoの管理者案内は`.feedback-redmine/public/feedback-redmine.json`を編集してブラウザを再読み込みすると反映されます。
+公開用directoryだけをread-only mountするため、同じstate directory内のsecretはdemo containerへ渡しません。
+
 `local backup`はRedmineを停止してDB、files、復元に必要なローカルsecret/profileを同じ世代で保存します。`local restore`と
 `local reset`は`--yes`を必須とする破壊的操作です。顧客Redmineではローカル用`--local-evaluation`を使用しません。

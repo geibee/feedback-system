@@ -11,6 +11,8 @@ thread一覧はscope省略時のresource境界と、`scope=workspace`のProfile�
 resourceKind/resourceKey/pageKeyを受け付けず、server profileに固定されたapplication/environment/workspace/project/trackerだけで
 Redmineを絞り込みます。公開participant modeではProfileへ到達できる利用者がこの一覧を閲覧できるため、Profileの公開範囲を認可境界として扱います。
 createの任意`threadUrl`は同一originと対象thread IDを検証してから、Redmine issueの説明欄へ人がクリックできるURLとして保存します。
+`GET /profiles/{profileId}/creation-options`はprofileでopt-inした親チケット、期限、重要度とactive priorityを返します。
+createでは無効項目、別projectの親チケット、存在しない日付、無効なpriorityを拒否します。
 
 実装時は`contracts/feedback/redmine-gateway.openapi.yaml`と次を必須にしてください。
 

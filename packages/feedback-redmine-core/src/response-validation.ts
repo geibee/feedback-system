@@ -1,5 +1,6 @@
 import type {
   FeedbackTargetV1,
+  RedmineCreationOptionsV1,
   RedmineCurrentPrincipalV1,
   RedmineThreadSummaryV1,
   RedmineThreadV1
@@ -15,6 +16,18 @@ export function parseProfileResult(value: unknown): RedmineProfileResult {
     typeof capabilities.canReply !== "boolean" || typeof capabilities.canEditOwn !== "boolean" ||
     capabilities.stateReadOnly !== true) throw invalid("capabilities");
   return { profile: validateClientProfile(result.profile), capabilities: capabilities as RedmineProfileResult["capabilities"] };
+}
+
+export function parseCreationOptions(value: unknown): RedmineCreationOptionsV1 {
+  const result = exact(value, ["optionalIssueFields", "priorities"], "creation options");
+  if (!Array.isArray(result.optionalIssueFields) || result.optionalIssueFields.length > 3 ||
+    new Set(result.optionalIssueFields).size !== result.optionalIssueFields.length ||
+    result.optionalIssueFields.some((field) => !(optionalIssueFields as readonly unknown[]).includes(field))) {
+    throw invalid("optionalIssueFields");
+  }
+  if (!Array.isArray(result.priorities) || result.priorities.length > 100) throw invalid("priorities");
+  result.priorities.forEach((priority) => named(priority, "priority"));
+  return result as unknown as RedmineCreationOptionsV1;
 }
 
 export function parseCurrentUserResult(value: unknown): RedmineCurrentPrincipalV1 {
@@ -72,6 +85,7 @@ const summaryKeys = [
   "perspectiveCode", "locator", "hasAttachments", "createdAt", "updatedAt", "closed"
 ] as const;
 const detailKeys = ["description", "tracker", "timeline", "attachments", "redmineUrl", "diagnosticCount", "messages"] as const;
+const optionalIssueFields = ["parent_issue", "due_date", "priority"] as const;
 
 function validateSummary(thread: Record<string, unknown>): void {
   if (!uuidPattern.test(String(thread.threadId))) throw invalid("threadId");

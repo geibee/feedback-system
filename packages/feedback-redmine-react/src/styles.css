@@ -394,6 +394,7 @@
 
 .feedback-redmine-field textarea,
 .feedback-redmine-field input,
+.feedback-redmine-field select,
 .feedback-redmine-toolbar input,
 .feedback-redmine-toolbar select,
 .feedback-redmine-reply textarea,
@@ -409,6 +410,7 @@
 
 .feedback-redmine-field textarea:focus,
 .feedback-redmine-field input:focus,
+.feedback-redmine-field select:focus,
 .feedback-redmine-toolbar input:focus,
 .feedback-redmine-toolbar select:focus,
 .feedback-redmine-reply textarea:focus,
@@ -479,7 +481,14 @@
 .feedback-redmine-reply textarea { min-height: 90px; }
 .feedback-redmine-reply { display: grid; gap: 8px; }
 .feedback-redmine-activities:empty { display: none; }
+.feedback-redmine-history > summary { cursor: pointer; font-weight: 700; }
 .feedback-redmine-timeline li { border-top: 1px solid #e2e8f0; padding: 10px 0; }
+.feedback-redmine-submission-notice { border: 1px solid #bae6fd; border-radius: 8px; background: #f0f9ff; padding: 10px 12px; }
+.feedback-redmine-submission-notice h3,
+.feedback-redmine-submission-notice p { margin: 0; }
+.feedback-redmine-submission-notice h3 { margin-bottom: 6px; font-size: 13px; }
+.feedback-redmine-submission-notice p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.feedback-redmine-submission-notice p + p { margin-top: 6px; }
 .feedback-redmine-drawer section[aria-label="添付ファイル"] ul { display: grid; gap: 10px; padding-left: 20px; }
 .feedback-redmine-drawer section[aria-label="添付ファイル"] li { display: grid; gap: 7px; }
 .feedback-redmine-drawer img { width: 100%; max-height: 400px; object-fit: contain; border: 1px solid var(--feedback-redmine-border); border-radius: 6px; }

@@ -35,12 +35,14 @@ export function FeedbackIntegration(): null {
 }
 ```
 
-既定では`/.well-known/feedback-redmine.json`から`enabled`、`profileId`、same-originの`gatewayBasePath`を`no-store`で読みます。
+既定では`/.well-known/feedback-redmine.json`から`enabled`、`profileId`、same-originの`gatewayBasePath`、任意の`submissionNotice`を`no-store`で読みます。
 取得または厳密なschema検証に失敗した場合はfail-closedでnullを返し、UIや通信を開始しません。配備時に有効・無効を変更でき、
 SPAの再buildは不要です。従来の`createRedmineFeedbackPluginController()`も、host feature flagへ直接接続する用途で利用できます。
 取得timeoutは既定5秒で、`timeoutMs`により1〜60000msの範囲で変更できます。React cleanupから`signal`を中止すると
 `onUnavailable`へ通知せず終了し、初期化途中のcontrollerも破棄します。subpath配備では同一originのroot-relativeな`configPath`を指定できます。
 任意機能の設定取得でhost SPAの起動を止めないため、factoryをtop-level `await`せず、上記のようにReact effect内で開始します。
+runtime loaderでは案内を呼出しoptionから上書きできず、runtime JSONを唯一の設定源にします。直接
+`createRedmineFeedbackPlugin()`または`createRedmineFeedbackPluginController()`を使うintegrationだけは、同じshapeの`submissionNotice` optionを指定できます。
 
 `mount`を省略すると、controllerは`document.body`配下に専用要素を作成し、無効化時に要素ごと削除します。
 host所有要素を`mount`へ指定した場合は、plugin内容だけを破棄してhost要素を残します。`purgeLocalState()`は

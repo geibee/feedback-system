@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 親チケット・期限・重要度をrequest hash、context attachment、Redmine issue作成へ追加し、親projectとactive priorityを検証するようにしました。
+
 - 新規Redmine issueの証跡画像を添付したままdescription内にもclick可能なthumbnailとして表示し、SPA URLを
   CommonMarkとTextileの双方で自動linkになる安全な形式で保存するようにしました。
 

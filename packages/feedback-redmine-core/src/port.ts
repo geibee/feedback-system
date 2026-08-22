@@ -4,6 +4,7 @@ import type {
   RedmineCapabilitiesV1,
   RedmineClientProfileV1,
   RedmineCurrentPrincipalV1,
+  RedmineCreationOptionsV1,
   RedmineMessageCreateInput,
   RedmineMessageUpdateInput,
   RedmineParticipantV1,
@@ -22,6 +23,7 @@ export type RedmineProfileResult = {
 export interface RedmineFeedbackPort {
   getOrCreateParticipant(profileId: string, signal?: AbortSignalLike): Promise<RedmineParticipantV1>;
   getCapabilities(profileId: string, signal?: AbortSignalLike): Promise<RedmineProfileResult>;
+  getCreationOptions?(profileId: string, signal?: AbortSignalLike): Promise<RedmineCreationOptionsV1>;
   getCurrentUser(profileId: string, signal?: AbortSignalLike): Promise<RedmineCurrentPrincipalV1>;
   listThreads(input: RedmineThreadListInput, signal?: AbortSignalLike): Promise<RedmineThreadListResult>;
   getThread(input: RedmineThreadLookupInput, signal?: AbortSignalLike): Promise<RedmineThreadV1>;

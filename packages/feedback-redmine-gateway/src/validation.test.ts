@@ -62,3 +62,21 @@ describe("Redmine gateway custom target validation", () => {
     )).toThrow();
   });
 });
+
+describe("Redmine gateway任意issue項目validation", () => {
+  it("親チケット、期限、重要度をcreate inputへ写像する", () => {
+    expect(parseCreateRequest(
+      { ...createRequest(), parentIssueId: 123, dueDate: "2026-08-31", priorityId: 4 },
+      "inventory-production",
+      "https://app.example"
+    )).toMatchObject({ parentIssueId: 123, dueDate: "2026-08-31", priorityId: 4 });
+  });
+
+  it.each(["2026-02-30", "2026-8-01", "not-a-date"])("不正な期限%sを拒否する", (dueDate) => {
+    expect(() => parseCreateRequest(
+      { ...createRequest(), dueDate },
+      "inventory-production",
+      "https://app.example"
+    )).toThrow(/dueDate/u);
+  });
+});

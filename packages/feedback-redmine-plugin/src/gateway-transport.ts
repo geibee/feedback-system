@@ -3,6 +3,7 @@ import type {
   RedmineAttachmentContent,
   RedmineAttachmentInput,
   RedmineCurrentPrincipalV1,
+  RedmineCreationOptionsV1,
   RedmineFeedbackPort,
   RedmineMessageCreateInput,
   RedmineMessageUpdateInput,
@@ -19,6 +20,7 @@ import {
   RedmineDiagnosticBuffer,
   diagnosticErrorCode,
   parseCurrentUserResult,
+  parseCreationOptions,
   parseProfileResult,
   parseThreadListResult,
   parseThreadResult,
@@ -78,6 +80,12 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
       parseCurrentUserResult(await this.#json(`${this.#profilePath()}/me`, signal, diagnostic, participant.credential)));
   }
 
+  async getCreationOptions(profileId: string, signal?: AbortSignalLike): Promise<RedmineCreationOptionsV1> {
+    this.#assertProfile(profileId);
+    return this.#diagnose("redmine.creation-options.get.v1", async (diagnostic) =>
+      parseCreationOptions(await this.#json(`${this.#profilePath()}/creation-options`, signal, diagnostic)));
+  }
+
   async listThreads(input: RedmineThreadListInput, signal?: AbortSignalLike): Promise<RedmineThreadListResult> {
     this.#assertProfile(input.profileId);
     const query = input.scope === "workspace" ? new URLSearchParams({ scope: "workspace" }) : resourceQuery(input.resourceRef);
@@ -125,7 +133,10 @@ export class GatewayRedmineFeedbackTransport implements RedmineFeedbackPort {
       threadUrl: input.threadUrl ?? null,
       capturedAt: input.capturedAt,
       evidence: input.evidence,
-      participantName: input.participantName ?? null
+      participantName: input.participantName ?? null,
+      ...(input.parentIssueId === undefined ? {} : { parentIssueId: input.parentIssueId }),
+      ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
+      ...(input.priorityId === undefined ? {} : { priorityId: input.priorityId })
     };
     const form = new FormData();
     form.append("request", new Blob([JSON.stringify(request)], { type: "application/json;charset=utf-8" }));

@@ -62,7 +62,22 @@
     },
     "isPrivate": { "type": "boolean" },
     "captureEnabled": { "type": "boolean" },
-    "showRedmineLink": { "type": "boolean" }
+    "showRedmineLink": { "type": "boolean" },
+    "perspectives": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "label"],
+        "properties": {
+          "code": { "$ref": "#/$defs/key" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    }
   },
   "$defs": {
     "key": {

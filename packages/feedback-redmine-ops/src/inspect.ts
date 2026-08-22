@@ -123,7 +123,7 @@ export async function inspectRedmine(input: {
     applicationKey: manifest.applicationKey,
     environmentKey: manifest.environmentKey,
     externalWorkspaceKey: manifest.externalWorkspaceKey,
-    perspectives: [{ code: "general", label: "一般" }],
+    perspectives: manifest.perspectives ?? [{ code: "general", label: "一般" }],
     capture: { enabled: manifest.captureEnabled, maximumUploadBytes: 10_485_760, contentTypes: ["image/png", "image/webp"] },
     attachments: { maximumInlinePreviewBytes: 10_485_760, maximumDownloadBytes: 52_428_800 },
     showRedmineLink: manifest.showRedmineLink

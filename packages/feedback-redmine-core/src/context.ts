@@ -30,6 +30,9 @@ export type RedmineFeedbackContextV1 = {
   initialMessageSignature: string | null;
   capturedAt: string;
   primaryEvidence: RedmineEvidenceMetadata | null;
+  parentIssueId?: number;
+  dueDate?: string;
+  priorityId?: number;
 };
 
 export type RequestHashInput = Omit<
@@ -54,6 +57,9 @@ export async function calculateRequestHash(input: RequestHashInput): Promise<str
     perspectiveCode: input.perspectiveCode,
     location: input.location,
     target: input.target,
+    parentIssueId: input.parentIssueId,
+    dueDate: input.dueDate,
+    priorityId: input.priorityId,
     authorParticipantId: input.author.participantId,
     authorSource: input.author.source,
     comment: input.comment,

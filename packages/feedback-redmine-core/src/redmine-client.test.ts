@@ -154,6 +154,24 @@ describe("Redmine trusted HTTP policy", () => {
     expect(result.customFields).toBe("not-yet-proven");
   });
 
+  it("active priorityだけを列挙し、親チケットを固定projectへ制限する", async () => {
+    const trusted = client(async (url) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith("/enumerations/issue_priorities.json")) return json({
+        issue_priorities: [{ id: 2, name: "通常", active: true }, { id: 3, name: "廃止", active: false }]
+      });
+      if (path.endsWith("/issues/100.json")) return json({ issue: { id: 100, project: { id: 12, name: "Feedback" } } });
+      if (path.endsWith("/issues/101.json")) return json({ issue: { id: 101, project: { id: 99, name: "別project" } } });
+      throw new Error(`unexpected request: ${url}`);
+    });
+    expect(await trusted.listIssuePriorities()).toEqual([{ id: 2, name: "通常" }]);
+    await expect(trusted.validateParentIssue(100)).resolves.toBeUndefined();
+    await expect(trusted.validateParentIssue(101)).rejects.toMatchObject({
+      code: "redmine.validation_failed",
+      upstreamStatus: 422
+    });
+  });
+
   it.each([
     [401, "redmine.invalid_api_key"],
     [403, "redmine.permission_denied"],
@@ -197,6 +215,7 @@ describe("Redmine trusted HTTP policy", () => {
   });
 
   it.each([false, true])("upload tokenをissue createへ渡し、結果不明=%sでも既存issueへ収束する", async (unknownResult) => {
+    const optionalInput = { ...createInput, parentIssueId: 100, dueDate: "2026-08-31", priorityId: 4 };
     let createdIssue: ReturnType<typeof issueFixture> | null = null;
     let createCalls = 0;
     let contextUploads = 0;
@@ -209,7 +228,12 @@ describe("Redmine trusted HTTP policy", () => {
       }
       if (parsed.pathname.endsWith("/issues.json") && init.method === "POST") {
         createCalls += 1;
-        const request = JSON.parse(init.body as string) as { issue: ReturnType<typeof issueFixture> & { uploads: unknown[] } };
+        const request = JSON.parse(init.body as string) as { issue: ReturnType<typeof issueFixture> & {
+          uploads: unknown[];
+          parent_issue_id: number;
+          due_date: string;
+          priority_id: number;
+        } };
         expect(request.issue.uploads).toEqual([expect.objectContaining({ token: "context-upload-token" })]);
         expect(request.issue.custom_fields).toEqual(expect.arrayContaining([
           { id: profile.customFieldIds.submittedById, value: "00000000-0000-4000-8000-000000000007" }
@@ -218,6 +242,7 @@ describe("Redmine trusted HTTP policy", () => {
         expect(request.issue.description).toContain(createInput.threadUrl);
         expect(request.issue.description).not.toContain("Feedback metadata v1");
         expect(request.issue.description).not.toContain("Application:");
+        expect(request.issue).toMatchObject({ parent_issue_id: 100, due_date: "2026-08-31", priority_id: 4 });
         createdIssue = {
           ...issueFixture(),
           subject: request.issue.subject,
@@ -238,7 +263,7 @@ describe("Redmine trusted HTTP policy", () => {
       if (parsed.pathname.endsWith("/issues/123.json") && createdIssue) return json({ issue: createdIssue });
       throw new Error(`unexpected request: ${init.method} ${url}`);
     };
-    const created = await client(fetch).createThreadWithDisposition(createInput, null);
+    const created = await client(fetch).createThreadWithDisposition(optionalInput, null);
     expect(created.thread.threadId).toBe(threadId);
     expect(created.thread.initialComment).toBe("最初のコメント");
     expect(created.disposition).toBe(unknownResult ? "recovered" : "created");

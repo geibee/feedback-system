@@ -159,6 +159,27 @@ describe("gateway authentication・same-origin", () => {
     expect(body).not.toContain("redmineBaseUrl");
     expect(body).not.toContain("projectId");
   });
+
+  it("有効な任意issue項目とRedmineのactive priorityを返す", async () => {
+    const redmineFetch = vi.fn<RedmineFetch>().mockResolvedValue(json({
+      issue_priorities: [
+        { id: 2, name: "通常", active: true },
+        { id: 3, name: "廃止", active: false }
+      ]
+    }));
+    const deps = dependencies({
+      fetch: redmineFetch,
+      loadProfile: vi.fn().mockResolvedValue({ ...profile, optionalIssueFields: ["due_date", "priority"] })
+    });
+    const response = await createFeedbackRedmineGatewayHandler(deps.value)(request(
+      "/internal/feedback-redmine/v1/profiles/inventory-production/creation-options"
+    ));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      optionalIssueFields: ["due_date", "priority"],
+      priorities: [{ id: 2, name: "通常" }]
+    });
+  });
 });
 
 describe("public participant mode", () => {
@@ -311,6 +332,25 @@ describe("gateway create protection", () => {
       body: createForm({ author: { subjectId: "attacker" }, projectId: 999 })
     }));
     expect(invalidBody.status).toBe(400);
+  });
+
+  it("profileで無効な任意issue項目をRedmine接続前に拒否する", async () => {
+    const deps = dependencies();
+    const handler = createFeedbackRedmineGatewayHandler(deps.value);
+    const credential = await participantCredential(handler);
+    const response = await handler(request(
+      "/internal/feedback-redmine/v1/profiles/inventory-production/threads",
+      {
+        method: "POST",
+        headers: {
+          "X-Feedback-Participant-Credential": credential,
+          "Idempotency-Key": "00000000-0000-4000-8000-000000000002"
+        },
+        body: createForm({ priorityId: 2 })
+      }
+    ));
+    expect(response.status).toBe(400);
+    expect(deps.redmineFetch).not.toHaveBeenCalled();
   });
 
   it("unknown multipart partを拒否する", async () => {

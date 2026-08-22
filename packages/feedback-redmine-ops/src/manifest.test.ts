@@ -15,4 +15,17 @@ describe("Redmine installation manifest", () => {
     expect(Object.keys(redmineCustomFieldSpecs)).toHaveLength(11);
     expect(redmineCustomFieldSpecs.locator).toEqual({ name: "Feedback Locator", format: "text", filter: false });
   });
+
+  it("レビュー観点は省略時互換を保ち、指定時は重複しないcodeを検証する", () => {
+    const manifest = { ...defaultLocalManifest(), redmineBaseUrl: "https://redmine.example.test" };
+    expect(validateInstallationManifest({
+      ...manifest,
+      perspectives: [{ code: "security", label: "セキュリティ" }, { code: "ux", label: "UI/UX" }]
+    }).perspectives).toHaveLength(2);
+    expect(() => validateInstallationManifest({ ...manifest, perspectives: [] })).toThrow(/1〜100件/u);
+    expect(() => validateInstallationManifest({
+      ...manifest,
+      perspectives: [{ code: "ux", label: "UI" }, { code: "ux", label: "重複" }]
+    })).toThrow(/重複/u);
+  });
 });

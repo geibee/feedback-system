@@ -33,11 +33,23 @@ def load_manifest(path)
     trackerName openStatusName closedStatusName defaultPriorityName roleName integrationUser isPrivate captureEnabled
     showRedmineLink
   ]
-  fail_with("installation manifestのshapeが不正です") unless value.is_a?(Hash) && value.keys.sort == required.sort
+  optional = %w[perspectives]
+  fail_with("installation manifestのshapeが不正です") unless value.is_a?(Hash) &&
+    (value.keys - required - optional).empty? && (required - value.keys).empty?
   fail_with("schemaVersionは1である必要があります") unless value["schemaVersion"] == "1"
   fail_with("projectが不正です") unless value["project"].is_a?(Hash) && value["project"].keys.sort == %w[identifier name]
   fail_with("integrationUserが不正です") unless value["integrationUser"].is_a?(Hash) &&
     value["integrationUser"].keys.sort == %w[firstName lastName login mail]
+  if value.key?("perspectives")
+    perspectives = value["perspectives"]
+    valid = perspectives.is_a?(Array) && perspectives.length.between?(1, 100) &&
+      perspectives.all? { |perspective|
+        perspective.is_a?(Hash) && perspective.keys.sort == %w[code label] &&
+          perspective["code"].is_a?(String) && perspective["code"].match?(/\A[a-z0-9][a-z0-9._-]{0,99}\z/) &&
+          perspective["label"].is_a?(String) && perspective["label"].length.between?(1, 200)
+      } && perspectives.map { |perspective| perspective["code"] }.uniq.length == perspectives.length
+    fail_with("perspectivesが不正です") unless valid
+  end
   value
 rescue JSON::ParserError
   fail_with("installation manifestをJSONとして読めません")
@@ -246,7 +258,7 @@ def apply_manifest(manifest, output_directory, local_evaluation)
     "applicationKey" => manifest["applicationKey"],
     "environmentKey" => manifest["environmentKey"],
     "externalWorkspaceKey" => manifest["externalWorkspaceKey"],
-    "perspectives" => [{ "code" => "general", "label" => "一般" }],
+    "perspectives" => manifest.fetch("perspectives", [{ "code" => "general", "label" => "一般" }]),
     "capture" => {
       "enabled" => manifest["captureEnabled"],
       "maximumUploadBytes" => 10_485_760,

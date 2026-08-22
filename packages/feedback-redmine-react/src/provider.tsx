@@ -9,6 +9,7 @@ import type {
   FeedbackPinPositionProvider,
   FeedbackTargetResolver
 } from "@geibee/feedback-core";
+import type { FeedbackSubmissionNoticeV1 } from "@geibee/feedback-contracts";
 
 export type RedmineFeedbackRuntime = {
   port: RedmineFeedbackPort;
@@ -23,6 +24,7 @@ export type RedmineFeedbackRuntime = {
     getWarning(): string | null;
     subscribe(listener: () => void): () => void;
   };
+  submissionNotice?: FeedbackSubmissionNoticeV1;
 };
 
 const RuntimeContext = createContext<RedmineFeedbackRuntime | null>(null);

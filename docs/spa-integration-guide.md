@@ -27,9 +27,16 @@ SPAと同じoriginから次のruntime configを`Content-Type: application/json`�
   "schemaVersion": "1",
   "enabled": true,
   "profileId": "inventory-production",
-  "gatewayBasePath": "/internal/feedback-redmine/v1"
+  "gatewayBasePath": "/internal/feedback-redmine/v1",
+  "submissionNotice": {
+    "message": "ファイルはSharePointへ配置し、URLを共有してください。",
+    "link": { "url": "https://sharepoint.example.test/feedback", "label": "配置先を開く" }
+  }
 }
 ```
+
+`submissionNotice`は任意で、投稿コメント欄の直前に「管理者からの案内」として表示します。messageはHTMLとして解釈せず、linkは
+userinfoを含まないHTTPSだけを許可します。Blob StorageやS3上のこのJSONを更新し、利用者がページを再読み込みすると反映されます。
 
 Host Adapterを用意し、アプリケーションrootでcontrollerを1つ作成します。
 

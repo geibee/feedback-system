@@ -17,6 +17,7 @@ FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON
 FEEDBACK_REDMINE_GATEWAY_API_KEY
 FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE
 FEEDBACK_PARTICIPANT_SIGNING_KEY
+FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS
 PORT
 ```
 
@@ -27,6 +28,11 @@ PORT
 browser profile用credentialとRedmine message markerのHMAC署名用で、いずれも必須かつ既定値を持たない。署名鍵は32 bytes以上とし、
 API keyとともにprofile file、image、SPAへ記載しない。鍵を変更すると既存localStorage credentialは無効になり、新participant採番が必要になる。
 `PORT`の既定値は8080である。`NODE_ENV=development`のときだけローカル評価用HTTPを許可し、本番では設定しない。
+
+`FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS`は任意で、`parent_issue`、`due_date`、`priority`から重複しないcomma区切りsubsetを指定する。
+未設定または空文字では3項目すべてを投稿画面へ表示しない。指定したgateway profileを利用する全員に同じ項目が表示され、新しい利用者権限scopeは
+追加しない。unknown値と重複はgateway起動時に拒否する。`parent_issue`を有効にする場合は専用integration roleへ
+Redmineの「サブタスクの管理」（`manage_subtasks`）権限も付与する。
 
 library組込時も環境変数名そのものは契約ではない。配備環境のsecret managerから`participantSigningKey`へ値を注入し、
 Redmine API keyとparticipant signing keyをlog、metric、problem responseへ含めない。
@@ -55,10 +61,12 @@ FEEDBACK_REDMINE_ADMIN_PORT
 FEEDBACK_REDMINE_DEMO_PORT
 FEEDBACK_REDMINE_GATEWAY_IMAGE
 FEEDBACK_REDMINE_DEMO_IMAGE
+FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS
 ```
 
-`local up`のoptionからportとimageを変更し、生成済みstateの`.env`を直接編集しない。state directoryにはAPI key、管理者password、
-participant署名鍵が含まれるため0700で保護する。
+`local up`のoptionからportとimageを変更する。任意issue項目のローカル評価だけは生成済み`.env`へ
+`FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS=parent_issue,due_date,priority`のように追記し、gatewayを再作成する。state directoryにはAPI key、
+管理者password、participant署名鍵が含まれるため0700で保護する。
 
 Redmine release builderの一時buildx builder名だけを次で変更できる。本番runtimeへ設定しない。
 

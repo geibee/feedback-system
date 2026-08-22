@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- profile単位で親チケット・期限・重要度をopt-inする作成option endpointと投稿時validationを追加しました。
+
 - 新規issueのsame-origin thread URLをRedmine UIで開ける自動linkとして保存するようにしました。
 
 - 初回投稿からextension由来の`submissionChannel` metadataを除去しました。

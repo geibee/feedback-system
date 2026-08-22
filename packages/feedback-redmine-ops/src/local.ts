@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultLocalManifest } from "./manifest.js";
+import { defaultLocalManifest, validateInstallationManifest } from "./manifest.js";
 import { run } from "./run.js";
 
 export type LocalOptions = {
@@ -49,6 +49,7 @@ export async function localReset(options: LocalOptions, confirmed: boolean): Pro
     ".env", "database.yml", "client-profile.json", "server-profile.json", "runtime-config.json", "redmine-api-key",
     "redmine-admin-password", "provision-result.json", "provision-plan.json"
   ]) await rm(resolve(context.directory, name), { force: true });
+  await rm(resolve(context.directory, "public"), { recursive: true, force: true });
 }
 
 export async function localBackup(options: LocalOptions, outputDirectory: string): Promise<void> {
@@ -76,7 +77,7 @@ export async function localBackup(options: LocalOptions, outputDirectory: string
       installation: JSON.parse(await readFile(resolve(context.directory, "installation.json"), "utf8")),
       clientProfile: JSON.parse(await readFile(resolve(context.directory, "client-profile.json"), "utf8")),
       serverProfile: JSON.parse(await readFile(resolve(context.directory, "server-profile.json"), "utf8")),
-      runtimeConfig: JSON.parse(await readFile(resolve(context.directory, "runtime-config.json"), "utf8"))
+      runtimeConfig: JSON.parse(await readFile(resolve(context.directory, "public", "feedback-redmine.json"), "utf8"))
     }, null, 2)}\n`);
     await writeFile(statePath, localState, { mode: 0o600 });
     const manifest = {
@@ -120,6 +121,8 @@ export async function localRestore(options: LocalOptions, inputDirectory: string
   await writeFile(resolve(context.directory, "client-profile.json"), `${JSON.stringify(localState.clientProfile, null, 2)}\n`, { mode: 0o600 });
   await writeFile(resolve(context.directory, "server-profile.json"), `${JSON.stringify(localState.serverProfile, null, 2)}\n`, { mode: 0o600 });
   await writeFile(resolve(context.directory, "runtime-config.json"), `${JSON.stringify(localState.runtimeConfig, null, 2)}\n`, { mode: 0o644 });
+  await mkdir(resolve(context.directory, "public"), { recursive: true, mode: 0o755 });
+  await writeFile(resolve(context.directory, "public", "feedback-redmine.json"), `${JSON.stringify(localState.runtimeConfig, null, 2)}\n`, { mode: 0o644 });
   const restoredEnvironment = parseEnvironment(await readFile(context.environment, "utf8"));
   restoredEnvironment.FEEDBACK_PARTICIPANT_SIGNING_KEY = localState.participantSigningKey;
   await writeFile(context.environment, `${Object.entries(restoredEnvironment).map(([key, value]) => `${key}=${quoteEnvironment(value)}`).join("\n")}\n`, { mode: 0o600 });
@@ -138,6 +141,29 @@ async function ensureLocalState(options: LocalOptions): Promise<LocalContext> {
     await stat(installationPath);
   } catch {
     await writeFile(installationPath, `${JSON.stringify(defaultLocalManifest(), null, 2)}\n`, { mode: 0o600 });
+  }
+  const runtimePublicDirectory = resolve(directory, "public");
+  const runtimeConfigPath = resolve(runtimePublicDirectory, "feedback-redmine.json");
+  try {
+    await stat(runtimeConfigPath);
+  } catch {
+    await mkdir(runtimePublicDirectory, { recursive: true, mode: 0o755 });
+    const installation = validateInstallationManifest(
+      JSON.parse(await readFile(installationPath, "utf8")),
+      { allowHttp: true }
+    );
+    let runtimeConfig: unknown;
+    try {
+      runtimeConfig = JSON.parse(await readFile(resolve(directory, "runtime-config.json"), "utf8"));
+    } catch {
+      runtimeConfig = {
+        schemaVersion: "1",
+        enabled: true,
+        profileId: installation.profileId,
+        gatewayBasePath: "/internal/feedback-redmine/v1"
+      };
+    }
+    await writeFile(runtimeConfigPath, `${JSON.stringify(runtimeConfig, null, 2)}\n`, { mode: 0o644 });
   }
   const packageVersion = await readPackageVersion();
   const environmentPath = resolve(directory, ".env");

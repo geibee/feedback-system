@@ -24,6 +24,26 @@ afterEach(() => {
 });
 
 describe("Redmine runtime config", () => {
+  it("管理者案内のplain textとHTTPS linkを検証する", () => {
+    expect(validateRuntimeConfig({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      submissionNotice: {
+        message: "ファイルはSharePointへ配置し、URLを共有してください。",
+        link: { url: "https://sharepoint.example.test/feedback", label: "配置先を開く" }
+      }
+    })).toMatchObject({ submissionNotice: { message: expect.stringContaining("SharePoint") } });
+    expect(() => validateRuntimeConfig({
+      schemaVersion: "1",
+      enabled: true,
+      profileId: "inventory-production",
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      submissionNotice: { message: "案内", link: { url: "https://user@example.test/", label: "開く" } }
+    })).toThrow(/userinfo/u);
+  });
+
   it("無効設定ではcontrollerを作るがUIをmountしない", async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({
       schemaVersion: "1",

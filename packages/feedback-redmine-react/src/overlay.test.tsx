@@ -7,6 +7,7 @@ import {
   sha256Hex,
   type FeedbackRedmineHostAdapter,
   type RedmineFeedbackPort,
+  type RedmineCreationOptionsV1,
   type RedmineThreadListResult,
   type RedmineThreadSummaryV1,
   type RedmineThreadV1
@@ -135,6 +136,8 @@ type SetupOptions = {
   contextMenu?: boolean;
   targetResolver?: FeedbackTargetResolver<Element>;
   captureDiagnostics?: RedmineFeedbackRuntime["captureDiagnostics"];
+  creationOptions?: RedmineCreationOptionsV1;
+  submissionNotice?: RedmineFeedbackRuntime["submissionNotice"];
 };
 
 function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {}) {
@@ -170,6 +173,7 @@ function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {
       displayName: "利用者",
       source: "participant-credential"
     }),
+    getCreationOptions: vi.fn().mockResolvedValue(options.creationOptions ?? { optionalIssueFields: [], priorities: [] }),
     listThreads,
     getThread,
     createThread,
@@ -190,7 +194,8 @@ function setup(threadDetail: RedmineThreadV1 = detail, options: SetupOptions = {
     profileId: clientProfile.id,
     contextMenu: options.contextMenu,
     targetResolver: options.targetResolver,
-    captureDiagnostics: options.captureDiagnostics
+    captureDiagnostics: options.captureDiagnostics,
+    submissionNotice: options.submissionNotice
   }}><RedmineFeedbackOverlay /></RedmineFeedbackProvider>);
   return { port, clientState, listThreads, getThread, createThread, hostAdapter };
 }
@@ -265,11 +270,14 @@ describe("Redmine共通UI", () => {
     const { port } = setup();
     const drawer = await openThreadFromList();
     expect(within(drawer).getAllByText(/Redmineからの返信/u).length).toBeGreaterThan(0);
+    const history = within(drawer).getByText("Redmineの変更履歴（1件）").closest("details");
+    expect(history?.hasAttribute("open")).toBe(false);
+    fireEvent.click(within(drawer).getByText("Redmineの変更履歴（1件）"));
     expect(within(drawer).getByText(/statusを変更/u)).toBeTruthy();
     expect(within(drawer).getByText(/evidence\.png/u)).toBeTruthy();
     expect(port.getAttachment).not.toHaveBeenCalled();
-    fireEvent.click(within(drawer).getByRole("button", { name: "証跡" }));
-    expect(await within(drawer).findByRole("img", { name: "証跡画像" })).toHaveProperty("src", "blob:test");
+    fireEvent.click(within(drawer).getByRole("button", { name: "画面キャプチャを表示" }));
+    expect(await within(drawer).findByRole("img", { name: "画面キャプチャ" })).toHaveProperty("src", "blob:test");
     fireEvent.click(within(drawer).getByRole("button", { name: "スレッドを閉じる" }));
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:test");
   });
@@ -311,6 +319,30 @@ describe("Redmine共通UI", () => {
     expect(composer.querySelector("img")).toBeNull();
   });
 
+  it("管理者案内とopt-inした親チケット・期限・重要度だけを投稿する", async () => {
+    const { createThread } = setup(detail, {
+      creationOptions: {
+        optionalIssueFields: ["parent_issue", "due_date", "priority"],
+        priorities: [{ id: 2, name: "通常" }, { id: 4, name: "至急" }]
+      },
+      submissionNotice: {
+        message: "動画はSharePointへ配置し、URLを共有してください。<script>alert(1)</script>",
+        link: { url: "https://sharepoint.example.test/feedback", label: "配置先を開く" }
+      }
+    });
+    const composer = await startComposer();
+    expect(within(composer).getByRole("heading", { name: "管理者からの案内" })).toBeTruthy();
+    expect(composer.querySelector("script")).toBeNull();
+    expect(within(composer).getByRole("link", { name: "配置先を開く" }).getAttribute("rel")).toBe("noopener noreferrer");
+    fireEvent.change(within(composer).getByLabelText("親チケットID"), { target: { value: "123" } });
+    fireEvent.change(within(composer).getByLabelText("期限"), { target: { value: "2026-08-31" } });
+    fireEvent.change(within(composer).getByLabelText("重要度"), { target: { value: "4" } });
+    fireEvent.change(within(composer).getByLabelText("最初のコメント"), { target: { value: "任意項目付き" } });
+    fireEvent.click(within(composer).getByRole("button", { name: "Feedbackを送信" }));
+    await waitFor(() => expect(createThread).toHaveBeenCalledOnce());
+    expect(createThread.mock.calls[0]?.[0]).toMatchObject({ parentIssueId: 123, dueDate: "2026-08-31", priorityId: 4 });
+  });
+
   it("右クリックではmenuを表示し、選択後にcomposerを開く", async () => {
     setup(detail, { contextMenu: true });
     await screen.findByRole("button", { name: /^フィードバック$/u });
@@ -348,7 +380,7 @@ describe("Redmine共通UI", () => {
       hostAdapter: { ...defaultAdapter(), captureEvidence }
     });
     const composer = await startComposer();
-    expect(await within(composer).findByRole("img", { name: "証跡プレビュー" })).toHaveProperty("src", "blob:test");
+    expect(await within(composer).findByRole("img", { name: "画面キャプチャのプレビュー" })).toHaveProperty("src", "blob:test");
     expect(within(composer).queryByRole("checkbox")).toBeNull();
     fireEvent.change(within(composer).getByLabelText("最初のコメント"), { target: { value: "画像付き指摘" } });
     fireEvent.click(within(composer).getByRole("button", { name: "Feedbackを送信" }));
@@ -385,7 +417,7 @@ describe("Redmine共通UI", () => {
     });
 
     const composer = await startComposer();
-    expect(await within(composer).findByRole("img", { name: "証跡プレビュー" })).toBeTruthy();
+    expect(await within(composer).findByRole("img", { name: "画面キャプチャのプレビュー" })).toBeTruthy();
     expect(createDomEvidenceProvider).toHaveBeenCalledWith({ maxBytes: 1_048_576 });
     expect(wrapProvider).toHaveBeenCalledWith(vi.mocked(createDomEvidenceProvider).mock.results[0]?.value);
   });

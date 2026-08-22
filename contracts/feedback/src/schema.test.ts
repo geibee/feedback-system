@@ -300,7 +300,11 @@ describe("Feedback Redmine JSON Schema", () => {
       schemaVersion: "1",
       enabled: true,
       profileId: "inventory-production",
-      gatewayBasePath: "/internal/feedback-redmine/v1"
+      gatewayBasePath: "/internal/feedback-redmine/v1",
+      submissionNotice: {
+        message: "動画はSharePointへ配置してURLを共有してください。",
+        link: { url: "https://sharepoint.example.test/feedback", label: "配置先を開く" }
+      }
     }), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({
       schemaVersion: "1",
@@ -363,6 +367,12 @@ describe("Feedback Redmine JSON Schema", () => {
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({ ...manifest, projectId: 10 })).toBe(false);
     expect(validate({ ...manifest, apiKey: "secret" })).toBe(false);
+    expect(validate({
+      ...manifest,
+      perspectives: [{ code: "security", label: "セキュリティ" }, { code: "ux", label: "UI/UX" }]
+    }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...manifest, perspectives: [] })).toBe(false);
+    expect(validate({ ...manifest, perspectives: [{ code: "ux", label: "UI" }, { code: "ux", label: "UI" }] })).toBe(false);
   });
 
   it("provision planとresultはdigestおよび実IDを固定shapeで検証する", () => {
@@ -592,12 +602,13 @@ describe("Feedback Redmine JSON Schema", () => {
     })).toBe(false);
   });
 
-  it("gateway OpenAPIは9つの共通operationを重複なく公開する", () => {
+  it("gateway OpenAPIは10個の共通operationを重複なく公開する", () => {
     const source = readFileSync(new URL("../redmine-gateway.openapi.yaml", import.meta.url), "utf8");
     const operations = [...source.matchAll(/x-feedback-operation: ([^\n]+)/g)].map((match) => match[1]);
     expect(operations).toEqual([
       "redmine.participant.create.v1",
       "redmine.profile.get.v1",
+      "redmine.creation-options.get.v1",
       "redmine.current-user.get.v1",
       "redmine.thread.list.v1",
       "redmine.thread.create.v1",
@@ -606,6 +617,6 @@ describe("Feedback Redmine JSON Schema", () => {
       "redmine.message.update.v1",
       "redmine.attachment.get.v1"
     ]);
-    expect(new Set(operations).size).toBe(9);
+    expect(new Set(operations).size).toBe(10);
   });
 });

@@ -237,7 +237,7 @@ packageを追加します。
 npm install "@geibee/feedback-redmine-plugin@${FEEDBACK_REDMINE_VERSION}"
 ```
 
-[SPA導入ガイドの組込み例](spa-integration-guide.md#spaへ導入する)に従ってHost Adapterとplugin controllerを追加します。
+[SPA導入ガイドの組込み例](spa-integration-guide.md#2-host-adapterを実装する)に従ってHost Adapterとplugin controllerを追加します。
 
 生成された`runtime-config.json`を、SPAと同じoriginの`/.well-known/feedback-redmine.json`として配備します。このファイルにはsecretを
 追加しません。緊急時は`enabled`を`false`に変更して再配備し、利用者がページを再読み込みするとFeedback UIを停止できます。

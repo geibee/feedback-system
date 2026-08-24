@@ -37,7 +37,7 @@ npx @geibee/feedback-redmine-ops@next provision extract \
   --output /secure/feedback-redmine/provision.rb
 ```
 
-manifestと実行手順は[`Feedback Redmine導入・運用手順`](docs/feedback-redmine-installation.md#3-既存redmineの準備)を参照してください。
+manifestと実行手順は[`Feedback Redmine導入・利用ガイド`](docs/feedback-redmine-installation.md#3-既存redmineの準備)を参照してください。
 
 ### 2. gatewayを配備する
 

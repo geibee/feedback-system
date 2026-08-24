@@ -1,60 +1,45 @@
-# MapLibre・地物連携ガイド
+# MapLibre連携
 
-この文書は、MapLibreを使用するSPAで地図をスクリーンショットへ含めたり、経緯度や地物IDを
-フィードバック対象として保存したりする場合だけ参照する任意拡張ガイドです。通常のWeb画面は
-[`SPA導入ガイド`](spa-integration-guide.md)だけで導入でき、この設定は必要ありません。
+この文書はMapLibreを使う画面だけが対象です。先に[`SPA導入ガイド`](spa-integration-guide.md)の確認まで完了してください。
 
-## 連携範囲を選ぶ
+必要な機能だけ追加します。
 
-| 段階 | 投稿対象 | スクリーンショット | SPA側で追加するもの |
-| --- | --- | --- | --- |
-| 通常DOM | DOM要素または画面座標 | provider未指定でもDOM全体を撮影 | 基本導入のみ |
-| MapLibre撮影 | DOM要素または画面座標 | DOMに加えて地図、Marker、Popup、controlを撮影 | `controller.registerMapLibreMap(map)` |
-| 地物単位フィードバック | 経緯度または安定した地物ID | MapLibre撮影と同じ | 上記に加えて`targetResolver`と`pinPositionProvider` |
+| やりたいこと | 追加する設定 |
+| --- | --- |
+| スクリーンショットに地図を写す | `controller.registerMapLibreMap(map)` |
+| Feedbackを経緯度や地物IDへ関連付ける | 上記に加えて`targetResolver`と`pinPositionProvider` |
 
-MapLibreの登録APIはWebGL証跡の接続だけを担当します。地理座標や地物IDを保存する必要がなければ、
-`targetResolver`と`pinPositionProvider`は不要です。
+地物連携のAPIを直接importするため、gatewayとpluginに揃えたversionをSPAの直接依存へ追加します。
 
-## MapLibreをスクリーンショットへ含める
-
-MapLibreの既定WebGL canvasは描画bufferを保持しないため、通常DOM providerだけでは地図が白紙になることがあります。
-map生成後にcontrollerへ登録し、map破棄前に戻り値を呼び出します。controllerの有効化前、読込中、無効中にも登録でき、
-再有効化後のpluginへ自動的に引き継がれます。
-
-```tsx
-import type { Map as MapLibreMap } from "maplibre-gl";
-import type { RedmineFeedbackPluginController } from "@geibee/feedback-redmine-plugin/loader";
-
-export function connectFeedbackMap(
-  controller: RedmineFeedbackPluginController,
-  map: MapLibreMap
-): () => void {
-  return controller.registerMapLibreMap(map);
-}
+```bash
+export FEEDBACK_REDMINE_VERSION='1.0.0-alpha.6'
+npm install "@geibee/feedback-maplibre@${FEEDBACK_REDMINE_VERSION}"
 ```
 
-React componentでは、MapLibre mapを生成したeffectと同じcleanupで解除します。
+## 1. スクリーンショットに地図を写す
+
+MapLibreのmapを作成した後に登録し、mapを破棄する前に解除します。
 
 ```tsx
 useEffect(() => {
-  if (!controller || !map) return;
-  return controller.registerMapLibreMap(map);
-}, [controller, map]);
+  if (!feedbackController || !map) return;
+  return feedbackController.registerMapLibreMap(map);
+}, [feedbackController, map]);
 ```
 
-登録したmapは撮影時に再描画され、WebGL canvasを一時的な2D canvasへ退避してからDOM全体を撮影します。
-複数の地図はそれぞれ登録してください。client profileでcaptureが有効なときに、bufferを保持しない
-`canvas.maplibregl-canvas`が未登録のまま見つかると、pluginは「地図が白紙になる可能性があります」と通知します。
-独自providerを使用する場合は`@geibee/feedback-maplibre`の`createMapLibreEvidenceProvider()`で包むと、
-診断も接続済みと判定します。
+複数の地図がある場合は、すべて登録します。通常は`preserveDrawingBuffer`を有効にする必要はありません。
 
-常時`canvasContextAttributes.preserveDrawingBuffer=true`にする方法もありますが、描画性能とmemory消費へ影響します。
-通常は遅延登録APIを使用してください。tileやstyle画像はCORS対応が必要です。
+投稿して、Redmineの添付画像に次が写っていることを確認します。
 
-## 地物単位フィードバックを追加する
+- 地図
+- MarkerとPopup
+- NavigationControlなどのcontrol
 
-地図上のクリックを単なる画面座標ではなく`map-position`または`map-feature`として保存する場合だけ、
-`targetResolver`と`pinPositionProvider`を追加します。
+地図が白紙になる場合は、mapが登録済みか、tileとstyle画像がCORSを許可しているかを確認します。
+
+## 2. 経緯度や地物IDへ関連付ける
+
+地図上のFeedbackを、単なる画面座標ではなく経緯度または地物IDとして保存したい場合だけ追加します。
 
 ```ts
 import {
@@ -68,6 +53,7 @@ const targetResolver = (input: {
   clientY: number;
 }) => {
   if (!input.element?.closest("[data-feedback-map]")) return null;
+
   return resolveMapLibreFeedbackTargetAtClientPoint(map, input, {
     layers: ["parcels"],
     toSourceKey: () => "parcels",
@@ -80,13 +66,29 @@ const targetResolver = (input: {
 const pinPositionProvider = createMapLibreFeedbackPinPositionProvider(map);
 ```
 
-これらをcontroller作成optionへ渡します。`sourceKey`と`featureKey`には、style reloadや配備をまたいでも変わらない
-業務上の安定IDを使ってください。resolverが`null`を返した場所は通常のDOM／画面座標targetへ戻ります。
-詳細な型と複数layerの扱いは[`@geibee/feedback-maplibre` README](../packages/feedback-maplibre/README.md)を参照してください。
+`targetResolver`と`pinPositionProvider`を`createRedmineFeedbackPluginControllerFromRuntimeConfig()`のoptionへ渡します。
 
-## 確認項目
+```ts
+const controller = await createRedmineFeedbackPluginControllerFromRuntimeConfig({
+  adapter,
+  targetResolver,
+  pinPositionProvider
+});
+```
 
-1. MapLibre登録前は未接続警告が出る。
-2. 登録後は警告が消え、画像に地図とcontrolが含まれる。
-3. map破棄前に登録解除関数を呼び出している。
-4. 地物単位を使う場合は、地図移動後も保存済みpinが経緯度へ追従する。
+地図のcontainerには`data-feedback-map`を付けます。
+
+```tsx
+<div ref={mapContainerRef} data-feedback-map />
+```
+
+`sourceKey`と`featureKey`には、style変更や再配備後も同じ地物を指す業務IDを使用します。配列のindexや描画順は使わないでください。
+
+最後に次を確認します。
+
+1. 地物を選んでFeedbackを投稿する。
+2. 地図を移動しても保存済みpinが同じ経緯度へ追従する。
+3. 対象layerがない場所では通常の画面座標として投稿できる。
+4. mapを破棄した後に古いpinが残らない。
+
+複数layerや独自providerの型は[`@geibee/feedback-maplibre` README](../packages/feedback-maplibre/README.md)を参照してください。

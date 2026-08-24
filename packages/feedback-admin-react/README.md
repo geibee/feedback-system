@@ -32,6 +32,6 @@ CSV／XLSX／証跡パッケージExportを作成すると、jobが`queued`／`r
 できません。
 
 証跡パッケージはPower BIへ取り込みやすい正規化CSV、全コメント版履歴、トリアージ・状態・リアクション履歴、
-証跡画像、SHA-256 manifestをZIPへ格納します。詳細は[`docs/evidence-export.md`](../../docs/evidence-export.md)を参照してください。
+証跡画像、SHA-256 manifestをZIPへ格納します。操作方法は[`Legacy Feedback Service`](../../docs/legacy-quickstart.md#exportとbackupを使う)を参照してください。
 
 正式配布先が承認されるまでは `private: true` を維持し、repository内のAdmin Consoleからworkspace参照します。

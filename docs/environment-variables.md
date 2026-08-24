@@ -1,52 +1,52 @@
 # 環境変数
 
-新規導入の標準であるRedmine SPA plugin自体は環境変数を読まない。公開runtime configからprofile ID、enabled、
-same-origin gateway pathを読み、host adapterはSPAの明示的なintegration moduleから渡す。Redmine接続情報やsecretをbrowserへ渡さない。
+新規導入では「Redmine gateway」だけを参照してください。SPAは環境変数を読まず、`/.well-known/feedback-redmine.json`を読みます。
 
-## Redmine gateway（標準）
+secretには既定値がありません。secret managerまたはorchestratorのsecret機能から注入し、Git、image、公開runtime config、logへ保存しないでください。
 
-`@geibee/feedback-redmine-gateway` libraryは環境変数名を公開契約にせず、ホストbackendの既存設定・secret注入機構から
-`loadProfile`と`loadSecret`を実装する。secretに既定値を置かない。
+## Redmine gateway
 
-標準配布gateway serverが次を使用する。
+標準配布gatewayで使用する設定です。
 
-```text
-FEEDBACK_PUBLIC_ORIGIN
-FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE
-FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON
-FEEDBACK_REDMINE_GATEWAY_API_KEY
-FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE
-FEEDBACK_PARTICIPANT_SIGNING_KEY
-FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS
-PORT
-```
+| 変数 | 必須 | 指定する値 |
+| --- | --- | --- |
+| `FEEDBACK_PUBLIC_ORIGIN` | 必須 | 利用者が開くSPAのorigin。例: `https://app.example.com` |
+| `FEEDBACK_REDMINE_GATEWAY_PROFILE_FILE` | どちらか | `server-profile.json`のcontainer内absolute path |
+| `FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON` | どちらか | `clientProfile`を埋め込んだ最大64 KiBのserver profile JSON |
+| `FEEDBACK_REDMINE_GATEWAY_API_KEY` | どちらか | Feedback専用integration userのRedmine API key |
+| `FEEDBACK_REDMINE_GATEWAY_API_KEY_FILE` | どちらか | API keyを保存したsecret fileのabsolute path |
+| `FEEDBACK_PARTICIPANT_SIGNING_KEY` | 必須 | 32 bytes以上のランダムな署名鍵 |
+| `FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS` | 任意 | 下表の値をcomma区切りで指定 |
+| `PORT` | 任意 | listen port。既定は`8080` |
 
-`FEEDBACK_PUBLIC_ORIGIN`は利用者が開くSPAの正確なoriginで、本番ではHTTPSを必須とする。gatewayはHost headerからoriginを
-推測しない。profileはread-only server profile JSONへのabsolute pathか、`clientProfile`を埋め込んだ最大64 KiBのJSON文字列を
-`FEEDBACK_REDMINE_GATEWAY_PROFILE_JSON`へ指定する。両方の同時指定は拒否する。API keyは値または`_FILE`のabsolute pathの
-どちらか一方で指定する。API keyはFeedback専用integration user用、participant signing keyは
-browser profile用credentialとRedmine message markerのHMAC署名用で、いずれも必須かつ既定値を持たない。署名鍵は32 bytes以上とし、
-API keyとともにprofile file、image、SPAへ記載しない。鍵を変更すると既存localStorage credentialは無効になり、新participant採番が必要になる。
-`PORT`の既定値は8080である。`NODE_ENV=development`のときだけローカル評価用HTTPを許可し、本番では設定しない。
+profileは`_FILE`か`_JSON`の一方、API keyは値か`_FILE`の一方だけを指定します。両方指定するとgatewayは起動しません。本番で`NODE_ENV=development`を設定しないでください。
 
-`FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS`は任意で、`parent_issue`、`due_date`、`priority`から重複しないcomma区切りsubsetを指定する。
-未設定または空文字では3項目すべてを投稿画面へ表示しない。指定したgateway profileを利用する全員に同じ項目が表示され、新しい利用者権限scopeは
-追加しない。unknown値と重複はgateway起動時に拒否する。`parent_issue`を有効にする場合は専用integration roleへ
-Redmineの「サブタスクの管理」（`manage_subtasks`）権限も付与する。
+任意の起票項目は次の値だけを指定できます。
 
-library組込時も環境変数名そのものは契約ではない。配備環境のsecret managerから`participantSigningKey`へ値を注入し、
-Redmine API keyとparticipant signing keyをlog、metric、problem responseへ含めない。
+| 値 | 投稿画面へ出す項目 | Redmine側の追加条件 |
+| --- | --- | --- |
+| `parent_issue` | 親チケットID | integration roleへ「サブタスクの管理」を付与 |
+| `due_date` | 期限 | なし |
+| `priority` | 重要度 | Redmineで有効なpriorityがあること |
 
-## Redmine導入・ローカル運用CLI
-
-既存Redmineのread-only inspectは、指定した環境変数から一時administrator API keyを読む。既定の変数名は次であり、
-`--api-key-env`で組織のsecret名へ変更できる。
+例:
 
 ```text
-FEEDBACK_REDMINE_INSPECT_API_KEY
+FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS=parent_issue,due_date,priority
 ```
 
-ローカルCLIはstate directoryの0600 `.env`へ次を生成する。利用者が本番runtimeへ設定する変数ではなく、値に既定secretはない。
+署名鍵を変更すると、既存browserのparticipant credentialが無効になります。通常の更新では値を維持してください。
+
+## Redmine運用CLI
+
+| 変数 | 使用箇所 |
+| --- | --- |
+| `FEEDBACK_REDMINE_INSPECT_API_KEY` | 既存Redmineを`inspect`するときだけ使う一時管理者API key |
+| `FEEDBACK_REDMINE_RELEASE_BUILDER` | release builderの一時Docker Buildx builder名 |
+
+`inspect`では`--api-key-env`を指定すると、管理者API keyを別名の環境変数から読めます。終了後はunsetしてください。
+
+`local up`はstate directoryの`.env`へ次を自動生成します。利用者が本番へ設定する値ではありません。
 
 ```text
 FEEDBACK_REDMINE_COMPOSE_PROJECT
@@ -64,32 +64,23 @@ FEEDBACK_REDMINE_DEMO_IMAGE
 FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS
 ```
 
-`local up`のoptionからportとimageを変更する。任意issue項目のローカル評価だけは生成済み`.env`へ
-`FEEDBACK_REDMINE_OPTIONAL_ISSUE_FIELDS=parent_issue,due_date,priority`のように追記し、gatewayを再作成する。state directoryにはAPI key、
-管理者password、participant署名鍵が含まれるため0700で保護する。
+state directoryにはpassword、API key、署名鍵があるため0700で保護します。
 
-Redmine release builderの一時buildx builder名だけを次で変更できる。本番runtimeへ設定しない。
-
-```text
-FEEDBACK_REDMINE_RELEASE_BUILDER
-```
-
-Redmine Docker適合性試験だけが次を使用し、本番runtimeへ設定しない。
+次はRedmineのbuild／適合性試験専用です。本番へ設定しません。
 
 ```text
 FEEDBACK_REDMINE_IMAGE
 FEEDBACK_REDMINE_CONFORMANCE_SECRET
 FEEDBACK_REDMINE_CONFORMANCE_RUN_ID
+FEEDBACK_RELEASE_VERSION
+FEEDBACK_RELEASE_BUILDER
 ```
 
-通常はmatrix scriptが一時secretとrun IDを生成する。固定値をrepositoryやCI定義へ保存しない。
+## Legacy Feedback Service
 
-## Legacy Feedback Service variables
+ここから先は`/feedback/v1`、PostgreSQL、private object storage、workerを使う旧構成だけが対象です。新規導入では設定しません。実行手順は[`Legacy Feedback Service`](legacy-quickstart.md)を参照してください。
 
-> **Legacy Feedback Service:** 以下はPostgreSQL、object storage、OIDC、workerを使う従来runtime向けで、新規導入の標準ではない。
-> `*_PASSWORD`、`*_SECRET`、暗号鍵、OIDC/connector接続情報はsecret managerから注入する。
-
-## API・DB・認証・制限
+### API、DB、認証
 
 ```text
 FEEDBACK_PORT
@@ -106,12 +97,12 @@ FEEDBACK_OIDC_JWKS_URL
 FEEDBACK_OIDC_SUBJECT_CLAIM
 FEEDBACK_OIDC_DISPLAY_NAME_CLAIM
 FEEDBACK_OIDC_EMAIL_CLAIM
-FEEDBACK_ALLOW_INSECURE_HTTP
 FEEDBACK_TOKEN_EXCHANGE_ISSUER
 FEEDBACK_TOKEN_EXCHANGE_AUDIENCE
 FEEDBACK_TOKEN_EXCHANGE_JWKS_URL
 FEEDBACK_TOKEN_EXCHANGE_ACTOR_ISSUERS
 FEEDBACK_TOKEN_EXCHANGE_MAX_LIFETIME_SECONDS
+FEEDBACK_ALLOW_INSECURE_HTTP
 FEEDBACK_EVIDENCE_MAX_BYTES
 FEEDBACK_EVIDENCE_MAX_COUNT_PER_WORKSPACE
 FEEDBACK_WRITE_RATE_LIMIT_PER_MINUTE
@@ -119,24 +110,11 @@ FEEDBACK_WRITE_RATE_LIMIT_PER_TENANT_PER_MINUTE
 FEEDBACK_WRITE_RATE_LIMIT_PER_IP_PER_MINUTE
 ```
 
-`FEEDBACK_DEPLOYMENT_PROFILE`は `full`（既定）または `core` を指定する。`full`は従来どおりEvidence、Export/Backup、
-Notification/Connectorをすべて有効にする。`core`はコメント・session・manifest・membership・retention APIだけを配線し、
-full profile専用のAPIパスは互換性のため残したまま501で拒否する。`/capabilities`からも無効なfeatureを除外し、
-`/health/ready`では該当依存を`disabled`と報告する。
+`FEEDBACK_DEPLOYMENT_PROFILE`は`full`または`core`です。`full`はEvidence、Export／Backup、Notificationを有効化し、`core`はPostgreSQLだけを使います。`FEEDBACK_DATABASE_PASSWORD`は必須です。
 
-`FEEDBACK_DATABASE_PASSWORD`はAPIで必須であり、secretに既定値を置かない。認証は次のいずれか一方以上を必須とする。
+認証は直接OIDCかtoken exchangeの一方以上を完全に設定します。両方のissuerを同じ値にしないでください。`FEEDBACK_ALLOW_INSECURE_HTTP=1`はローカルfixture専用です。
 
-- direct OIDC: `FEEDBACK_OIDC_ISSUER` と `FEEDBACK_OIDC_AUDIENCE`
-- token exchange: `FEEDBACK_TOKEN_EXCHANGE_ISSUER`、`FEEDBACK_TOKEN_EXCHANGE_AUDIENCE`、
-  `FEEDBACK_TOKEN_EXCHANGE_ACTOR_ISSUERS`
-
-direct OIDCは任意であり、token exchangeだけの配備では `FEEDBACK_OIDC_*` を設定しない。どちらかのissuerを設定した場合は、
-同じ境界の必須変数をすべて設定する。両方のissuerは同一にしない。
-直接OIDCのaccess tokenは `feedback_permissions`文字列配列を必須とする。claim名を変更する設定はないため、
-IdP側でFeedback用OAuth scopeをこのclaimへmappingする。
-`FEEDBACK_ALLOW_INSECURE_HTTP=1`はローカルfixture専用で、本番へ設定しない。
-
-## Storage・worker
+### Evidence、Export、worker
 
 ```text
 FEEDBACK_EVIDENCE_STORAGE
@@ -169,7 +147,9 @@ FEEDBACK_RETENTION_POLL_MS
 FEEDBACK_ORPHAN_GRACE_SECONDS
 ```
 
-## Backup pull
+`FEEDBACK_EVIDENCE_STORAGE`と`FEEDBACK_EXPORT_STORAGE`は`local`、`s3`、`azure_blob`のいずれかです。分散配備ではprivate S3またはAzure Blobを使います。localを選ぶ場合だけ`FEEDBACK_EVIDENCE_DIR`／`FEEDBACK_EXPORT_DIR`を永続volumeへ向けます。
+
+### backup pull
 
 ```text
 FEEDBACK_PULL_API_BASE_URL
@@ -182,10 +162,9 @@ FEEDBACK_PULL_EXTERNAL_WORKSPACE_KEY
 FEEDBACK_PULL_DESTINATION_DIR
 ```
 
-## Application manifest apply
+`feedback-backup-pull`だけへ渡します。`FEEDBACK_PULL_CLIENT_SECRET`はsecretです。
 
-`feedback manifest apply`はAPI runtimeと分離したCI/CD one-shotとして実行する。manifestとAPI URLはflagまたは環境変数で指定する。
-認証は短時間のBearer token、そのtokenを格納したsecret file、OAuth client credentialsのいずれか1つに限定する。
+### application manifest
 
 ```text
 FEEDBACK_MANIFEST_INPUT
@@ -198,12 +177,9 @@ FEEDBACK_MANIFEST_CLIENT_SECRET
 FEEDBACK_MANIFEST_SCOPE
 ```
 
-`FEEDBACK_MANIFEST_ACCESS_TOKEN`と`FEEDBACK_MANIFEST_CLIENT_SECRET`に既定値はなく、CI/CDのsecret注入を使用する。
-本番ではtokenをprocess引数へ渡さない。通常はOAuth client credentialsを使い、対象applicationの
-`feedback.admin` membershipをservice accountへ事前に付与する。CLIはGET応答のETagを更新PUTの`If-Match`へ指定し、
-競合時は再取得や上書きを行わず失敗する。
+認証はaccess token、token file、OAuth client credentialsのいずれか1つにします。本番ではtokenをprocess引数へ渡しません。
 
-## Connector runtime・register
+### connector runtime
 
 ```text
 FEEDBACK_CONNECTOR_KEY
@@ -228,12 +204,14 @@ FEEDBACK_SMTP_USERNAME
 FEEDBACK_SMTP_PASSWORD
 ```
 
-## Bootstrap one-shot
+providerのURL、宛先、SMTP credentialはconnector processだけへ渡します。`FEEDBACK_CONNECTOR_IDEMPOTENCY_FILE`は永続volumeへ置きます。
 
-`FEEDBACK_BOOTSTRAP_*`はbootstrap one-shotだけへ渡し、常駐API/workerへ設定しない。
-複数workspace・複数主体は環境変数を反復せず、`feedback-bootstrap --input <installation-manifest.json>`を使用する。
+### bootstrap
+
+複数Workspaceでは`FEEDBACK_BOOTSTRAP_*`を繰り返さず、installation manifestを`feedback-bootstrap --input`へ渡します。
 
 ```text
+FEEDBACK_BOOTSTRAP_
 FEEDBACK_BOOTSTRAP_TENANT_KEY
 FEEDBACK_BOOTSTRAP_TENANT_DISPLAY_NAME
 FEEDBACK_BOOTSTRAP_APPLICATION_KEY
@@ -250,7 +228,7 @@ FEEDBACK_BOOTSTRAP_DISPLAY_NAME
 FEEDBACK_BOOTSTRAP_PERMISSIONS
 ```
 
-## Broker・Admin consumer
+### token brokerとAdmin
 
 ```text
 FEEDBACK_BROKER_ISSUER
@@ -273,12 +251,22 @@ FEEDBACK_ADMIN_ENVIRONMENT
 FEEDBACK_ADMIN_WORKSPACE
 ```
 
-brokerの証明書、秘密鍵、client policyはsecret mountで供給する。`FEEDBACK_ADMIN_*`はAdmin Consoleの開発時既定scopeだけに
-使い、認可判断の正本にはしない。
+Adminのbrowser buildでは次も使用します。
 
-## Compose・統合試験・内部test protocol
+```text
+VITE_FEEDBACK_API_BASE
+VITE_FEEDBACK_ADMIN_OIDC_AUTHORITY
+VITE_FEEDBACK_ADMIN_OIDC_CLIENT_ID
+VITE_FEEDBACK_ADMIN_OIDC_REDIRECT_URI
+VITE_FEEDBACK_ADMIN_OIDC_SCOPE
+VITE_FEEDBACK_ADMIN_APPLICATION_KEY
+VITE_FEEDBACK_ADMIN_ENVIRONMENT_KEY
+VITE_FEEDBACK_ADMIN_WORKSPACE_KEY
+```
 
-次は本番runtimeへ設定しない。専用DB/bucket/run ID guardを持つ統合試験または子process testだけが使用する。
+### test、smoke、release専用
+
+次は本番runtimeへ設定しません。
 
 ```text
 FEEDBACK_POSTGRES_PASSWORD
@@ -290,71 +278,31 @@ FEEDBACK_GO_INTEGRATION_S3_ENDPOINT_URL
 FEEDBACK_GO_INTEGRATION_S3_BUCKET
 FEEDBACK_GO_INTEGRATION_S3_CREATE_BUCKET
 FEEDBACK_GO_INTEGRATION_S3_INTEROP_PHASE
-FEEDBACK_S3_INTEROP
+FEEDBACK_CONNECTOR_CHILD
+FEEDBACK_CONNECTOR_ADDRESS_FILE
+FEEDBACK_CONNECTOR_ID_FILE
+FEEDBACK_CONNECTOR_MARKER
+FEEDBACK_TEST_RUN_ID
 FEEDBACK_TEST_S3_ENDPOINT
 FEEDBACK_TEST_S3_REGION
 FEEDBACK_TEST_S3_BUCKET
 FEEDBACK_TEST_S3_ACCESS_KEY
 FEEDBACK_TEST_S3_SECRET_KEY
-FEEDBACK_CONNECTOR_CHILD
-FEEDBACK_CONNECTOR_ADDRESS_FILE
-FEEDBACK_CONNECTOR_ID_FILE
-FEEDBACK_CONNECTOR_MARKER
+FEEDBACK_DIFFERENTIAL_KOTLIN_URL
+FEEDBACK_DIFFERENTIAL_GO_URL
+FEEDBACK_CANARY_BEARER_TOKEN
+FEEDBACK_SERVICE_DOCKERFILE
+FEEDBACK_SMOKE_RUNTIME
+FEEDBACK_SMOKE_PROJECT
+FEEDBACK_SMOKE_ROLLBACK
+FEEDBACK_SMOKE_MANAGE_COMPOSE
 FEEDBACK_VERIFY_SKIP_NPM_CI
 FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS
 FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES
 FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS
 FEEDBACK_EXTRACTION_SKIP_DOCKER_BUILD
 FEEDBACK_EXTRACTION_SKIP_STANDALONE_SMOKE
+FEEDBACK_S3_INTEROP
 ```
 
-`FEEDBACK_VERIFY_SKIP_NPM_CI`、`FEEDBACK_VERIFY_SKIP_PACKAGE_CONSUMERS`、`FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES`、
-`FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS`は局所切り分けとaggregate script内の重複排除専用である。利用者が直接設定した実行を
-release/CIの合格証跡として扱わない。
-
-## Service storage
-
-次のstorageとnotification secretは `FEEDBACK_DEPLOYMENT_PROFILE=full` のAPI runtimeだけで必須となる。
-`core`ではobject storageを初期化せず、`FEEDBACK_NOTIFICATION_ENCRYPTION_KEY`も要求しない。workerを個別起動する場合は
-API profileにかかわらず、そのworker固有のstorageまたはsecretを従来どおり設定する。
-
-- `FEEDBACK_EVIDENCE_STORAGE=local|s3|azure_blob`。S3時は `FEEDBACK_S3_BUCKET` 必須、任意で
-  `FEEDBACK_S3_REGION`、`FEEDBACK_S3_ENDPOINT_URL`、`FEEDBACK_S3_KEY_PREFIX`。
-- `FEEDBACK_EXPORT_STORAGE=local|s3|azure_blob`。S3時は `FEEDBACK_EXPORT_S3_BUCKET` 必須、任意で
-  `FEEDBACK_EXPORT_S3_REGION`、`FEEDBACK_EXPORT_S3_ENDPOINT_URL`、`FEEDBACK_EXPORT_KEY_PREFIX`。
-- `azure_blob`時はEvidence用の`FEEDBACK_AZURE_BLOB_ACCOUNT_URL`、`FEEDBACK_AZURE_BLOB_CONTAINER`と、
-  Export用の`FEEDBACK_EXPORT_AZURE_BLOB_ACCOUNT_URL`、`FEEDBACK_EXPORT_AZURE_BLOB_CONTAINER`が必須。
-  prefixはそれぞれ`FEEDBACK_AZURE_BLOB_KEY_PREFIX`、`FEEDBACK_EXPORT_AZURE_BLOB_KEY_PREFIX`で指定する。
-- local時は `FEEDBACK_EVIDENCE_DIR` / `FEEDBACK_EXPORT_DIR` を使用する。
-
-自動backupはexport workerが同じExport storageへ`FEEDBACK_BACKUP_KEY_PREFIX` (既定`backups/`)で保存し、
-`FEEDBACK_BACKUP_MAX_ATTEMPTS` (既定`5`)まで再試行する。共有フォルダ搬送CLIは
-`FEEDBACK_PULL_API_BASE_URL`、`FEEDBACK_PULL_TOKEN_URL`、client ID/secret、対象application/workspace、
-マウント済み`FEEDBACK_PULL_DESTINATION_DIR`を使用する。scopeの既定は`feedback.manage`。
-
-別プロセスconnectorの登録には`FEEDBACK_CONNECTOR_KEY`、descriptor/delivery URL、共有secret、表示名を使う。
-runtimeにはprovider、`destinationRef` mapping、共有secret、永続的な`FEEDBACK_CONNECTOR_IDEMPOTENCY_FILE`が必須。
-Webhook runtimeは外向き署名用`FEEDBACK_WEBHOOK_SIGNING_SECRET`、SMTP runtimeは`FEEDBACK_SMTP_*`を追加で使う。
-実URL、宛先、SMTP資格情報はFeedback Serviceへ渡さない。
-
-DB password、notification暗号鍵、connector/Webhook署名secretに既定値はない。notification暗号鍵は
-base64 decode後32 byte、署名secretと参照consumerのfixture session署名secretは32文字以上とする。OIDCとtoken exchangeの変数は
-`apps/feedback-service-go/internal/config/config.go`、brokerの変数は
-`apps/feedback-token-broker-reference/README.md` を参照する。productionではsecret managerまたは
-orchestratorのsecret注入を使用し、ファイルやimageへ埋め込まない。
-
-integration testは`FEEDBACK_TEST_RUN_ID`で一時DB名を分離する。Kotlin/Go live differentialを実行するときだけ
-`FEEDBACK_DIFFERENTIAL_KOTLIN_URL`と`FEEDBACK_DIFFERENTIAL_GO_URL`を指定し、各serverを別DB/Object Storageへ接続する。
-これら3変数は本番runtimeへ設定しない。
-
-`FEEDBACK_CANARY_BEARER_TOKEN`は`measure-feedback-canary.sh`だけが読む短時間の検証tokenであり、canary実行時に
-承認済みIdPから環境変数へ注入する。本番runtime、shell引数、証跡JSON、repositoryへ保存しない。
-
-standalone Composeは`apps/feedback-service-go/Dockerfile`を既定にする。`FEEDBACK_SERVICE_DOCKERFILE`は過去のrollback artifactを
-明示検証するときだけ使うCompose変数で、runtimeへ注入しない。fresh installは`feedback-migrate`が空DBへ埋め込みclean V1を
-適用し、以後も同じone-shot migratorを使う。
-
-build/検証時だけ、`FEEDBACK_SMOKE_RUNTIME`、`FEEDBACK_SMOKE_PROJECT`、`FEEDBACK_SMOKE_ROLLBACK`、
-`FEEDBACK_SMOKE_MANAGE_COMPOSE`でstandalone smokeを制御する。`FEEDBACK_RELEASE_VERSION`と
-`FEEDBACK_RELEASE_BUILDER`はrelease script専用である。`FEEDBACK_VERIFY_SKIP_*`と
-`FEEDBACK_EXTRACTION_SKIP_*`は局所切り分け用で、CI/releaseの合格証跡では設定しない。いずれも本番runtimeへ注入しない。
+`FEEDBACK_VERIFY_SKIP_*`と`FEEDBACK_EXTRACTION_SKIP_*`を設定した結果は、CIやreleaseの合格証跡として扱いません。

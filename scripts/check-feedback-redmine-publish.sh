@@ -58,6 +58,7 @@ case "${1:-}" in
       exit 0
     fi
     if [[ "${3:-}" == dist-tags ]]; then
+      printf 'npm view dist-tags\t%s\n' "${2:-}" >>"$FAKE_CALL_LOG"
       if [[ -f "$FAKE_REGISTRY_STATE/npm-tag-next" ]]; then
         printf '%s\n' '{"next":"1.2.3-test.1","latest":"1.2.3-test.1"}'
       else
@@ -232,6 +233,8 @@ missing_status=$(run_scenario missing missing missing)
 [[ "$missing_status" == 0 ]] || fail "未公開artifactの公開検証が失敗しました"
 [[ "$(rg -c '^npm publish$' "$test_tmp/missing/calls.log")" == 1 ]] || fail "npm publish回数が不正です"
 [[ "$(rg -c '^skopeo copy$' "$test_tmp/missing/calls.log")" == 1 ]] || fail "skopeo copy回数が不正です"
+rg -q $'^npm view dist-tags\t@geibee/feedback-core@1.2.3-test.1$' "$test_tmp/missing/calls.log" || \
+  fail "dist-tag確認で公開versionが明示されていません"
 assert_tokens_hidden "$test_tmp/missing"
 rg -q '\[feedback-redmine-publish\] PASS' "$test_tmp/missing/output.log" || fail "初回公開結果がPASSではありません"
 

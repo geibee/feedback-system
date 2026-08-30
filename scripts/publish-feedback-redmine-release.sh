@@ -132,6 +132,26 @@ reconcile_npm_tags() {
   fi
 }
 
+resolve_matching_oci_digest() {
+  local destination=$1
+  local expected_digest=$2
+  local reported_digest=$3
+  local raw_digest
+  if [[ "$reported_digest" == "$expected_digest" ]]; then
+    printf '%s\n' "$reported_digest"
+    return 0
+  fi
+  if skopeo inspect --raw "$destination" >"$preflight_directory/image-raw.json" \
+      2>"$preflight_directory/image-raw.err"; then
+    raw_digest="sha256:$(sha256sum "$preflight_directory/image-raw.json" | cut -d' ' -f1)"
+    if [[ "$raw_digest" == "$expected_digest" ]]; then
+      printf '%s\n' "$raw_digest"
+      return 0
+    fi
+  fi
+  printf '%s\n' "$reported_digest"
+}
+
 while IFS=$'\t' read -r package_name filename; do
   local_integrity=$(PACKAGE_FILE="$input/$filename" node -e '
     const { createHash } = require("node:crypto");
@@ -158,8 +178,9 @@ while [[ "$npm_only" != true ]] && IFS=$'\t' read -r image_name archive expected
   destination="docker://ghcr.io/$owner/$image_name:$version"
   if skopeo inspect --format '{{.Digest}}' "$destination" >"$preflight_directory/image.out" 2>"$preflight_directory/image.err"; then
     actual_digest=$(<"$preflight_directory/image.out")
+    actual_digest=$(resolve_matching_oci_digest "$destination" "$expected_digest" "$actual_digest")
     [[ "$actual_digest" == "$expected_digest" ]] || \
-      fail "ghcr.io/$owner/$image_name:$version は異なるdigestで既に存在します"
+      fail "ghcr.io/$owner/$image_name:$version は異なるdigestで既に存在します: expected=$expected_digest actual=$actual_digest"
     action=skip
   else
     if ! rg -qi 'manifest unknown|name unknown|not found' "$preflight_directory/image.err"; then
@@ -194,8 +215,9 @@ while [[ "$npm_only" != true ]] && IFS=$'\t' read -r image_name archive expected
   fi
   if skopeo inspect --format '{{.Digest}}' "$destination" >"$preflight_directory/image.out" 2>"$preflight_directory/image.err"; then
     actual_digest=$(<"$preflight_directory/image.out")
+    actual_digest=$(resolve_matching_oci_digest "$destination" "$expected_digest" "$actual_digest")
     [[ "$actual_digest" == "$expected_digest" ]] || \
-      fail "$image_name の公開直前に異なるdigestのtagが作成されました"
+      fail "$image_name の公開直前に異なるdigestのtagが作成されました: expected=$expected_digest actual=$actual_digest"
     echo "[feedback-redmine-publish] OCI ghcr.io/$owner/$image_name:$version は同一digestのため再利用します"
     continue
   fi

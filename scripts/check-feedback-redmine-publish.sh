@@ -93,6 +93,13 @@ case "${1:-}" in
     case "$FAKE_OCI_MODE" in
       same) printf '%s\n' "$FAKE_EXPECTED_OCI_DIGEST" ;;
       different) printf 'sha256:%064d\n' 0 | tr '0' 'b' ;;
+      raw-match)
+        if [[ " $* " == *' --raw '* ]]; then
+          printf '%s' "$FAKE_EXPECTED_OCI_RAW"
+        else
+          printf 'sha256:%064d\n' 0 | tr '0' 'b'
+        fi
+        ;;
       missing)
         if [[ -f "$FAKE_REGISTRY_STATE/oci-published" ]]; then
           printf '%s\n' "$FAKE_EXPECTED_OCI_DIGEST"
@@ -116,11 +123,14 @@ chmod 0700 "$fake_bin/npm" "$fake_bin/skopeo"
 
 version=1.2.3-test.1
 expected_oci_digest="sha256:$(printf '%064d' 0 | tr '0' 'a')"
+expected_oci_raw='{"schemaVersion":2}'
+expected_raw_oci_digest="sha256:$(printf '%s' "$expected_oci_raw" | sha256sum | cut -d' ' -f1)"
 node_token='node-auth-secret-for-publish-check'
 github_token='github-auth-secret-for-publish-check'
 
 prepare_scenario() {
   local name=$1
+  local scenario_digest=${2:-$expected_oci_digest}
   local scenario="$test_tmp/$name"
   local release="$scenario/release"
   mkdir -p "$release" "$scenario/state"
@@ -142,7 +152,7 @@ prepare_scenario() {
     {
       "name": "feedback-redmine-gateway",
       "archive": "feedback-redmine-gateway.oci.tar",
-      "indexDigest": "$expected_oci_digest",
+      "indexDigest": "$scenario_digest",
       "platforms": ["linux/amd64", "linux/arm64"]
     }
   ]
@@ -159,6 +169,7 @@ run_scenario() {
   local name=$1
   local npm_mode=$2
   local oci_mode=$3
+  local scenario_digest=${4:-$expected_oci_digest}
   local scenario="$test_tmp/$name"
   local package_file="$scenario/release/geibee-core-1.2.3-test.1.tgz"
   local npm_integrity
@@ -174,7 +185,8 @@ run_scenario() {
     FAKE_REGISTRY_STATE="$scenario/state" \
     FAKE_CALL_LOG="$scenario/calls.log" \
     FAKE_EXPECTED_NPM_INTEGRITY="$npm_integrity" \
-    FAKE_EXPECTED_OCI_DIGEST="$expected_oci_digest" \
+    FAKE_EXPECTED_OCI_DIGEST="$scenario_digest" \
+    FAKE_EXPECTED_OCI_RAW="$expected_oci_raw" \
     NODE_AUTH_TOKEN="$node_token" \
     GITHUB_TOKEN="$github_token" \
     GITHUB_ACTOR='feedback-publish-check' \
@@ -208,6 +220,13 @@ assert_tokens_hidden "$test_tmp/same"
 rg -q '同一integrityのため再利用します' "$test_tmp/same/output.log" || fail "npm再利用結果がありません"
 rg -q '同一digestのため再利用します' "$test_tmp/same/output.log" || fail "OCI再利用結果がありません"
 rg -q '\[feedback-redmine-publish\] PASS' "$test_tmp/same/output.log" || fail "再利用結果がPASSではありません"
+
+prepare_scenario raw-match "$expected_raw_oci_digest"
+raw_match_status=$(run_scenario raw-match same raw-match "$expected_raw_oci_digest")
+[[ "$raw_match_status" == 0 ]] || fail "raw manifestが一致するOCI artifactを再利用できませんでした"
+assert_no_publish "$test_tmp/raw-match"
+assert_tokens_hidden "$test_tmp/raw-match"
+rg -q '同一digestのため再利用します' "$test_tmp/raw-match/output.log" || fail "raw manifestによるOCI再利用結果がありません"
 
 prepare_scenario partial
 partial_status=$(run_scenario partial same missing)

@@ -78,7 +78,6 @@ for index in "${!react_versions[@]}"; do
       "typescript@${typescript_versions[$index]}" "vite@$vite_version" vitest@4.1.9 jsdom@29.1.1 \
       "${tarballs[@]}"
     npm ls react react-dom --all >/dev/null
-    test ! -d node_modules/@geibee/react
     npm run typecheck
     npm run test
     npm run build

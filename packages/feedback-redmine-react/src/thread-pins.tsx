@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RedmineThreadSummaryV1 } from "@geibee/feedback-redmine-core";
 import type { FeedbackPinPositionProvider } from "@geibee/feedback-core";
+import { feedbackDomPositionProvider } from "@geibee/feedback-react-ui";
 
 export function ThreadPins(props: {
   threads: RedmineThreadSummaryV1[];
@@ -63,7 +64,7 @@ export function resolveFeedbackPinPosition(
   value: Parameters<FeedbackPinPositionProvider["getPosition"]>[0],
   provider?: FeedbackPinPositionProvider
 ): { x: number; y: number } | null {
-  const target = value as Record<string, unknown>;
+  const target = value;
   const provided = provider?.getPosition(value);
   if (provided) return provided;
   if (
@@ -81,6 +82,8 @@ export function resolveFeedbackPinPosition(
     typeof target.fallbackRelativeX === "number" &&
     typeof target.fallbackRelativeY === "number"
   ) {
+    const domPosition = resolveDomCustomTargetPosition(target);
+    if (domPosition !== undefined) return domPosition;
     return {
       x: target.fallbackRelativeX * document.documentElement.clientWidth,
       y: target.fallbackRelativeY * document.documentElement.clientHeight
@@ -92,12 +95,52 @@ export function resolveFeedbackPinPosition(
     typeof target.relativeX === "number" &&
     typeof target.relativeY === "number"
   ) {
-    const escape = (globalThis.CSS as { escape?: (value: string) => string } | undefined)?.escape;
-    const escaped = escape ? escape(target.elementKey) : target.elementKey.replace(/["\\]/gu, "\\$&");
-    const element = document.querySelector<HTMLElement>(`[data-feedback-key="${escaped}"]`);
+    const element = findKeyedElement("data-feedback-key", target.elementKey);
     if (!element) return null;
     const rect = element.getBoundingClientRect();
     return { x: rect.left + rect.width * target.relativeX, y: rect.top + rect.height * target.relativeY };
   }
   return null;
+}
+
+function resolveDomCustomTargetPosition(
+  target: Extract<Parameters<FeedbackPinPositionProvider["getPosition"]>[0], { kind: "custom" }>
+): { x: number; y: number } | null | undefined {
+  if (target.provider !== feedbackDomPositionProvider || !target.metadata) return undefined;
+  const coordinateSpace = target.metadata.coordinateSpace;
+  if (coordinateSpace === "document") {
+    const documentX = target.metadata.documentX;
+    const documentY = target.metadata.documentY;
+    if (!isNonNegativeNumber(documentX) || !isNonNegativeNumber(documentY)) return undefined;
+    return { x: documentX - window.scrollX, y: documentY - window.scrollY };
+  }
+  if (coordinateSpace !== "scroll-container") return undefined;
+  const contentX = target.metadata.contentX;
+  const contentY = target.metadata.contentY;
+  if (!isNonNegativeNumber(contentX) || !isNonNegativeNumber(contentY)) return undefined;
+  const element = findKeyedElement("data-feedback-scroll-key", target.targetKey);
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  const contentLeft = rect.left + element.clientLeft;
+  const contentTop = rect.top + element.clientTop;
+  const position = {
+    x: contentLeft + contentX - element.scrollLeft,
+    y: contentTop + contentY - element.scrollTop
+  };
+  const visibleLeft = Math.max(0, contentLeft);
+  const visibleTop = Math.max(0, contentTop);
+  const visibleRight = Math.min(document.documentElement.clientWidth, contentLeft + element.clientWidth);
+  const visibleBottom = Math.min(document.documentElement.clientHeight, contentTop + element.clientHeight);
+  return position.x >= visibleLeft && position.x <= visibleRight &&
+    position.y >= visibleTop && position.y <= visibleBottom ? position : null;
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function findKeyedElement(attribute: string, key: string): HTMLElement | null {
+  const escape = (globalThis.CSS as { escape?: (value: string) => string } | undefined)?.escape;
+  const escaped = escape ? escape(key) : key.replace(/["\\]/gu, "\\$&");
+  return document.querySelector<HTMLElement>(`[${attribute}="${escaped}"]`);
 }

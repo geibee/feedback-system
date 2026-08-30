@@ -78,8 +78,6 @@ npx @geibee/feedback-redmine-ops@next doctor \
 - 環境変数とsecret: [`docs/environment-variables.md`](docs/environment-variables.md)
 - APIとpackageの互換性: [`docs/api-compatibility.md`](docs/api-compatibility.md)
 - release手順: [`docs/release.md`](docs/release.md)
-- 従来Feedback Service: [`docs/legacy-quickstart.md`](docs/legacy-quickstart.md)
-
 開発時の検証入口は`bash scripts/verify-feedback.sh`です。
 
 ## License

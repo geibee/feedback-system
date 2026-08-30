@@ -9,10 +9,11 @@ input=""
 version=""
 owner=geibee
 npm_only=false
+trusted_publishing=false
 npm_registry=https://npm.pkg.github.com
 npm_tag=latest
 usage() {
-  echo "usage: scripts/publish-feedback-redmine-release.sh --input <release-directory> --version <semver> [--npm-only] [--tag <dist-tag>]" >&2
+  echo "usage: scripts/publish-feedback-redmine-release.sh --input <release-directory> --version <semver> [--npm-only] [--trusted-publishing] [--tag <dist-tag>]" >&2
   exit 2
 }
 while [[ $# -gt 0 ]]; do
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
     --input) [[ $# -ge 2 ]] || usage; input=$2; shift 2 ;;
     --version) [[ $# -ge 2 ]] || usage; version=$2; shift 2 ;;
     --npm-only) npm_only=true; shift ;;
+    --trusted-publishing) trusted_publishing=true; shift ;;
     --tag) [[ $# -ge 2 ]] || usage; npm_tag=$2; shift 2 ;;
     *) usage ;;
   esac
@@ -27,12 +29,23 @@ done
 [[ -n "$input" && -d "$input" && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ &&
   "$npm_tag" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || usage
 input=$(cd "$input" && pwd)
+[[ "$trusted_publishing" != true || "$npm_only" == true ]] || usage
 
 fail() { echo "[feedback-redmine-publish] FAIL: $*" >&2; exit 1; }
 commands=(npm jq rg sha256sum)
 if [[ "$npm_only" == true ]]; then
   npm_registry=https://registry.npmjs.org
-  [[ "$(npm whoami --registry="$npm_registry" 2>/dev/null)" == "$owner" ]] || fail "npmjsへ$ownerとしてloginしていません"
+  if [[ "$trusted_publishing" == true ]]; then
+    [[ "${GITHUB_ACTIONS:-}" == true && -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" &&
+      -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]] || fail "npm trusted publishing用のGitHub OIDCがありません"
+    npm_version=$(npm --version)
+    NPM_VERSION="$npm_version" node -e '
+      const [major, minor] = process.env.NPM_VERSION.split(".").map(Number);
+      if (major < 11 || (major === 11 && minor < 5)) process.exit(1);
+    ' || fail "npm trusted publishingにはnpm 11.5.1以上が必要です"
+  else
+    [[ "$(npm whoami --registry="$npm_registry" 2>/dev/null)" == "$owner" ]] || fail "npmjsへ$ownerとしてloginしていません"
+  fi
 else
   commands+=(skopeo)
   [[ -n "${NODE_AUTH_TOKEN:-}" ]] || fail "NODE_AUTH_TOKENがありません"

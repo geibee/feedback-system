@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-alpha.7 - 2026-08-30
 
 - installation manifestの任意レビュー観点をclient profile生成へ反映するようにしました。
 - ローカルdemoへsecretと分離した公開runtime config directoryをread-only mountし、ブラウザ再読み込みだけで案内を変更できるようにしました。

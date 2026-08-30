@@ -1,21 +1,16 @@
 {
   "name": "feedback-system",
-  "version": "1.0.0-alpha.3",
+  "version": "1.0.0-alpha.7",
   "private": true,
   "engines": {
     "node": ">=22.12 <25"
   },
   "workspaces": [
-    "apps/feedback-admin",
-    "apps/feedback-token-broker-reference",
-    "apps/feedback-conformance-consumer",
     "contracts/feedback",
     "packages/feedback-core",
     "packages/feedback-dom-capture",
     "packages/feedback-react-ui",
-    "packages/feedback-react",
     "packages/feedback-maplibre",
-    "packages/feedback-admin-react",
     "packages/feedback-redmine-core",
     "packages/feedback-redmine-react",
     "packages/feedback-redmine-plugin",
@@ -32,21 +27,14 @@
     "build:shared": "npm --workspace @geibee/feedback-contracts run build && npm --workspace @geibee/feedback-core run build && npm --workspace @geibee/feedback-dom-capture run build && npm --workspace @geibee/feedback-react-ui run build",
     "build:redmine:packages": "npm --workspace @geibee/feedback-maplibre run build && npm --workspace @geibee/feedback-redmine-core run build && npm --workspace @geibee/feedback-redmine-react run build && npm --workspace @geibee/feedback-redmine-plugin run build && npm --workspace @geibee/feedback-redmine-gateway run build",
     "build:redmine:ops": "npm --workspace @geibee/feedback-redmine-ops run build",
-    "build:legacy:packages": "npm --workspace @geibee/react run build && npm --workspace @geibee/feedback-maplibre run build && npm --workspace @geibee/admin-react run build",
-    "build:legacy:apps": "npm --workspace @geibee/admin-console run build && npm --workspace @geibee/token-broker-reference run build && npm --workspace @geibee/conformance-consumer run build",
     "build:redmine": "npm run build:shared && npm run build:redmine:packages && npm run build:redmine:ops",
     "build:reference": "npm run build:redmine && npm --workspace @geibee/redmine-gateway-reference run build && npm --workspace @geibee/redmine-demo run build",
-    "build:legacy": "npm run build:shared && npm run build:legacy:packages && npm run build:legacy:apps",
-    "build:all": "npm run build:shared && npm run build:redmine:packages && npm run build:redmine:ops && npm --workspace @geibee/redmine-gateway-reference run build && npm --workspace @geibee/redmine-demo run build && npm run build:legacy:packages && npm run build:legacy:apps",
+    "build:all": "npm run build:reference",
     "test": "bash scripts/verify-feedback.sh",
     "test:redmine": "bash scripts/verify-feedback-redmine.sh",
-    "test:legacy": "bash scripts/verify-feedback-legacy.sh",
     "smoke:redmine": "bash scripts/smoke-feedback-redmine.sh",
     "feedback:redmine:local": "bash scripts/start-feedback-redmine-local.sh",
-    "release:redmine": "bash scripts/build-feedback-redmine-release.sh",
-    "release:legacy:sdk": "bash scripts/build-feedback-sdk-release.sh",
-    "release:legacy:go": "bash scripts/build-feedback-go-release.sh",
-    "legacy:compose:config": "docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet"
+    "release:redmine": "bash scripts/build-feedback-redmine-release.sh"
   },
   "devDependencies": {
     "@stoplight/spectral-cli": "^6.16.1"

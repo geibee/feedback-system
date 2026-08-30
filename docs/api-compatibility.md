@@ -6,8 +6,6 @@
 | --- | --- |
 | Redmine gateway API | [`contracts/feedback/redmine-gateway.openapi.yaml`](../contracts/feedback/redmine-gateway.openapi.yaml) |
 | Redmineのprofile、runtime config、保存形式 | [`contracts/feedback/schemas/redmine-*.json`](../contracts/feedback/schemas) |
-| Legacy Feedback Service API | [`contracts/feedback/openapi.yaml`](../contracts/feedback/openapi.yaml) |
-| token exchange | [`contracts/feedback/token-exchange.openapi.yaml`](../contracts/feedback/token-exchange.openapi.yaml) |
 | releaseごとの差分 | [`contracts/feedback/CHANGELOG.md`](../contracts/feedback/CHANGELOG.md)と各packageの`CHANGELOG.md` |
 
 ## 利用者が揃えるversion
@@ -16,7 +14,11 @@ Redmine構成では、SPAで使う`@geibee/feedback-*`、`@geibee/feedback-redmi
 
 React 18または19とbundlerはSPA側で用意します。公開packageはReactやViteを内包しません。gatewayのbase pathは`/internal/feedback-redmine/v1`で、SPAと同じoriginから公開します。
 
-Legacy構成の`/feedback/v1`を使う場合は、Legacy SDKのmajor versionも`1`に揃えます。新規導入では使用しません。
+`1.0.0-alpha.7`で旧Feedback Service、旧React UI、管理UI、token broker、関連するAPI／schema／配備物を削除しました。
+Redmine構成だけが公開対象です。`FeedbackHostContextV1.locale`の任意性と`FeedbackTargetV1`の5種類のunionは
+alpha.3〜alpha.6との公開型互換を維持します。keyなしのDOM追従座標は新しいtarget kindを追加せず、既存の
+`custom` variant（providerは`io.github.geibee.feedback.dom`）のscalar metadataへ保存します。旧gatewayは
+同じshapeを受理・保存し、旧UIは`fallbackRelativeX/Y`、新UIはmetadataのdocument／scroll content座標を使います。
 
 ## 変更時に行うこと
 

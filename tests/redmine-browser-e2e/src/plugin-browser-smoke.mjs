@@ -16,6 +16,7 @@ const profile = {
   attachments: { maximumInlinePreviewBytes: 1_048_576, maximumDownloadBytes: 1_048_576 },
   showRedmineLink: false
 };
+/** @type {any} */
 const thread = {
   threadId: "00000000-0000-4000-8000-000000000001",
   issueId: 123,
@@ -116,6 +117,9 @@ const server = createServer(async (request, response) => {
     return respondJson(response, { threads: created ? [threadSummary] : [], totalCount: created ? 1 : 0, nextCursor: null });
   }
   if (request.method === "POST" && url.pathname === `${base}/threads`) {
+    const input = parseMultipartRequest(body);
+    thread.locator = { v: "1", location: input.location, target: input.target };
+    threadSummary.locator = thread.locator;
     created = true;
     return respondJson(response, { thread }, 201);
   }
@@ -315,6 +319,21 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.textContent?.includes("Redmine drawer reply"));
 
   await page.getByRole("button", { name: "スレッドを閉じる" }).click();
+  const pinY = async () => page.locator("[data-feedback-redmine-host]").evaluate((element) => {
+    const pin = element.shadowRoot?.querySelector(".feedback-redmine-pin-host");
+    return pin ? Number(pin.getAttribute("y")) : null;
+  });
+  await page.waitForFunction(() => Boolean(
+    document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector(".feedback-redmine-pin-host")
+  ));
+  const firstPinY = await pinY();
+  assert.notEqual(firstPinY, null, "document targetのpinを表示する必要があります");
+  await page.evaluate(() => window.scrollBy(0, 100));
+  await page.waitForFunction((previous) => {
+    const pin = document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector(".feedback-redmine-pin-host");
+    return pin != null && Number(pin.getAttribute("y")) === Number(previous) - 100;
+  }, firstPinY);
+  assert.equal(await pinY(), Number(firstPinY) - 100, "page scroll量に合わせてpinを追従させる必要があります");
   await page.getByRole("button", { name: "フィードバック", exact: true }).click();
   await page.mouse.click(100, 100);
   await page.waitForFunction(() => Boolean(document.querySelector("[data-feedback-redmine-host]")?.shadowRoot?.querySelector("textarea")));
@@ -414,6 +433,13 @@ function contentType(path) {
 /** @param {string | string[] | undefined} value */
 function headerValue(value) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+/** @param {Buffer} body @returns {{location: unknown; target: unknown}} */
+function parseMultipartRequest(body) {
+  const match = /name="request"[^\r\n]*\r\nContent-Type:[^\r\n]*\r\n\r\n([\s\S]*?)\r\n--/iu.exec(body.toString("utf8"));
+  if (!match?.[1]) throw new Error("multipart request JSONを取得できません");
+  return JSON.parse(match[1]);
 }
 
 /** @param {{path: string}} entry */

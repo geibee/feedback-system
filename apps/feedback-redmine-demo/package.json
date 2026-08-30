@@ -1,6 +1,6 @@
 {
   "name": "@geibee/redmine-demo",
-  "version": "1.0.0-alpha.3",
+  "version": "1.0.0-alpha.7",
   "description": "Feedback Redmineローカル評価用デモSPA",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@geibee/feedback-redmine-plugin": "1.0.0-alpha.3",
+    "@geibee/feedback-redmine-plugin": "1.0.0-alpha.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

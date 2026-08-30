@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-alpha.7 - 2026-08-30
 
+- document／名前付きscroll領域targetとcustom fallbackを投稿境界でfail-closed検証するようにしました。
+- gateway imageのdistroless baseをOpenSSL CVE-2026-14456修正版へ更新しました。
+- demo imageのnginx baseをOpenSSL CVE-2026-14456修正版へ更新しました。
 - profile単位で親チケット・期限・重要度をopt-inする作成option endpointと投稿時validationを追加しました。
 
 - 新規issueのsame-origin thread URLをRedmine UIで開ける自動linkとして保存するようにしました。

@@ -5,9 +5,7 @@ COPY contracts/feedback/package.json contracts/feedback/package.json
 COPY packages/feedback-core/package.json packages/feedback-core/package.json
 COPY packages/feedback-dom-capture/package.json packages/feedback-dom-capture/package.json
 COPY packages/feedback-react-ui/package.json packages/feedback-react-ui/package.json
-COPY packages/feedback-react/package.json packages/feedback-react/package.json
 COPY packages/feedback-maplibre/package.json packages/feedback-maplibre/package.json
-COPY packages/feedback-admin-react/package.json packages/feedback-admin-react/package.json
 COPY packages/feedback-redmine-core/package.json packages/feedback-redmine-core/package.json
 COPY packages/feedback-redmine-react/package.json packages/feedback-redmine-react/package.json
 COPY packages/feedback-redmine-plugin/package.json packages/feedback-redmine-plugin/package.json
@@ -15,9 +13,6 @@ COPY packages/feedback-redmine-gateway/package.json packages/feedback-redmine-ga
 COPY packages/feedback-redmine-ops/package.json packages/feedback-redmine-ops/package.json
 COPY apps/feedback-redmine-gateway-reference/package.json apps/feedback-redmine-gateway-reference/package.json
 COPY apps/feedback-redmine-demo/package.json apps/feedback-redmine-demo/package.json
-COPY apps/feedback-admin/package.json apps/feedback-admin/package.json
-COPY apps/feedback-token-broker-reference/package.json apps/feedback-token-broker-reference/package.json
-COPY apps/feedback-conformance-consumer/package.json apps/feedback-conformance-consumer/package.json
 COPY tests/redmine-conformance/package.json tests/redmine-conformance/package.json
 COPY tests/redmine-browser-e2e/package.json tests/redmine-browser-e2e/package.json
 COPY tests/fixtures/feedback-redmine-plugin-vanilla/package.json tests/fixtures/feedback-redmine-plugin-vanilla/package.json
@@ -41,7 +36,9 @@ RUN npm --workspace @geibee/feedback-contracts run build \
   && npm --workspace @geibee/feedback-redmine-plugin run build \
   && npm --workspace @geibee/redmine-demo run build
 
-FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:c3fed6436b61d2bf2201ec032c35c000871f7ed062dea5d586bc6bf4d0fdd140
+FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:901e944d1f4fc2bd077e8f5568b98c1f6f8cdacf6b97a87747c43134a339b9a7
+USER root
+RUN apk upgrade --no-cache libcrypto3 libssl3
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Feedback Redmine local demo" \

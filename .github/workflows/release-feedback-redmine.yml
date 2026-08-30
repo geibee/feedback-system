@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
       - name: Sourceを取得
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,15 +29,12 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
           scope: "@geibee"
           package-manager-cache: false
 
-      - name: Goを準備
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: 1.26.5
-          cache: false
+      - name: npm trusted publishing対応CLIを準備
+        run: npm install --global npm@11.6.2
 
       - name: Trivyを準備
         uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
@@ -66,6 +64,7 @@ jobs:
             if (value.version !== version) throw new Error(`${workspace}のversionがtagと一致しません: ${value.version}`);
           }
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `value=${version}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `dist_tag=${version.includes("-") ? "next" : "latest"}\n`);
           NODE
       - name: 正規品質ゲート
         run: bash scripts/verify-feedback.sh
@@ -75,7 +74,9 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
         run: |
           mkdir release
+          mkdir release-npmjs
           bash scripts/build-feedback-redmine-release.sh --output release --version "$RELEASE_VERSION"
+          bash scripts/build-feedback-redmine-release.sh --output release-npmjs --version "$RELEASE_VERSION" --npm-only
 
       - name: GitHub Release draftを準備
         env:
@@ -102,13 +103,38 @@ jobs:
             gh release create "$RELEASE_TAG" release/* "${release_flags[@]}"
           fi
 
+      - name: npmjsへOIDCで公開
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+          RELEASE_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+        run: >-
+          bash scripts/publish-feedback-redmine-release.sh
+          --input release-npmjs
+          --version "$RELEASE_VERSION"
+          --npm-only
+          --trusted-publishing
+          --tag "$RELEASE_DIST_TAG"
+
+      - name: GitHub Packages用npm設定を準備
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: https://npm.pkg.github.com
+          scope: "@geibee"
+          package-manager-cache: false
+
       - name: GitHub PackagesとGHCRへ公開
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_ACTOR: ${{ github.actor }}
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: bash scripts/publish-feedback-redmine-release.sh --input release --version "$RELEASE_VERSION"
+          RELEASE_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+        run: >-
+          bash scripts/publish-feedback-redmine-release.sh
+          --input release
+          --version "$RELEASE_VERSION"
+          --tag "$RELEASE_DIST_TAG"
 
       - name: GitHub Releaseを公開
         env:

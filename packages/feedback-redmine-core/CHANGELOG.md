@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-alpha.7 - 2026-08-30
 
+- document／名前付きscroll領域targetとcustom fallbackをRedmine locatorからfail-closedで復元するようにしました。
 - 親チケット・期限・重要度をrequest hash、context attachment、Redmine issue作成へ追加し、親projectとactive priorityを検証するようにしました。
 
 - 新規Redmine issueの証跡画像を添付したままdescription内にもclick可能なthumbnailとして表示し、SPA URLを

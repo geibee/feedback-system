@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-alpha.7 - 2026-08-30
 
 - runtime JSONまたは直接integration optionから管理者案内を表示できるようにし、runtime loaderではJSONを唯一の設定源にしました。
 - Gatewayの任意issue項目・priority選択肢を取得して投稿payloadへ渡すtransportを追加しました。

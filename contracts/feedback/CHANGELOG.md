@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-alpha.7 - 2026-08-30
 
+- `FeedbackHostContextV1.locale`の任意性と`FeedbackTargetV1`の5種類のunionを維持し、alpha.3〜alpha.6との公開型互換を固定した。
+- Redmineで使わないFeedback Service OpenAPI、token exchange、manifest／webhook schema、生成型を削除した。
 - runtime configへplain textの管理者案内、installation manifestへ任意のレビュー観点を後方互換で追加。
 - Redmine投稿option取得endpointと、任意の親チケット・期限・重要度をcreate契約へ追加。
 

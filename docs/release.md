@@ -59,8 +59,9 @@ git push origin "v${FEEDBACK_RELEASE_VERSION}"
 2. `bash scripts/verify-feedback.sh`を実行する。
 3. npm tarball、multi-architecture OCI image、SBOM、脆弱性report、`release-manifest.json`、`SHA256SUMS`を生成する。
 4. GitHub Release draftへartifactを添付する。
-5. GitHub PackagesとGHCRへ公開する。
-6. GitHub Releaseを公開する。
+5. npm trusted publishing（GitHub OIDC）でnpmjsへ公開する。
+6. GitHub PackagesとGHCRへ公開する。
+7. GitHub Releaseを公開する。
 
 `release` environmentの承認画面では、version、変更内容、未修正のHIGH/CRITICAL脆弱性がある場合の判断を確認します。tagを作り直したり、同じversionへ異なるartifactを手動publishしたりしないでください。
 
@@ -76,13 +77,13 @@ sha256sum --check SHA256SUMS
 jq -r '.images[] | [.name, .indexDigest] | @tsv' release-manifest.json
 ```
 
-packageを匿名で取得できることと、gateway imageをmanifest記載のdigestで取得できることも確認します。配備時はtagではなく、次の形式でdigestを固定します。
+npmjs packageを匿名で取得できることと、gateway imageをmanifest記載のdigestで取得できることも確認します。配備時はtagではなく、次の形式でdigestを固定します。
 
 ```text
 ghcr.io/geibee/feedback-redmine-gateway@sha256:<release-manifestのindexDigest>
 ```
 
-## npmjsだけへ公開する場合
+## npmjsだけへ手動公開する場合
 
 GitHub Packages／GHCRを使わずnpmjsだけへ公開する承認済み作業では、`--npm-only`を付けます。このmodeではOCI imageを生成・公開しません。
 
@@ -100,18 +101,4 @@ bash scripts/publish-feedback-redmine-release.sh \
   --version "${FEEDBACK_RELEASE_VERSION}" \
   --npm-only \
   --tag next
-```
-
-## Legacy artifactを検証する場合
-
-新規導入には使いません。Legacy Feedback Serviceを保守するときだけ生成します。
-
-```bash
-bash scripts/build-feedback-sdk-release.sh \
-  --output /tmp/feedback-sdk-release \
-  --version "${FEEDBACK_RELEASE_VERSION}"
-
-bash scripts/build-feedback-go-release.sh \
-  --output /tmp/feedback-go-release \
-  --version "${FEEDBACK_RELEASE_VERSION}"
 ```

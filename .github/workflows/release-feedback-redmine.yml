@@ -110,12 +110,21 @@ jobs:
             gh release create "$RELEASE_TAG" release/* "${release_flags[@]}"
           fi
 
+      - name: 公開automationを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-automation
+          sparse-checkout: scripts/publish-feedback-redmine-release.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - name: npmjsへOIDCで公開
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
           RELEASE_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
         run: >-
-          bash scripts/publish-feedback-redmine-release.sh
+          bash .release-automation/scripts/publish-feedback-redmine-release.sh
           --input release-npmjs
           --version "$RELEASE_VERSION"
           --npm-only
@@ -138,7 +147,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
           RELEASE_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
         run: >-
-          bash scripts/publish-feedback-redmine-release.sh
+          bash .release-automation/scripts/publish-feedback-redmine-release.sh
           --input release
           --version "$RELEASE_VERSION"
           --tag "$RELEASE_DIST_TAG"

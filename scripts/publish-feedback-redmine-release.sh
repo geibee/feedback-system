@@ -106,7 +106,7 @@ fetch_npm_dist_tags() {
   local package_name=$1
   local attempt
   for attempt in {1..300}; do
-    if npm view "$package_name" dist-tags --json --registry="$npm_registry" \
+    if npm view "$package_name@$version" dist-tags --json --registry="$npm_registry" \
         >"$preflight_directory/npm-tags.json" 2>"$preflight_directory/npm.err" &&
         jq -e 'type == "object"' "$preflight_directory/npm-tags.json" >/dev/null; then
       cat "$preflight_directory/npm-tags.json"

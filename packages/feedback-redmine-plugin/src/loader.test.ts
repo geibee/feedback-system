@@ -14,7 +14,8 @@ const adapter: FeedbackRedmineHostAdapter = {
     applicationKey: "inventory",
     environmentKey: "production",
     externalWorkspaceKey: "production-review",
-    release: "test"
+    release: "test",
+    locale: "ja-JP"
   }),
   getLocation: () => null,
   getResourceRef: () => ({ schemaVersion: "1", kind: "record", key: "order-1" }),

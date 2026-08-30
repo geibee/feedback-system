@@ -105,11 +105,11 @@ describe("Redmine DTO normalization", () => {
     locator.target = {
       schemaVersion: "1",
       kind: "custom",
-      provider: "com.example.threejs",
-      targetKey: "model-42",
+      provider: "io.github.geibee.feedback.dom",
+      targetKey: "orders.table",
       fallbackRelativeX: 0.25,
       fallbackRelativeY: 0.75,
-      metadata: { layerName: "equipment", level: 3 }
+      metadata: { coordinateSpace: "scroll-container", contentX: 640, contentY: 900 }
     };
     field.value = JSON.stringify(locator);
     const summary = normalizeIssueSummary(issue, profile);

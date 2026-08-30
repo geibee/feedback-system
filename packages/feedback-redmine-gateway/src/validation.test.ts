@@ -41,6 +41,23 @@ describe("Redmine gateway custom target validation", () => {
     ).target).toEqual(customTarget);
   });
 
+  it("旧gateway互換のcustom shapeでDOM追従座標を受理する", () => {
+    const target = {
+      schemaVersion: "1",
+      kind: "custom",
+      provider: "io.github.geibee.feedback.dom",
+      targetKey: "document",
+      fallbackRelativeX: 0.25,
+      fallbackRelativeY: 0.75,
+      metadata: { coordinateSpace: "document", documentX: 320, documentY: 1200 }
+    };
+    expect(parseCreateRequest(
+      createRequest(target),
+      "inventory-production",
+      "https://app.example"
+    ).target).toEqual(target);
+  });
+
   it.each([
     { ...customTarget, provider: "Invalid Provider" },
     { ...customTarget, targetKey: "" },

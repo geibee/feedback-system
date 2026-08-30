@@ -259,7 +259,8 @@ function evidenceRequest() {
       applicationKey: "consumer",
       environmentKey: "test",
       externalWorkspaceKey: "workspace-1",
-      release: "test"
+      release: "test",
+      locale: "ja-JP"
     },
     location: { schemaVersion: "1" as const, pageKey: "orders", routeTemplate: "/orders", pathParameters: {} },
     target: { schemaVersion: "1" as const, kind: "screen-position" as const, relativeX: 0.5, relativeY: 0.5 },

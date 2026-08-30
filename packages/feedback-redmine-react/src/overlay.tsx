@@ -25,7 +25,7 @@ import {
   type RedmineThreadV1
 } from "@geibee/feedback-redmine-core";
 import type { FeedbackEvidencePayload, FeedbackLocationV1, FeedbackTargetV1 } from "@geibee/feedback-core";
-import { resolveDomFeedbackTarget } from "@geibee/feedback-react-ui";
+import { feedbackDomPositionProvider, resolveDomFeedbackTarget } from "@geibee/feedback-react-ui";
 import { createDomEvidenceProvider } from "./capture.js";
 import { addFeedbackCaptureMarker, type FeedbackCaptureMarkerPosition } from "./capture-marker.js";
 import { useDismissiblePanel } from "./dismissible.js";
@@ -411,7 +411,7 @@ export const RedmineFeedbackOverlay = forwardRef<
       });
       if (generation !== captureGeneration.current) return;
       if (!payload) throw new Error("スクリーンショットを生成できませんでした");
-      const markerPosition = resolveFeedbackPinPosition(target, runtime.pinPositionProvider) ?? selectedPosition;
+      const markerPosition = selectedPosition ?? resolveFeedbackPinPosition(target, runtime.pinPositionProvider);
       if (!markerPosition) throw new Error("フィードバック位置をスクリーンショットへ描画できませんでした");
       payload = await addFeedbackCaptureMarker(payload, markerPosition);
       if (payload.bytes.byteLength > profile.capture.maximumUploadBytes ||
@@ -962,6 +962,11 @@ export function targetLabel(target: FeedbackTargetV1): string {
   if (target.kind === "ui-element") return `要素 ${target.elementKey}`;
   if (target.kind === "map-feature") return `地図地物 ${target.featureKey}`;
   if (target.kind === "map-position") return "地図上の位置";
+  if (target.kind === "custom" && target.provider === feedbackDomPositionProvider) {
+    return target.metadata?.coordinateSpace === "scroll-container"
+      ? `スクロール領域 ${target.targetKey} 内の位置`
+      : "ページ内の位置";
+  }
   if (target.kind === "custom") return `カスタム ${target.provider} / ${target.targetKey}`;
   return "画面上の位置";
 }

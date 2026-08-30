@@ -12,7 +12,7 @@ const captureEvidence = createDomEvidenceProvider({
 });
 ```
 
-既存consumerは`@geibee/react`または`@geibee/feedback-redmine-react`から同じAPIを引き続き利用できます。
+`@geibee/feedback-redmine-react`からも同じAPIを利用できます。
 cross-origin画像やfontを含める場合は対象resourceのCORSを設定するか、capture対象から除外してください。
 mask selectorに一致する要素は、画像化後の最終PNG上で不透明な黒色に塗りつぶします。
 マスク画像のデコードまたは再生成に失敗した場合は、秘匿前の画像を返さずcapture全体を失敗させます。

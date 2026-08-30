@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redmine標準構成とlegacy構成をまとめて実行する正規fail-closed品質ゲート。
+# Redmine標準構成を実行する正規fail-closed品質ゲート。
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && pwd))
@@ -15,9 +15,5 @@ if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
 fi
 
 FEEDBACK_VERIFY_SKIP_NPM_CI=1 bash scripts/verify-feedback-redmine.sh
-FEEDBACK_VERIFY_SKIP_NPM_CI=1 \
-FEEDBACK_VERIFY_SKIP_SHARED_PACKAGES=1 \
-FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS=1 \
-  bash scripts/verify-feedback-legacy.sh
 
 echo "[feedback-verify] PASS"

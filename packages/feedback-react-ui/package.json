@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-react-ui",
-  "version": "1.0.0-alpha.3",
+  "version": "1.0.0-alpha.7",
   "description": "Feedback UI実装間で共有するtarget解決と表示プリミティブ",
   "private": true,
   "type": "module",
@@ -27,8 +27,8 @@
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-alpha.3",
-    "@geibee/feedback-core": "1.0.0-alpha.3"
+    "@geibee/feedback-contracts": "1.0.0-alpha.7",
+    "@geibee/feedback-core": "1.0.0-alpha.7"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

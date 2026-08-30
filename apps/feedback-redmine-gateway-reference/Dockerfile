@@ -4,17 +4,12 @@ COPY package.json package-lock.json ./
 COPY contracts/feedback/package.json contracts/feedback/package.json
 COPY packages/feedback-core/package.json packages/feedback-core/package.json
 COPY packages/feedback-dom-capture/package.json packages/feedback-dom-capture/package.json
-COPY packages/feedback-react/package.json packages/feedback-react/package.json
 COPY packages/feedback-maplibre/package.json packages/feedback-maplibre/package.json
-COPY packages/feedback-admin-react/package.json packages/feedback-admin-react/package.json
 COPY packages/feedback-redmine-core/package.json packages/feedback-redmine-core/package.json
 COPY packages/feedback-redmine-react/package.json packages/feedback-redmine-react/package.json
 COPY packages/feedback-redmine-plugin/package.json packages/feedback-redmine-plugin/package.json
 COPY packages/feedback-redmine-gateway/package.json packages/feedback-redmine-gateway/package.json
 COPY packages/feedback-redmine-ops/package.json packages/feedback-redmine-ops/package.json
-COPY apps/feedback-admin/package.json apps/feedback-admin/package.json
-COPY apps/feedback-token-broker-reference/package.json apps/feedback-token-broker-reference/package.json
-COPY apps/feedback-conformance-consumer/package.json apps/feedback-conformance-consumer/package.json
 COPY apps/feedback-redmine-gateway-reference/package.json apps/feedback-redmine-gateway-reference/package.json
 COPY apps/feedback-redmine-demo/package.json apps/feedback-redmine-demo/package.json
 COPY tests/redmine-conformance/package.json tests/redmine-conformance/package.json
@@ -32,7 +27,7 @@ RUN npm --workspace @geibee/feedback-contracts run build \
   && npm --workspace @geibee/feedback-redmine-gateway run build \
   && npm --workspace @geibee/redmine-gateway-reference run build
 
-FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Feedback Redmine gateway" \

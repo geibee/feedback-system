@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-redmine-plugin",
-  "version": "1.0.0-alpha.3",
+  "version": "1.0.0-alpha.7",
   "description": "業務アプリへ埋め込むDBレスRedmine Feedback JavaScript plugin",
   "private": true,
   "type": "module",
@@ -31,11 +31,11 @@
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-alpha.3",
-    "@geibee/feedback-core": "1.0.0-alpha.3",
-    "@geibee/feedback-maplibre": "1.0.0-alpha.3",
-    "@geibee/feedback-redmine-core": "1.0.0-alpha.3",
-    "@geibee/feedback-redmine-react": "1.0.0-alpha.3"
+    "@geibee/feedback-contracts": "1.0.0-alpha.7",
+    "@geibee/feedback-core": "1.0.0-alpha.7",
+    "@geibee/feedback-maplibre": "1.0.0-alpha.7",
+    "@geibee/feedback-redmine-core": "1.0.0-alpha.7",
+    "@geibee/feedback-redmine-react": "1.0.0-alpha.7"
   },
   "peerDependencies": {
     "react": ">=18.0.0 <20",

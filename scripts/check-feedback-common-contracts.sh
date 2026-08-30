@@ -6,14 +6,14 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 fail() { echo "[feedback-common-contract] FAIL: $*" >&2; exit 1; }
-openapi=contracts/feedback/openapi.yaml
-generated=contracts/feedback/src/generated.ts
+openapi=contracts/feedback/redmine-gateway.openapi.yaml
+generated=contracts/feedback/src/redmine-gateway.generated.ts
 [[ -f "$openapi" && -f "$generated" ]] || fail "共有OpenAPIまたは生成型がありません"
 
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 npx --no-install openapi-typescript "$openapi" -o "$tmp" >/dev/null
-diff -u "$generated" "$tmp" || fail "@geibee/feedback-contractsの共有生成型がOpenAPIと同期していません"
+diff -u "$generated" "$tmp" || fail "@geibee/feedback-contractsの生成型がRedmine OpenAPIと同期していません"
 npx --no-install spectral lint --ruleset .spectral.yaml "$openapi"
 
 grep -qE '^  /api/' "$openapi" && fail "専用契約にWeb GISの/api pathが混入しています"

@@ -1,14 +1,12 @@
 {
   "name": "@geibee/feedback-contracts",
-  "version": "1.0.0-alpha.3",
-  "description": "フィードバックサービス v1 の OpenAPI、JSON Schema、TypeScript 契約",
+  "version": "1.0.0-alpha.7",
+  "description": "Feedback Redmine gatewayのOpenAPI、JSON Schema、TypeScript契約",
   "private": true,
   "type": "module",
   "files": [
     "dist",
-    "openapi.yaml",
     "redmine-gateway.openapi.yaml",
-    "token-exchange.openapi.yaml",
     "schemas",
     "README.md",
     "CHANGELOG.md"
@@ -21,18 +19,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./openapi.yaml": "./openapi.yaml",
     "./redmine-gateway.openapi.yaml": "./redmine-gateway.openapi.yaml",
-    "./token-exchange.openapi.yaml": "./token-exchange.openapi.yaml",
     "./schemas/*": "./schemas/*"
   },
   "publishConfig": {
     "access": "restricted"
   },
   "scripts": {
-    "generate": "npm run generate:legacy && npm run generate:redmine",
-    "generate:legacy": "openapi-typescript openapi.yaml -o src/generated.ts",
-    "generate:redmine": "openapi-typescript redmine-gateway.openapi.yaml -o src/redmine-gateway.generated.ts",
+    "generate": "openapi-typescript redmine-gateway.openapi.yaml -o src/redmine-gateway.generated.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"

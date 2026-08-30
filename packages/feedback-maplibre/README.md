@@ -1,11 +1,7 @@
 # @geibee/feedback-maplibre
 
-MapLibre featureを製品横断の安定した `sourceKey` / `featureKey` へ変換し、Overlay pinの位置解決、地図markerの lifecycleと
-WebGL証跡取得を管理する任意 package です。`maplibre-gl` はこの package だけの peer dependencyで、
-`@geibee/react` の導入には不要です。
-
-`bindMapLibreFeedbackPins` は style reload でmarkerを再構築し、required layer消滅時とmap unload時に
-markerを破棄します。
+MapLibre featureを製品横断の安定した `sourceKey` / `featureKey` へ変換し、Overlay pinの位置解決と
+WebGL証跡取得を管理する任意packageです。`maplibre-gl`はこのpackageだけのpeer dependencyです。
 
 ## 地図上のclick／右クリックをtargetへ変換する
 
@@ -58,8 +54,6 @@ viewport位置を加えてOverlay pinの座標を返します。`map-feature`も
 canvas、または削除済みmapのpinは非表示にします。Providerは`move`、`resize`、`styledata`、`remove`を内部購読し、
 Overlayが`subscribe`の戻り値を呼び出すと地図eventの購読も解除されます。map削除後の`getPosition`は`null`を返します。
 
-既存の`bindMapLibreFeedbackPins`はMapLibre Markerを直接管理したいconsumer向けに引き続き利用できます。
-
 ## 証跡へ地図とcontrolを含める
 
 MapLibreの既定WebGL設定では描画後のbufferが保持されず、通常のDOM captureでは地図だけが白紙になることが
@@ -68,13 +62,13 @@ MapLibreの既定WebGL設定では描画後のbufferが保持されず、通常�
 
 `@geibee/feedback-redmine-plugin`ではproviderを手作業で配線せず、遅延生成後に
 `controller.registerMapLibreMap(map)`を呼べます。戻り値はmap破棄前に呼び出してください。未登録のWebGL canvasは
-capture有効時にpluginが自動検出して警告します。次のprovider直接指定はlegacy UIや独自Host Adapter向けです。
+capture有効時にpluginが自動検出して警告します。次のprovider直接指定は独自Host Adapter向けです。
 pluginへの段階的な接続手順は
 [`MapLibre・地物連携ガイド`](https://github.com/geibee/feedback-system/blob/main/docs/maplibre-integration.md)を参照してください。
 
 ```ts
 import { createMapLibreEvidenceProvider } from "@geibee/feedback-maplibre";
-import { createDomEvidenceProvider } from "@geibee/react";
+import { createDomEvidenceProvider } from "@geibee/feedback-dom-capture";
 
 const captureEvidence = createMapLibreEvidenceProvider({
   capture: createDomEvidenceProvider(),
@@ -82,7 +76,7 @@ const captureEvidence = createMapLibreEvidenceProvider({
 });
 
 const adapter = {
-  // getContext、getLocation、getAccessToken、navigateなど
+  // getContext、getLocation、navigateなど
   captureEvidence
 };
 ```

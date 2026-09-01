@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0-alpha.7 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-01
+
+- `public-profile` browserがparticipant credentialを取得できるsame-origin発行endpointを追加した。
+- すべてのunsafe operationへ実装と同じ必須`X-Feedback-CSRF: 1` headerを明記した。
+- signed grant Bearerとpublic participant credential headerをOpenAPI security schemeへ明記した。
+- intent回収の`requestHash`はURLへ含めず、既存OpenAPIどおり`X-Feedback-Request-Hash`必須headerへ統一した。
+- 署名attachment markerへ必須`messageId`を追加し、provider attachmentをthread内messageへ束縛した。
+- `resource.key`の実装上限をOpenAPIどおり512文字へ統一した。
+
+## 1.0.0-alpha.7 Phase 2 contract freeze - 2026-08-31
+
+- v2 OpenAPIを`2.0.0-alpha.1`へ進め、intent回収のthread／resource scope、strict command DTO、provider timeout 504／unavailable 502／media type 415を固定した。
+- authorization targetをprofile／workspace／resourceへ分離し、remote authorization request／decisionを同じtargetへ束縛した。
+- message markerへreply／revision event、participant、body hashを追加し、server-only attachment mapping schemaを追加した。
+- provider profileへcreation fieldとmetadata byte上限を追加し、operation保証をprovider fixtureで固定した。
+- Jira Cloud REST v3のissue／comment／property／attachment／timeout回収をsanitized fixture化した。
+
+## 1.0.0-alpha.7 Phase 1 draft - 2026-08-31
+
+- provider非依存のFeedback Gateway v2 OpenAPIと生成型を追加した。
+- domain、Envelope、message marker、projection、provider profile、service settings、authorization schemaと生成型を追加した。
+- browser向け`./v2`とserver-only `./v2/server`を分離し、`ProviderRef`とprovider内部IDをbrowser契約へ公開しない境界を固定した。
+- workspace／resource discovery、operation別回復保証、独立attachment upload権限、typed intent回収、projection再検証のfreeze候補とnegative fixtureを追加した。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - `FeedbackHostContextV1.locale`の任意性と`FeedbackTargetV1`の5種類のunionを維持し、alpha.3〜alpha.6との公開型互換を固定した。

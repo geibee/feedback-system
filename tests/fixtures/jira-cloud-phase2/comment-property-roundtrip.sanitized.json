@@ -1,0 +1,27 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-v3-comment-property-roundtrip",
+  "events": [
+    {
+      "providerCommentId": "20001",
+      "propertyKey": "com.geibee.feedback.message.v2",
+      "eventKind": "reply",
+      "intentId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5011",
+      "signatureValidAfterProviderReread": true
+    },
+    {
+      "providerCommentId": "20002",
+      "propertyKey": "com.geibee.feedback.message.v2",
+      "eventKind": "revision",
+      "intentId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5012",
+      "appendOnly": true,
+      "signatureValidAfterProviderReread": true
+    }
+  ],
+  "pagination": { "total": 2, "maxResults": 1, "pageSizes": [1, 1] },
+  "expected": {
+    "replyIntentScanHits": 1,
+    "revisionIntentScanHits": 1,
+    "atomicOptimisticRevisionCondition": false
+  }
+}

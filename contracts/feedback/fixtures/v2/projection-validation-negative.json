@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "phase1-projection-validation-negative-v1",
+  "validationOrder": [
+    "schema",
+    "signature",
+    "provider-binding",
+    "request-scope",
+    "current-authorization",
+    "profile-policy",
+    "backend-capability"
+  ],
+  "cases": [
+    { "name": "projection-without-envelope", "failure": "envelope_missing", "expected": { "serializeCandidate": false, "legacyFallback": false } },
+    { "name": "invalid-envelope-with-legacy-marker", "failure": "signature_invalid", "expected": { "serializeCandidate": false, "legacyFallback": false } },
+    { "name": "provider-binding-mismatch", "failure": "object_id_mismatch", "expected": { "serializeCandidate": false, "legacyFallback": false } },
+    { "name": "scope-mismatch", "failure": "workspace_or_resource_mismatch", "expected": { "serializeCandidate": false, "legacyFallback": false } },
+    { "name": "authorization-revoked-after-search", "failure": "current_authorization_denied", "expected": { "serializeCandidate": false, "legacyFallback": false } },
+    { "name": "multiple-valid-thread-hits", "failure": "multiple_candidates", "expected": { "serializeCandidate": false, "state": "repair_required", "automaticSelectionCalls": 0 } }
+  ]
+}

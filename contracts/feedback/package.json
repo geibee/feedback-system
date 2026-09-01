@@ -1,12 +1,14 @@
 {
   "name": "@geibee/feedback-contracts",
   "version": "1.0.0-alpha.7",
-  "description": "Feedback Redmine gatewayのOpenAPI、JSON Schema、TypeScript契約",
+  "description": "Feedback v2とRedmine v1 gatewayのOpenAPI、JSON Schema、TypeScript契約",
   "private": true,
   "type": "module",
   "files": [
     "dist",
+    "feedback-gateway.openapi.yaml",
     "redmine-gateway.openapi.yaml",
+    "fixtures",
     "schemas",
     "README.md",
     "CHANGELOG.md"
@@ -19,14 +21,27 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./v2": {
+      "types": "./dist/v2.d.ts",
+      "import": "./dist/v2.js"
+    },
+    "./v2/server": {
+      "types": "./dist/v2-server.d.ts",
+      "import": "./dist/v2-server.js"
+    },
+    "./feedback-gateway.openapi.yaml": "./feedback-gateway.openapi.yaml",
     "./redmine-gateway.openapi.yaml": "./redmine-gateway.openapi.yaml",
+    "./fixtures/*": "./fixtures/*",
     "./schemas/*": "./schemas/*"
   },
   "publishConfig": {
     "access": "restricted"
   },
   "scripts": {
-    "generate": "openapi-typescript redmine-gateway.openapi.yaml -o src/redmine-gateway.generated.ts",
+    "generate": "npm run generate:redmine && npm run generate:v2 && npm run generate:schemas",
+    "generate:redmine": "openapi-typescript redmine-gateway.openapi.yaml -o src/redmine-gateway.generated.ts",
+    "generate:v2": "openapi-typescript feedback-gateway.openapi.yaml -o src/feedback-gateway.generated.ts",
+    "generate:schemas": "json2ts -i schemas/feedback-domain.schema.json -o src/feedback-domain.generated.ts --bannerComment '/* このファイルはfeedback-domain.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-envelope.schema.json -o src/feedback-envelope.generated.ts --bannerComment '/* このファイルはfeedback-envelope.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-message-marker.schema.json -o src/feedback-message-marker.generated.ts --bannerComment '/* このファイルはfeedback-message-marker.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-attachment-marker.schema.json -o src/feedback-attachment-marker.generated.ts --bannerComment '/* このファイルはfeedback-attachment-marker.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-provider-profile.schema.json -o src/feedback-provider-profile.generated.ts --bannerComment '/* このファイルはfeedback-provider-profile.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-service-settings.schema.json -o src/feedback-service-settings.generated.ts --bannerComment '/* このファイルはfeedback-service-settings.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-projection.schema.json -o src/feedback-projection.generated.ts --bannerComment '/* このファイルはfeedback-projection.schema.jsonから生成されます。手編集しないでください。 */' && json2ts -i schemas/feedback-authorization.schema.json -o src/feedback-authorization.generated.ts --bannerComment '/* このファイルはfeedback-authorization.schema.jsonから生成されます。手編集しないでください。 */'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
@@ -35,8 +50,10 @@
     "@types/node": "26.1.0",
     "ajv": "8.20.0",
     "ajv-formats": "2.1.1",
+    "json-schema-to-typescript": "15.0.4",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.6.3",
-    "vitest": "4.1.9"
+    "vitest": "4.1.9",
+    "yaml": "2.8.1"
   }
 }

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "phase1-operation-recovery-negative-v1",
+  "cases": [
+    {
+      "name": "eventual-search-miss",
+      "guarantee": "recoverable",
+      "providerFacts": { "searchConsistency": "eventual", "hits": 0 },
+      "expected": { "state": "pending", "automaticWriteCalls": 0 }
+    },
+    {
+      "name": "multiple-intent-hits",
+      "guarantee": "recoverable",
+      "providerFacts": { "hits": 2 },
+      "expected": { "state": "repair_required", "automaticWriteCalls": 0 }
+    },
+    {
+      "name": "best-effort-result-unknown",
+      "guarantee": "best-effort",
+      "providerFacts": { "responseReceived": false },
+      "expected": { "state": "repair_required", "automaticWriteCalls": 0 }
+    },
+    {
+      "name": "attachment-result-unknown",
+      "guarantee": "best-effort",
+      "operation": "feedback:attachment:upload",
+      "providerFacts": { "responseReceived": false },
+      "expected": { "state": "repair_required", "automaticWriteCalls": 0, "maximumUploadAttempts": 1 }
+    },
+    {
+      "name": "same-intent-different-request-hash",
+      "guarantee": "recoverable",
+      "providerFacts": { "requestHashMatches": false },
+      "expected": { "status": 409, "code": "feedback.conflict", "automaticWriteCalls": 0 }
+    }
+  ]
+}

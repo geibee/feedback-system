@@ -1,0 +1,46 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-comment-create-request-candidate",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/issue/{issueIdOrKey}/comment",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "providerIssueId": "10041",
+  "request": {
+    "body": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "合成reply"
+            }
+          ]
+        }
+      ]
+    },
+    "properties": [
+      {
+        "key": "com.geibee.feedback.message.v2",
+        "value": {
+          "messageId": "0191f34c-2177-7704-a355-f9be46129a60",
+          "intentId": "fb2f5f1d-bc22-4f21-8123-66b3f778341a",
+          "requestHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      }
+    ]
+  },
+  "expectedConnectorDecision": {
+    "singleProviderRequestContainsRecoveryMetadata": true,
+    "capability": "requires-live-confirmation"
+  },
+  "requiresLiveConfirmation": [
+    "response喪失直後にcomment paginationとproperty GETで一意回収できること",
+    "comment bodyとpropertyの障害時commit境界"
+  ]
+}

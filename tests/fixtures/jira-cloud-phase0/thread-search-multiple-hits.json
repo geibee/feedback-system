@@ -1,0 +1,44 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-thread-search-multiple-hits",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/search/jql",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "query": {
+    "threadId": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+    "profileId": "jira-cloud-uat"
+  },
+  "providerResult": {
+    "issues": [
+      {
+        "id": "10041",
+        "key": "FB-41",
+        "recoveryProperty": {
+          "threadId": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+          "intentId": "74cb2662-2467-43f4-a506-bebc65e45e8c"
+        }
+      },
+      {
+        "id": "10057",
+        "key": "FB-57",
+        "recoveryProperty": {
+          "threadId": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+          "intentId": "c6e4cff9-bb7d-4566-ae90-2e9e16de97b6"
+        }
+      }
+    ],
+    "isLast": true
+  },
+  "expectedConnectorDecision": {
+    "state": "repair_required",
+    "selectedProviderIssueId": null,
+    "automaticRecreate": false,
+    "validateEveryEnvelope": true
+  },
+  "requiresLiveConfirmation": [
+    "同一string property値を持つ複数issueがJQLで返ること"
+  ]
+}

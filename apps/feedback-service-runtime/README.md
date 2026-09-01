@@ -1,0 +1,16 @@
+# Feedback Service Runtime
+
+`@geibee/feedback-service`、Jira Cloud／Redmine Connector、production Envelope verifier、Node.js listenerを接続するdeploy artifactである。Feedback Service本体のprovider非依存境界と、Jira Connector配下にあるForge entity property index artifactを変更しない。
+
+このruntimeはDB、queue、persistent／shared application data cache、upload directory、private object storage、ホストDBを使用しない。設定fileはread-only、credentialと署名鍵はserver-side環境変数から解決する。
+
+起動前に`FEEDBACK_SERVICE_SETTINGS_FILE`、`FEEDBACK_CONNECTOR_PROFILES_FILE`、`FEEDBACK_PUBLIC_ORIGIN`と、provider profileが参照するsecretを設定し、依存packageをbuildする。
+
+```sh
+npm run build:feedback:v2
+npm --workspace @geibee/feedback-service-runtime run start
+```
+
+standalone listenerは`public-profile`と`signed-grant`を扱う。`remote-authorization`は認証済みsubjectを供給するhost adapterが必要なため、adapterなしでは起動をfail-closedにする。任意HTTP headerをsubjectとして信頼しない。
+
+`GET /healthz`はprocess liveness、`GET /readyz`は設定とsecret解決のreadinessである。providerの瞬断はreadiness条件に含めず、provider障害中のoffline readを保証しない。

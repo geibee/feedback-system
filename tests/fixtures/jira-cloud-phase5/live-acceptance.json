@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1",
+  "kind": "jira-cloud-phase5-live-acceptance",
+  "contractVersion": "2.0.0-alpha.2",
+  "implementationDigest": "sha256:b851c07e7a2a87544951d072827a03f89ca097ab97c372a0c3f4286e1ce58069",
+  "executedAt": "2026-09-01T05:37:24.716Z",
+  "api": "Jira Cloud REST API v3",
+  "siteType": "Forge development demo",
+  "tenantIdentifiersRemoved": true,
+  "runOwnedIssueCreated": true,
+  "firstWriteTripletRecovered": true,
+  "commentRoundtrip": true,
+  "revisionRoundtrip": true,
+  "bodyIntegrityVerified": true,
+  "attachmentRoundtrip": true,
+  "attachmentMessageBindingVerified": true,
+  "automaticWriteRetry": false,
+  "cleanup": "deleted-run-owned-issue"
+}

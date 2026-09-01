@@ -1,0 +1,277 @@
+import type { FeedbackCapabilitiesV2 } from "@geibee/feedback-contracts/v2";
+import type { FeedbackProviderProfileV2, FeedbackServiceSettingsV2 } from "@geibee/feedback-contracts/v2/server";
+import { createFakeFeedbackRepository } from "@geibee/feedback-connector-sdk/testing";
+import { FeedbackConnectorProblem } from "@geibee/feedback-connector-sdk";
+import { FeedbackGatewayApplicationService } from "@geibee/feedback-gateway";
+import { describe, expect, it } from "vitest";
+import { createFeedbackAuthorizationRuntime } from "./authorization.js";
+import { createFeedbackHttpHandler } from "./http.js";
+import { issueFeedbackParticipantCredential } from "./participant.js";
+
+const origin = "https://app.example";
+const resource = { kind: "record", key: "order-001" } as const;
+const profile: FeedbackProviderProfileV2 = {
+  schemaVersion: "2", profileId: "public", displayName: "Public", connectorKey: "fake", installationId: "fake",
+  workspacePolicy: { workspaceIds: ["OPS"], workspaceDiscovery: "supported", resourceDiscovery: "supported" },
+  authorization: { mode: "public-profile" },
+  policy: { operations: ["feedback:read", "feedback:create"], resourceKinds: ["record"] },
+  capabilities: {
+    operations: ["feedback:read", "feedback:create"], discovery: { workspaces: "supported", resources: "supported" },
+    operationGuarantees: { create: "recoverable", reply: "unsupported", revision: "unsupported", attachmentUpload: "unsupported" },
+    creationFields: [], maximumMetadataBytes: 32768, projectionValidation: "envelope-required", uniqueThreadLookup: true
+  },
+  secretRefs: {
+    providerCredential: { kind: "server-secret", id: "PROVIDER" }, envelopeKeyRing: { kind: "server-secret", id: "ENVELOPE" },
+    participantCredentialKeyRing: { kind: "server-secret", id: "PARTICIPANT_RING" }, participantIdDerivationKey: { kind: "server-secret", id: "DERIVATION" }
+  }
+};
+const settings: FeedbackServiceSettingsV2 = {
+  schemaVersion: "2", serviceId: "test", profileFiles: ["/profile.json"], signedGrantIssuers: [], remoteAuthorizationProfiles: [],
+  jwksCache: { maximumIssuers: 1, maximumKeysPerIssuer: 1, maximumTtlSeconds: 1 }
+};
+const capabilities: FeedbackCapabilitiesV2 = {
+  backendOperations: ["feedback:read", "feedback:create"],
+  discovery: { workspaces: "supported" as const, resources: "supported" as const },
+  operationGuarantees: { create: "recoverable" as const, reply: "unsupported" as const, revision: "unsupported" as const, attachmentUpload: "unsupported" as const },
+  creationFields: [], maximumAttachmentBytes: 1024, attachmentContentTypes: ["text/plain"]
+};
+const key = Buffer.alloc(32, 7).toString("base64url");
+const ring = JSON.stringify({ activeKid: "current", keys: [{ kid: "current", key }] });
+const secretResolver = { async resolve(id: string) { return id === "PARTICIPANT_RING" ? ring : key; } };
+
+function fixture(
+  repository = createFakeFeedbackRepository({ async getCapabilities() { return capabilities; } }),
+  operationTimeoutMilliseconds = 1000,
+  bindParticipant?: Parameters<typeof createFeedbackHttpHandler>[0]["bindParticipant"],
+  activeProfile: FeedbackProviderProfileV2 = profile
+) {
+  const profileLoader = { async loadProfiles() { return [activeProfile]; } };
+  const authorization = createFeedbackAuthorizationRuntime({
+    settings, profileLoader, secretResolver,
+    httpClient: { async request() { throw new Error("unexpected HTTP"); } }
+  });
+  const gateway = new FeedbackGatewayApplicationService({
+    profileLoader,
+    authorizationPorts: authorization.ports,
+    connectors: new Map([["fake", repository]]),
+    projectionVerifier: { async verify() { return { valid: false as const, reason: "signature" as const }; } }
+  });
+  const handler = createFeedbackHttpHandler({
+    gateway, authorization, profileLoader, secretResolver,
+    expectedOrigin: origin, basePath: "/internal/feedback/v2", maximumRequestBytes: 4096, operationTimeoutMilliseconds,
+    ...(bindParticipant ? { bindParticipant } : {})
+  });
+  return { handler, repository };
+}
+
+describe("Feedback Service v2 HTTP adapter", () => {
+  it("public-profile participant credentialを公開routeから発行し、他modeへfallbackしない", async () => {
+    const { handler } = fixture();
+    const browserProfileId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5303";
+    const path = `${origin}/internal/feedback/v2/profiles/public/participants`;
+    const missingCsrf = await handler(new Request(path, {
+      method: "POST", headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ browserProfileId })
+    }));
+    expect(missingCsrf.status).toBe(403);
+    const issued = await handler(new Request(path, {
+      method: "POST", headers: { "content-type": "application/json", origin, "x-feedback-csrf": "1" },
+      body: JSON.stringify({ browserProfileId })
+    }));
+    expect(issued.status).toBe(201);
+    expect(await issued.json()).toMatchObject({ participantId: expect.any(String), credential: expect.stringMatching(/^v2\./u) });
+
+    const signedProfile: FeedbackProviderProfileV2 = {
+      ...profile,
+      authorization: { mode: "signed-grant", issuerProfileRef: "issuer" }
+    };
+    const signed = fixture(undefined, 1000, undefined, signedProfile).handler;
+    const denied = await signed(new Request(path, {
+      method: "POST", headers: { "content-type": "application/json", origin, "x-feedback-csrf": "1" },
+      body: JSON.stringify({ browserProfileId })
+    }));
+    expect(denied.status).toBe(403);
+  });
+
+  it("same-origin profile requestだけを処理し、security headerを付ける", async () => {
+    const { handler, repository } = fixture();
+    const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect((await response.json()) as object).toMatchObject({ profile: { effectivePermissions: ["feedback:read"] } });
+    expect(repository.count("getCapabilities")).toBe(1);
+
+    const crossOrigin = await handler(new Request("https://evil.example/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001"));
+    expect(crossOrigin.status).toBe(403);
+    expect(repository.count("getCapabilities")).toBe(1);
+  });
+
+  it("unsafe requestへOrigin、CSRF、participant credentialを必須化する", async () => {
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() { return capabilities; },
+      async createThread(query) {
+        return {
+          disposition: "created",
+          intentId: query.command.intentId,
+          thread: {
+            threadId: query.command.threadId, resource, title: query.command.title, status: "open",
+            createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z", messageCount: 1,
+            messages: [{
+              messageId: query.command.threadId, body: query.command.body,
+              author: { kind: "unknown", displayName: "Unknown" }, createdAt: "2026-09-01T00:00:00.000Z",
+              orderingKey: { occurredAt: "2026-09-01T00:00:00.000Z", eventId: query.command.threadId }, revisions: [], attachments: []
+            }]
+          }
+        };
+      }
+    });
+    const { handler } = fixture(repository);
+    const command = {
+      intentId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5301", requestHash: `sha256:${"1".repeat(64)}`,
+      threadId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5302", resource, title: "title", body: "body"
+    };
+    const missingCsrf = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads`, {
+      method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify(command)
+    }));
+    expect(missingCsrf.status).toBe(403);
+    const missingParticipant = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads`, {
+      method: "POST", headers: { "content-type": "application/json", origin, "x-feedback-csrf": "1" }, body: JSON.stringify(command)
+    }));
+    expect(missingParticipant.status).toBe(403);
+
+    const participantResponse = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/participants`, {
+      method: "POST", headers: { "content-type": "application/json", origin, "x-feedback-csrf": "1" },
+      body: JSON.stringify({ browserProfileId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5303" })
+    }));
+    const participant = await participantResponse.json() as { credential: string };
+    const created = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json", origin, "x-feedback-csrf": "1",
+        "x-feedback-participant-credential": participant.credential
+      },
+      body: JSON.stringify(command)
+    }));
+    expect(created.status).toBe(201);
+    expect(repository.count("createThread")).toBe(1);
+  });
+
+  it("intent回収のrequest hashをOpenAPIどおりheaderだけから受ける", async () => {
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() { return capabilities; },
+      async recoverIntent(query) {
+        return { intentId: query.intentId, state: "not_found", operation: query.operation };
+      }
+    });
+    const { handler } = fixture(repository);
+    const participant = await issueFeedbackParticipantCredential({
+      profile, browserProfileId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5311", origin, secretResolver
+    });
+    const base = `${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/intents/018f0f58-c3d1-7a2b-8a4f-4c09571e5312` +
+      `?threadId=018f0f58-c3d1-7a2b-8a4f-4c09571e5313&operation=feedback%3Acreate&resourceKind=record&resourceKey=order-001`;
+    const headers = { "x-feedback-participant-credential": participant.credential };
+    expect((await handler(new Request(`${base}&requestHash=${encodeURIComponent(`sha256:${"1".repeat(64)}`)}`, { headers }))).status).toBe(400);
+    expect((await handler(new Request(base, { headers }))).status).toBe(400);
+    const recovered = await handler(new Request(base, {
+      headers: { ...headers, "x-feedback-request-hash": `sha256:${"1".repeat(64)}` }
+    }));
+    expect(recovered.status).toBe(200);
+    expect(repository.count("recoverIntent")).toBe(1);
+  });
+
+  it("resource keyをOpenAPIと同じ512文字まで受理する", async () => {
+    const { handler, repository } = fixture();
+    const request = (key: string) => handler(new Request(
+      `${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=${key}`
+    ));
+    expect((await request("a".repeat(512))).status).toBe(200);
+    expect((await request("a".repeat(513))).status).toBe(400);
+    expect(repository.count("getCapabilities")).toBe(1);
+  });
+
+  it("public-profileのcredentialをreadでも検証してrequest accessへ束縛する", async () => {
+    const bindings: Array<{ access: object; principal: { participantId: string } | null }> = [];
+    const { handler } = fixture(undefined, 1000, (binding) => bindings.push(binding));
+    const participant = await issueFeedbackParticipantCredential({
+      profile,
+      browserProfileId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5310",
+      origin,
+      secretResolver
+    });
+    const response = await handler(new Request(
+      `${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`,
+      { headers: { "x-feedback-participant-credential": participant.credential } }
+    ));
+    expect(response.status).toBe(200);
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0]?.principal?.participantId).toBe(participant.participantId);
+  });
+
+  it("strict DTO、content type、body上限をConnector前に拒否する", async () => {
+    const { handler, repository } = fixture();
+    const base = `${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads`;
+    const headers = { origin, "x-feedback-csrf": "1" };
+    const media = await handler(new Request(base, { method: "POST", headers, body: "{}" }));
+    expect(media.status).toBe(415);
+    const large = await handler(new Request(base, {
+      method: "POST", headers: { ...headers, "content-type": "application/json", "content-length": "99999" }, body: "{}"
+    }));
+    expect(large.status).toBe(413);
+    const streamedLarge = await handler(new Request(base, {
+      method: "POST", headers: { ...headers, "content-type": "application/json" }, body: "x".repeat(5000)
+    }));
+    expect(streamedLarge.status).toBe(413);
+    expect(repository.count("createThread")).toBe(0);
+  });
+
+  it("public-profileでBearer tokenを別modeとして受理しない", async () => {
+    const { handler } = fixture();
+    const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`, {
+      headers: { authorization: "Bearer a.b.c" }
+    }));
+    expect(response.status).toBe(401);
+  });
+
+  it("Connectorがabort通知を無視してもhard deadlineで504を返し、writeを再試行しない", async () => {
+    let createCalls = 0;
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() { return capabilities; },
+      async createThread() {
+        createCalls += 1;
+        return new Promise(() => undefined);
+      }
+    });
+    const { handler } = fixture(repository, 100);
+    const participant = await issueFeedbackParticipantCredential({
+      profile, browserProfileId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5304", origin, secretResolver
+    });
+    const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json", origin, "x-feedback-csrf": "1",
+        "x-feedback-participant-credential": participant.credential
+      },
+      body: JSON.stringify({
+        intentId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5305", requestHash: `sha256:${"2".repeat(64)}`,
+        threadId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5306", resource, title: "timeout", body: "body"
+      })
+    }));
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({ code: "feedback.provider_timeout", retryable: true });
+    expect(createCalls).toBe(1);
+  });
+
+  it("v1 Connectorのstatus付きlegacy codeを凍結v2 wire codeへ正規化する", async () => {
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() {
+        throw new FeedbackConnectorProblem({
+          code: "feedback.unsupported", status: 413, retryable: false, message: "legacy code"
+        });
+      }
+    });
+    const { handler } = fixture(repository);
+    const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "feedback.payload_too_large", retryable: false });
+  });
+});

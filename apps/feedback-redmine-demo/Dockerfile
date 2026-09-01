@@ -3,6 +3,15 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY contracts/feedback/package.json contracts/feedback/package.json
 COPY packages/feedback-core/package.json packages/feedback-core/package.json
+COPY packages/feedback-client/package.json packages/feedback-client/package.json
+COPY packages/feedback-connector-sdk/package.json packages/feedback-connector-sdk/package.json
+COPY packages/feedback-envelope/package.json packages/feedback-envelope/package.json
+COPY packages/feedback-gateway/package.json packages/feedback-gateway/package.json
+COPY packages/feedback-controller/package.json packages/feedback-controller/package.json
+COPY packages/feedback-web-component/package.json packages/feedback-web-component/package.json
+COPY packages/feedback-react/package.json packages/feedback-react/package.json
+COPY packages/feedback-connector-redmine/package.json packages/feedback-connector-redmine/package.json
+COPY packages/feedback-connector-jira-cloud/package.json packages/feedback-connector-jira-cloud/package.json
 COPY packages/feedback-dom-capture/package.json packages/feedback-dom-capture/package.json
 COPY packages/feedback-react-ui/package.json packages/feedback-react-ui/package.json
 COPY packages/feedback-maplibre/package.json packages/feedback-maplibre/package.json
@@ -13,12 +22,19 @@ COPY packages/feedback-redmine-gateway/package.json packages/feedback-redmine-ga
 COPY packages/feedback-redmine-ops/package.json packages/feedback-redmine-ops/package.json
 COPY apps/feedback-redmine-gateway-reference/package.json apps/feedback-redmine-gateway-reference/package.json
 COPY apps/feedback-redmine-demo/package.json apps/feedback-redmine-demo/package.json
+COPY apps/feedback-service/package.json apps/feedback-service/package.json
+COPY apps/feedback-service-runtime/package.json apps/feedback-service-runtime/package.json
 COPY tests/redmine-conformance/package.json tests/redmine-conformance/package.json
 COPY tests/redmine-browser-e2e/package.json tests/redmine-browser-e2e/package.json
+COPY tests/feedback-provider-acceptance/package.json tests/feedback-provider-acceptance/package.json
+COPY tests/fixtures/feedback-web-component-vanilla/package.json tests/fixtures/feedback-web-component-vanilla/package.json
 COPY tests/fixtures/feedback-redmine-plugin-vanilla/package.json tests/fixtures/feedback-redmine-plugin-vanilla/package.json
 RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY contracts/feedback contracts/feedback
 COPY packages/feedback-core packages/feedback-core
+COPY packages/feedback-client packages/feedback-client
+COPY packages/feedback-controller packages/feedback-controller
+COPY packages/feedback-react packages/feedback-react
 COPY packages/feedback-dom-capture packages/feedback-dom-capture
 COPY packages/feedback-react-ui packages/feedback-react-ui
 COPY packages/feedback-maplibre packages/feedback-maplibre
@@ -28,6 +44,9 @@ COPY packages/feedback-redmine-plugin packages/feedback-redmine-plugin
 COPY apps/feedback-redmine-demo apps/feedback-redmine-demo
 RUN npm --workspace @geibee/feedback-contracts run build \
   && npm --workspace @geibee/feedback-core run build \
+  && npm --workspace @geibee/feedback-client run build \
+  && npm --workspace @geibee/feedback-controller run build \
+  && npm --workspace @geibee/feedback-react run build \
   && npm --workspace @geibee/feedback-dom-capture run build \
   && npm --workspace @geibee/feedback-react-ui run build \
   && npm --workspace @geibee/feedback-maplibre run build \

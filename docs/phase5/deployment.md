@@ -1,0 +1,36 @@
+# Feedback Service v2 deployment
+
+## 配備単位
+
+配備物は次の二つで、同じprocessやmanifestへ統合しない。
+
+1. `apps/feedback-service-runtime`: Feedback Service、request-scoped Jira／Redmine Connector factory、Envelope verifier、Node.js listenerを含むDBレスruntime。
+2. `packages/feedback-connector-jira-cloud/forge-app`: Jira issue entity propertyをJQL index化するForge development／production artifact。function、UI、Forge Storage、Connect moduleを持たない。
+
+runtimeはDB、queue、persistent／shared application data cache、upload directory、private object storage、ホストDBを必要としない。ticket本文、会話、証跡、回復metadataはproviderを正本とする。container filesystemへ設定以外を書かず、設定はread-only mount、secretはorchestratorから環境変数へ注入する。最終imageはproduction `dist`とpackage manifestだけを含み、Forge artifact、source、test、dev dependencyを同梱しない。
+
+## 配備順序
+
+1. 対象Jira environmentへForge entity property artifactを`forge lint`後にdeployし、Jira siteへinstallまたはmajor-version upgradeする。
+2. entity property indexの`threadId`、`intentId`、`requestHash`完全一致検索をmanaged acceptanceで確認する。
+3. Redmine対象ではv2 custom field provisioning planをread-onlyで確認し、承認済みの別作業でapplyする。既存v1 fieldは変更しない。
+4. provider profile、Connector runtime catalog、secret referenceを配備する。
+5. `apps/feedback-service-runtime/Dockerfile`をbuildし、immutable digestで配備する。
+6. `/healthz`、`/readyz`、profile read、provider acceptanceを確認してtrafficを切り替える。
+
+Forge deploy／install credentialはFeedback Serviceへ渡さない。Jira REST credentialはprovider profileの`providerCredential` secretだけから解決する。
+
+## 起動検査
+
+- provider profileの`connectorProfileRef`がcatalogに一件だけ存在し、`connectorKey`が一致する。
+- Redmine workspace bindingはprofile allowlistの単一workspaceと一致する。
+- Authorization Modeごとのportが存在し、別modeへfallbackしない。
+- `remote-authorization`はhostの認証済みsubject adapterがない限りlistenしない。
+- Envelope／participant credential key ringはactive一鍵、最大8鍵、全鍵32 bytes以上のcanonical base64urlとしてparseでき、participant ID derivation鍵とsecret IDを分離する。
+- provider credentialはJira Cloudの`jira-cloud-basic`またはRedmineの`redmine-api-key` exact JSONとしてparseでき、署名鍵とprofile secret referenceをすべて解決できる。不正形式では`/readyz`を503にする。
+
+readinessは設定とsecret解決だけを検査し、provider瞬断でpod全体を再起動しない。provider障害中のoffline readは提供しない。
+
+## release前live Gate
+
+保存済みevidenceのboolean確認だけではlive Gate通過としない。release候補sourceで`bash scripts/check-feedback-phase5-live.sh`を明示実行し、run-owned issueの作成、回収、comment、revision、attachment、再読込、cleanupを同じrunで完了させる。credentialは`FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO`または一時的なprocess環境からだけ渡し、fixtureへ保存しない。出力の`implementationDigest`はOpenAPI、attachment schema、Jira Connector、REST client、live runnerへ束縛し、`scripts/check-feedback-phase5.sh`で現sourceと再比較する。

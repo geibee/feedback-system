@@ -6,19 +6,43 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && 
 cd "$ROOT"
 
 fail() { echo "[feedback-common-contract] FAIL: $*" >&2; exit 1; }
-openapi=contracts/feedback/redmine-gateway.openapi.yaml
-generated=contracts/feedback/src/redmine-gateway.generated.ts
-[[ -f "$openapi" && -f "$generated" ]] || fail "共有OpenAPIまたは生成型がありません"
+tmp_dir=$(mktemp -d)
+trap 'rm -rf -- "$tmp_dir"' EXIT
 
-tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
-npx --no-install openapi-typescript "$openapi" -o "$tmp" >/dev/null
-diff -u "$generated" "$tmp" || fail "@geibee/feedback-contractsの生成型がRedmine OpenAPIと同期していません"
-npx --no-install spectral lint --ruleset .spectral.yaml "$openapi"
+openapi_contracts=(
+  "contracts/feedback/redmine-gateway.openapi.yaml:contracts/feedback/src/redmine-gateway.generated.ts"
+  "contracts/feedback/feedback-gateway.openapi.yaml:contracts/feedback/src/feedback-gateway.generated.ts"
+)
+for contract in "${openapi_contracts[@]}"; do
+  openapi=${contract%%:*}
+  generated=${contract#*:}
+  [[ -f "$openapi" && -f "$generated" ]] || fail "共有OpenAPIまたは生成型がありません: $openapi"
+  tmp_generated="$tmp_dir/$(basename "$generated")"
+  npx --no-install openapi-typescript "$openapi" -o "$tmp_generated" >/dev/null
+  diff -u "$generated" "$tmp_generated" || fail "生成型がOpenAPIと同期していません: $generated"
+  npx --no-install spectral lint --ruleset .spectral.yaml "$openapi"
+  grep -qE '^  /api/' "$openapi" && fail "専用契約にWeb GISの/api pathが混入しています: $openapi"
+  grep -qE '/(tiles|layers|lands|buildings|parties|zones|analysis-jobs|import-jobs)(/|:|$)' "$openapi" && \
+    fail "専用契約にGIS・業務endpointが混入しています: $openapi"
+done
 
-grep -qE '^  /api/' "$openapi" && fail "専用契約にWeb GISの/api pathが混入しています"
-grep -qE '/(tiles|layers|lands|buildings|parties|zones|analysis-jobs|import-jobs)(/|:|$)' "$openapi" && \
-  fail "専用契約にGIS・業務endpointが混入しています"
+schema_generated_contracts=(
+  "feedback-domain"
+  "feedback-envelope"
+  "feedback-message-marker"
+  "feedback-provider-profile"
+  "feedback-service-settings"
+  "feedback-projection"
+  "feedback-authorization"
+)
+for contract in "${schema_generated_contracts[@]}"; do
+  schema="contracts/feedback/schemas/$contract.schema.json"
+  generated="contracts/feedback/src/$contract.generated.ts"
+  tmp_generated="$tmp_dir/$contract.generated.ts"
+  banner="/* このファイルは$contract.schema.jsonから生成されます。手編集しないでください。 */"
+  npx --no-install json2ts -i "$schema" -o "$tmp_generated" --bannerComment "$banner"
+  diff -u "$generated" "$tmp_generated" || fail "生成型がJSON Schemaと同期していません: $generated"
+done
 
 for schema in contracts/feedback/schemas/*.json; do
   node -e 'const fs=require("node:fs"); const value=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (!value["$schema"] || !value["$id"]) process.exit(1)' "$schema" || \

@@ -58,6 +58,9 @@ trap cleanup EXIT
 
 packages=(
   @geibee/feedback-contracts
+  @geibee/feedback-client
+  @geibee/feedback-controller
+  @geibee/feedback-react
   @geibee/feedback-core
   @geibee/feedback-dom-capture
   @geibee/feedback-react-ui

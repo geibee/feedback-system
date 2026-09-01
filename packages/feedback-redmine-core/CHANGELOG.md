@@ -2,6 +2,7 @@
 
 ## 1.0.0-alpha.7 - 2026-08-30
 
+- v2 dual-write ticketのUUIDv7／UUIDv8識別子をv1 readerでも保持できるよう、UUID検証をRFC 9562のversion範囲へ広げました。
 - document／名前付きscroll領域targetとcustom fallbackをRedmine locatorからfail-closedで復元するようにしました。
 - 親チケット・期限・重要度をrequest hash、context attachment、Redmine issue作成へ追加し、親projectとactive priorityを検証するようにしました。
 

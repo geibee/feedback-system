@@ -1,0 +1,49 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-comment-revision-request-candidate",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "PUT /rest/api/3/issue/{issueIdOrKey}/comment/{id}",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "providerIssueId": "10041",
+  "providerCommentId": "20071",
+  "request": {
+    "body": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "合成revision"
+            }
+          ]
+        }
+      ]
+    },
+    "properties": [
+      {
+        "key": "com.geibee.feedback.revision.v2",
+        "value": {
+          "eventId": "0191f34d-99b7-78e2-b545-570f13b4dc37",
+          "intentId": "f95fcad9-b587-45c6-a90b-b1527cefb466",
+          "requestHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      }
+    ]
+  },
+  "expectedConnectorDecision": {
+    "capability": "requires-live-confirmation",
+    "assumeConditionalUpdate": false,
+    "onMarkerMismatch": "conflict"
+  },
+  "requiresLiveConfirmation": [
+    "bodyとpropertyの障害時commit境界",
+    "同時更新時のlast-write-wins挙動",
+    "response喪失後の直接readによる回収"
+  ]
+}

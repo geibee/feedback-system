@@ -1,0 +1,16 @@
+modules:
+  jira:entityProperty:
+    - key: feedback-recovery-v2-index
+      entityType: issue
+      propertyKey: com.geibee.feedback.recovery.v2
+      values:
+        - path: threadId
+          type: string
+        - path: intentId
+          type: string
+        - path: requestHash
+          type: string
+app:
+  id: ari:cloud:ecosystem::app/64cb2d08-5d8a-453a-b483-a814fdbc1848
+  runtime:
+    name: nodejs22.x

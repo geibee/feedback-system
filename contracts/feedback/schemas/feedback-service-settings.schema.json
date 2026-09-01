@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-service-settings.v2.json",
+  "title": "FeedbackServiceSettingsV2",
+  "description": "DBレスFeedback Serviceの非secret起動設定",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "serviceId", "profileFiles", "signedGrantIssuers", "remoteAuthorizationProfiles", "jwksCache"],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "serviceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "profileFiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^/[^\\u0000]{1,1023}$"
+      }
+    },
+    "signedGrantIssuers": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/SignedGrantIssuerProfile" }
+    },
+    "remoteAuthorizationProfiles": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/RemoteAuthorizationProfile" }
+    },
+    "jwksCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumIssuers", "maximumKeysPerIssuer", "maximumTtlSeconds"],
+      "properties": {
+        "maximumIssuers": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "maximumKeysPerIssuer": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "maximumTtlSeconds": { "type": "integer", "minimum": 1, "maximum": 300 }
+      }
+    }
+  },
+  "$defs": {
+    "StableKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "SecretReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "server-secret" },
+        "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
+      }
+    },
+    "OidcIssuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grantKind", "clientId"],
+      "properties": {
+        "grantKind": { "const": "oidc" },
+        "clientId": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "TokenExchangeIssuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grantKind", "clientId", "actorId"],
+      "properties": {
+        "grantKind": { "const": "token-exchange" },
+        "clientId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "actorId": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "SignedGrantIssuerProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "issuer", "jwksUri", "algorithm", "grant"],
+      "properties": {
+        "id": { "$ref": "#/$defs/StableKey" },
+        "issuer": { "type": "string", "format": "uri", "maxLength": 200 },
+        "jwksUri": { "type": "string", "format": "uri", "maxLength": 500 },
+        "algorithm": { "enum": ["RS256", "ES256", "EdDSA"] },
+        "grant": {
+          "oneOf": [
+            { "$ref": "#/$defs/OidcIssuer" },
+            { "$ref": "#/$defs/TokenExchangeIssuer" }
+          ]
+        }
+      }
+    },
+    "RemoteAuthorizationProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "endpoint", "timeoutMilliseconds", "credentialRef"],
+      "properties": {
+        "id": { "$ref": "#/$defs/StableKey" },
+        "endpoint": { "type": "string", "format": "uri", "maxLength": 500 },
+        "timeoutMilliseconds": { "const": 2000 },
+        "credentialRef": { "$ref": "#/$defs/SecretReference" }
+      }
+    }
+  }
+}

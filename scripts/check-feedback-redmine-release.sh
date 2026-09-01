@@ -27,6 +27,9 @@ const directory = process.env.RELEASE_DIRECTORY;
 const manifest = JSON.parse(fs.readFileSync(path.join(directory, "release-manifest.json"), "utf8"));
 const expected = [
   "@geibee/feedback-contracts",
+  "@geibee/feedback-client",
+  "@geibee/feedback-controller",
+  "@geibee/feedback-react",
   "@geibee/feedback-core",
   "@geibee/feedback-dom-capture",
   "@geibee/feedback-react-ui",

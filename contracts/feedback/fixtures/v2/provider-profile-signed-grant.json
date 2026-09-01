@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "2",
+  "profileId": "inventory-production",
+  "displayName": "Inventory / Production",
+  "connectorKey": "jira-cloud",
+  "installationId": "jira-site-1",
+  "connectorProfileRef": "jira-inventory-production",
+  "workspacePolicy": {
+    "workspaceIds": ["OPS"],
+    "workspaceDiscovery": "supported",
+    "resourceDiscovery": "supported"
+  },
+  "authorization": {
+    "mode": "signed-grant",
+    "issuerProfileRef": "inventory-issuer"
+  },
+  "policy": {
+    "operations": [
+      "feedback:read",
+      "feedback:create",
+      "feedback:reply",
+      "feedback:revise",
+      "feedback:attachment:read",
+      "feedback:attachment:upload"
+    ],
+    "resourceKinds": ["record", "page"]
+  },
+  "capabilities": {
+    "operations": [
+      "feedback:read",
+      "feedback:create",
+      "feedback:reply",
+      "feedback:revise",
+      "feedback:attachment:read",
+      "feedback:attachment:upload"
+    ],
+    "discovery": {
+      "workspaces": "supported",
+      "resources": "supported"
+    },
+    "operationGuarantees": {
+      "create": "recoverable",
+      "reply": "best-effort",
+      "revision": "best-effort",
+      "attachmentUpload": "best-effort"
+    },
+    "creationFields": [
+      {
+        "key": "issueType",
+        "label": "Issue type",
+        "type": "select",
+        "required": true,
+        "options": [
+          { "value": "task", "label": "Task" }
+        ]
+      }
+    ],
+    "maximumMetadataBytes": 32768,
+    "projectionValidation": "envelope-required",
+    "uniqueThreadLookup": true
+  },
+  "secretRefs": {
+    "providerCredential": { "kind": "server-secret", "id": "FEEDBACK_JIRA_CLOUD_CREDENTIAL" },
+    "envelopeKeyRing": { "kind": "server-secret", "id": "FEEDBACK_ENVELOPE_KEY_RING" },
+    "participantCredentialKeyRing": { "kind": "server-secret", "id": "FEEDBACK_PARTICIPANT_CREDENTIAL_KEY_RING" },
+    "participantIdDerivationKey": { "kind": "server-secret", "id": "FEEDBACK_PARTICIPANT_ID_DERIVATION_KEY" }
+  }
+}

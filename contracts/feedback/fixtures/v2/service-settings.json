@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "2",
+  "serviceId": "feedback-production",
+  "profileFiles": ["/etc/feedback/profiles/inventory-production.json"],
+  "signedGrantIssuers": [
+    {
+      "id": "inventory-issuer",
+      "issuer": "https://issuer.example.invalid/",
+      "jwksUri": "https://issuer.example.invalid/.well-known/jwks.json",
+      "algorithm": "RS256",
+      "grant": { "grantKind": "oidc", "clientId": "feedback-browser" }
+    }
+  ],
+  "remoteAuthorizationProfiles": [],
+  "jwksCache": {
+    "maximumIssuers": 32,
+    "maximumKeysPerIssuer": 32,
+    "maximumTtlSeconds": 300
+  }
+}

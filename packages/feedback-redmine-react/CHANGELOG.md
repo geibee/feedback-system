@@ -1,7 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha.7 - 2026-09-01
+
+- `FeedbackControllerPort`へ接続する`RedmineFeedbackControllerOverlay`互換wrapperを追加しました。
+- 既存`RedmineFeedbackOverlay`とv1 UI characterizationはlegacy互換entry pointとして維持します。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
+- v2 dual-write ticketのUUIDv7／UUIDv8 thread／message IDを既存overlayで保持するようにしました。
 - 既存`custom` targetのDOM座標metadataを使い、keyのないpinをpage scrollへ、`data-feedback-scroll-key`のpinを領域scrollへ追従させました。
 - スクリーンショットのピン座標を選択時点で固定し、非同期capture中のscrollによるずれを防止しました。
 - Redmine変更履歴を既定で折りたたみ、主画像の操作名を「画面キャプチャを表示」へ変更しました。

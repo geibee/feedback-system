@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-provider-profile.v2.json",
+  "title": "FeedbackProviderProfileV2",
+  "description": "起動時に一つのAuthorization Modeへ固定するread-only provider profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profileId",
+    "displayName",
+    "connectorKey",
+    "installationId",
+    "workspacePolicy",
+    "authorization",
+    "policy",
+    "capabilities",
+    "secretRefs"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "profileId": { "$ref": "#/$defs/StableKey" },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "connectorKey": { "$ref": "#/$defs/StableKey" },
+    "installationId": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "connectorProfileRef": { "$ref": "#/$defs/StableKey" },
+    "workspacePolicy": { "$ref": "#/$defs/WorkspacePolicy" },
+    "authorization": { "$ref": "#/$defs/AuthorizationConfiguration" },
+    "policy": { "$ref": "#/$defs/ProfilePolicy" },
+    "capabilities": { "$ref": "#/$defs/BackendCapabilities" },
+    "secretRefs": { "$ref": "#/$defs/SecretReferences" }
+  },
+  "$defs": {
+    "StableKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "SecretReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "server-secret" },
+        "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
+      }
+    },
+    "Operation": {
+      "type": "string",
+      "enum": [
+        "feedback:read",
+        "feedback:create",
+        "feedback:reply",
+        "feedback:revise",
+        "feedback:attachment:read",
+        "feedback:attachment:upload"
+      ]
+    },
+    "OperationGuarantee": {
+      "type": "string",
+      "enum": ["recoverable", "best-effort", "unsupported"]
+    },
+    "WorkspacePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspaceIds", "workspaceDiscovery", "resourceDiscovery"],
+      "properties": {
+        "workspaceIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/StableKey" }
+        },
+        "workspaceDiscovery": { "enum": ["supported", "unsupported"] },
+        "resourceDiscovery": { "enum": ["supported", "unsupported"] }
+      }
+    },
+    "PublicAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": { "mode": { "const": "public-profile" } }
+    },
+    "SignedGrantAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "issuerProfileRef"],
+      "properties": {
+        "mode": { "const": "signed-grant" },
+        "issuerProfileRef": { "$ref": "#/$defs/StableKey" }
+      }
+    },
+    "RemoteAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "authorizationProfileRef", "subjectSource"],
+      "properties": {
+        "mode": { "const": "remote-authorization" },
+        "authorizationProfileRef": { "$ref": "#/$defs/StableKey" },
+        "subjectSource": { "const": "authenticated-adapter" }
+      }
+    },
+    "AuthorizationConfiguration": {
+      "oneOf": [
+        { "$ref": "#/$defs/PublicAuthorization" },
+        { "$ref": "#/$defs/SignedGrantAuthorization" },
+        { "$ref": "#/$defs/RemoteAuthorization" }
+      ]
+    },
+    "ProfilePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operations", "resourceKinds"],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Operation" }
+        },
+        "resourceKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/StableKey" }
+        }
+      }
+    },
+    "BackendCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operations", "discovery", "operationGuarantees", "creationFields", "maximumMetadataBytes", "projectionValidation", "uniqueThreadLookup"],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Operation" }
+        },
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workspaces", "resources"],
+          "properties": {
+            "workspaces": { "enum": ["supported", "unsupported"] },
+            "resources": { "enum": ["supported", "unsupported"] }
+          }
+        },
+        "operationGuarantees": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["create", "reply", "revision", "attachmentUpload"],
+          "properties": {
+            "create": { "$ref": "#/$defs/OperationGuarantee" },
+            "reply": { "$ref": "#/$defs/OperationGuarantee" },
+            "revision": { "$ref": "#/$defs/OperationGuarantee" },
+            "attachmentUpload": { "$ref": "#/$defs/OperationGuarantee" }
+          }
+        },
+        "creationFields": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/CreationField" }
+        },
+        "maximumMetadataBytes": { "type": "integer", "minimum": 1024 },
+        "projectionValidation": { "const": "envelope-required" },
+        "uniqueThreadLookup": { "const": true }
+      }
+    },
+    "CreationField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "required"],
+      "properties": {
+        "key": { "$ref": "#/$defs/StableKey" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "type": { "enum": ["text", "date", "select", "reference"] },
+        "required": { "type": "boolean" },
+        "options": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "label": { "type": "string", "minLength": 1, "maxLength": 200 }
+            }
+          }
+        }
+      }
+    },
+    "SecretReferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerCredential", "envelopeKeyRing", "participantCredentialKeyRing", "participantIdDerivationKey"],
+      "properties": {
+        "providerCredential": { "$ref": "#/$defs/SecretReference" },
+        "envelopeKeyRing": { "$ref": "#/$defs/SecretReference" },
+        "participantCredentialKeyRing": { "$ref": "#/$defs/SecretReference" },
+        "participantIdDerivationKey": { "$ref": "#/$defs/SecretReference" },
+        "authorizationCredential": { "$ref": "#/$defs/SecretReference" }
+      }
+    }
+  }
+}

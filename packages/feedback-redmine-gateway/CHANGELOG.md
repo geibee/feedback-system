@@ -2,6 +2,7 @@
 
 ## 1.0.0-alpha.7 - 2026-08-30
 
+- v2 dual-write ticketのUUIDv7／UUIDv8識別子をv1 validation／participant境界で受理するようにしました。
 - document／名前付きscroll領域targetとcustom fallbackを投稿境界でfail-closed検証するようにしました。
 - gateway imageのdistroless baseをOpenSSL CVE-2026-14456修正版へ更新しました。
 - demo imageのnginx baseをOpenSSL CVE-2026-14456修正版へ更新しました。

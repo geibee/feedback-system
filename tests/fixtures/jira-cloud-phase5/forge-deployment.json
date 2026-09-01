@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "kind": "jira-cloud-phase5-forge-deployment",
+  "observedAt": "2026-09-01T03:29:36.675Z",
+  "cliVersion": "13.5.0",
+  "environment": "development",
+  "siteType": "Forge development demo",
+  "deployed": true,
+  "installed": true,
+  "installationStatus": "Up-to-date",
+  "module": "jira:entityProperty",
+  "storageModules": 0,
+  "connectModules": 0,
+  "tenantIdentifiersRemoved": true
+}

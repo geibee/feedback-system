@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "phase1-request-hash-vector-v1",
+  "algorithm": "sha256",
+  "domainSeparator": "feedback-command\n2\n",
+  "input": {
+    "operation": "feedback:create",
+    "profileId": "inventory-production",
+    "workspaceId": "OPS",
+    "resource": { "kind": "record", "key": "order-001" },
+    "command": {
+      "intentId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5002",
+      "threadId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5001",
+      "title": "表示崩れ",
+      "body": "再現手順"
+    }
+  },
+  "canonicalInput": "{\"command\":{\"body\":\"再現手順\",\"intentId\":\"018f0f58-c3d1-7a2b-8a4f-4c09571e5002\",\"threadId\":\"018f0f58-c3d1-7a2b-8a4f-4c09571e5001\",\"title\":\"表示崩れ\"},\"operation\":\"feedback:create\",\"profileId\":\"inventory-production\",\"resource\":{\"key\":\"order-001\",\"kind\":\"record\"},\"workspaceId\":\"OPS\"}",
+  "requestHash": "sha256:b6438ac00c55095e68a8596f0dfd2708d580d38e6ec60e64764bd5ca93d2d8ce"
+}

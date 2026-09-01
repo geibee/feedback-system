@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "phase1-stable-ordering-v1",
+  "ordering": ["occurredAt", "eventId"],
+  "lastViewed": {
+    "occurredAt": "2026-08-31T06:00:00.000Z",
+    "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5002"
+  },
+  "events": [
+    {
+      "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5004",
+      "occurredAt": "2026-08-31T06:01:00.000Z",
+      "kind": "attachment"
+    },
+    {
+      "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5003",
+      "occurredAt": "2026-08-31T06:00:00.000Z",
+      "kind": "reply"
+    },
+    {
+      "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5001",
+      "occurredAt": "2026-08-31T06:00:00.000Z",
+      "kind": "initial-message"
+    },
+    {
+      "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5002",
+      "occurredAt": "2026-08-31T06:00:00.000Z",
+      "kind": "revision"
+    },
+    {
+      "eventId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5005",
+      "occurredAt": "2026-08-31T06:02:00.000Z",
+      "kind": "revision"
+    }
+  ],
+  "expectedEventIds": [
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5001",
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5002",
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5003",
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5004",
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5005"
+  ],
+  "expectedUnreadEventIds": [
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5003",
+    "018f0f58-c3d1-7a2b-8a4f-4c09571e5005"
+  ]
+}

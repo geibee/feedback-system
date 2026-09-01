@@ -26,7 +26,11 @@ bash scripts/verify-feedback.sh
 
 最後に`[feedback-verify] PASS`が出ないreleaseは公開しません。
 
+Feedback Service／Jira Connectorをreleaseする場合は、同じrelease候補sourceで管理Jira Cloud開発site向けの`bash scripts/check-feedback-phase5-live.sh`も実行する。正規verify内の保存済みevidence検査は外部writeを再実行しないため、明示live Gateの代用にはならない。run-owned issueのcleanup成功と、出力`implementationDigest`が保存済みevidenceおよび現sourceに一致することを確認する。
+
 release候補をローカルで確認したい場合だけ、空directoryを指定して生成します。Node.js、npm、Docker Buildx、Trivy、jq、tar、`sha256sum`が必要です。
+
+Redmine browser releaseにはv1互換packageに加え、`@geibee/feedback-redmine-react`のv2互換exportが参照する`@geibee/feedback-client`、`@geibee/feedback-controller`、`@geibee/feedback-react`を依存順で含めます。標準`@geibee/feedback-web-component`、provider Connector、Feedback Service runtimeはPhase 5で統合検証するが、このRedmine npm／OCI release集合へ暗黙に含めません。Feedback Service runtimeは[`docs/phase5/deployment.md`](./phase5/deployment.md)の独立deploy手順を使います。
 
 ```bash
 mkdir "/tmp/feedback-redmine-${FEEDBACK_RELEASE_VERSION}"

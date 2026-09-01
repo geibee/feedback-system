@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1",
+  "profiles": [
+    {
+      "id": "jira-inventory-production",
+      "connectorKey": "jira-cloud",
+      "siteUrl": "https://example.atlassian.net",
+      "application": "inventory",
+      "environment": "production",
+      "issueTypeId": "10001",
+      "maximumAttachmentBytes": 10485760,
+      "attachmentContentTypes": ["image/png", "text/plain"],
+      "timeoutMilliseconds": 30000,
+      "pageSize": 50,
+      "recoveryRetryAfterSeconds": 2
+    },
+    {
+      "id": "redmine-inventory-production",
+      "connectorKey": "redmine",
+      "baseUrl": "https://redmine.example.com",
+      "application": "inventory",
+      "environment": "production",
+      "applicationKey": "inventory",
+      "environmentKey": "production",
+      "workspaceId": "OPS",
+      "workspaceDisplayName": "Operations",
+      "projectId": 10,
+      "trackerId": 3,
+      "isPrivate": true,
+      "customFieldIds": {
+        "threadId": 101,
+        "intentId": 102,
+        "requestHash": 103,
+        "envelope": 104,
+        "projection": 105,
+        "applicationKey": 106,
+        "environmentKey": 107,
+        "externalWorkspaceKey": 108,
+        "hostResourceKey": 109
+      },
+      "maximumAttachmentBytes": 5242880,
+      "attachmentContentTypes": ["image/png", "text/plain"]
+    }
+  ]
+}

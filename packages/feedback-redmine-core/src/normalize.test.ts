@@ -29,6 +29,34 @@ describe("Redmine DTO normalization", () => {
     expect(normalizeIssueDetail(issue, profile, null).attachments[0]?.primaryEvidence).toBe(true);
   });
 
+  it("v2 dual-write由来のUUIDv7をv1 summaryとmessageで維持する", () => {
+    const v7ThreadId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5070";
+    const v7MessageId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5071";
+    const v7ParticipantId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5072";
+    const issue = issueFixture();
+    issue.custom_fields.find((field) => field.id === profile.customFieldIds.threadId)!.value = v7ThreadId;
+    (issue as RedmineIssueDto).journals = [{
+      id: 77,
+      user: { id: 7, name: "Integration" },
+      notes: buildRedmineMessageNote("UUIDv7 reply", {
+        kind: "reply",
+        messageId: v7MessageId,
+        participantId: v7ParticipantId,
+        participantName: "利用者",
+        version: 1,
+        intentId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5073",
+        signature: "signature"
+      }),
+      created_on: "2026-08-31T00:30:00Z",
+      details: []
+    }];
+    expect(normalizeIssueSummary(issue, profile).threadId).toBe(v7ThreadId);
+    expect(normalizeIssueDetail(issue, profile, null, v7ParticipantId).messages?.[1]).toMatchObject({
+      id: v7MessageId,
+      author: { participantId: v7ParticipantId }
+    });
+  });
+
   it("participant replyと追記型edit journalをversion履歴へfoldする", () => {
     const participantId = "00000000-0000-4000-8000-000000000007";
     const messageId = "00000000-0000-4000-8000-000000000008";

@@ -1,0 +1,51 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-phase2-live-observations",
+  "confirmedAt": "2026-08-31",
+  "api": "Jira Cloud REST API v3",
+  "siteType": "Forge development demo",
+  "tenantIdentifiersRemoved": true,
+  "forge": {
+    "cliVersion": "13.5.0",
+    "deployedVersion": "2.0.0",
+    "environment": "development",
+    "installed": true,
+    "module": "jira:entityProperty",
+    "storageModules": 0,
+    "connectModules": 0
+  },
+  "issue": {
+    "firstWriteStoredTriplet": true,
+    "initialExactIndexLatencySeconds": 1,
+    "exactThreadHits": 1,
+    "exactIntentHits": 1,
+    "multipleHitCount": 2,
+    "multipleHitDecision": "repair_required"
+  },
+  "timeout": {
+    "clientTimeoutMilliseconds": 800,
+    "clientResult": "curl-28-no-response-bytes",
+    "providerSearchAttemptsUntilRecovered": 1,
+    "reissuedProviderWrite": false,
+    "recoveredTripletMatched": true
+  },
+  "comments": {
+    "replyMarkerRoundtrip": true,
+    "revisionMarkerRoundtrip": true,
+    "intentScanHits": { "reply": 1, "revision": 1 },
+    "pagination": { "maxResults": 1, "pageSizes": [1, 1] }
+  },
+  "attachment": {
+    "uploadAttempts": 1,
+    "metadataRoundtrip": true,
+    "signedMappingRoundtrip": true,
+    "downloadHashMatched": true,
+    "automaticRetry": false
+  },
+  "guarantees": {
+    "create": "recoverable",
+    "reply": "recoverable",
+    "revision": "best-effort",
+    "attachmentUpload": "best-effort"
+  }
+}

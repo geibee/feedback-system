@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-domain.v2.json",
+  "title": "FeedbackDomainV2",
+  "description": "provider非依存のscope、stable ordering、cursor fingerprint契約",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "scope", "orderingKey"],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "scope": { "$ref": "#/$defs/FeedbackScopeV2" },
+    "orderingKey": { "$ref": "#/$defs/FeedbackOrderingKeyV2" }
+  },
+  "$defs": {
+    "StableKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "StableId": { "type": "string", "format": "uuid" },
+    "FeedbackResourceRefV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/StableKey" },
+        "key": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "FeedbackScopeV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "workspaceId", "resource"],
+      "properties": {
+        "profileId": { "$ref": "#/$defs/StableKey" },
+        "workspaceId": { "$ref": "#/$defs/StableKey" },
+        "resource": { "$ref": "#/$defs/FeedbackResourceRefV2" }
+      }
+    },
+    "FeedbackOrderingKeyV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occurredAt", "eventId"],
+      "properties": {
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "eventId": { "$ref": "#/$defs/StableId" }
+      }
+    },
+    "FeedbackCursorBoundaryV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "queryFingerprint", "orderingKey"],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "queryFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "orderingKey": { "$ref": "#/$defs/FeedbackOrderingKeyV2" }
+      }
+    }
+  }
+}

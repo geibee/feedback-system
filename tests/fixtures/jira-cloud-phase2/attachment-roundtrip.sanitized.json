@@ -1,0 +1,26 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-v3-attachment-roundtrip",
+  "upload": {
+    "multipartField": "file",
+    "xAtlassianToken": "no-check",
+    "attempts": 1,
+    "filename": "feedback-phase2.txt",
+    "contentType": "text/plain",
+    "sizeBytes": 104
+  },
+  "mapping": {
+    "storedAfterKnownSuccess": true,
+    "signed": true,
+    "providerRereadSignatureValidation": true
+  },
+  "download": {
+    "acceptApplicationOctetStreamStatus": 406,
+    "acceptWildcardHashMatched": true
+  },
+  "expected": {
+    "guarantee": "best-effort",
+    "automaticBinaryRetry": false,
+    "unknownResult": "repair_required"
+  }
+}

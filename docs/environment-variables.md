@@ -4,6 +4,84 @@
 
 secretには既定値がありません。secret managerまたはorchestratorのsecret機能から注入し、Git、image、公開runtime config、logへ保存しないでください。
 
+## Feedback Service v2
+
+Phase 5の`@geibee/feedback-service-runtime`は次の非secret設定を読み、`feedback-service-settings.v2`、`feedback-provider-profile.v2`、Connector runtime catalogを起動前に検証します。Feedback Service本体はprovider非依存のまま、別deploy compositionがnetwork listenerとConnectorを接続します。
+
+| 変数 | 必須 | 指定する値 |
+| --- | --- | --- |
+| `FEEDBACK_SERVICE_SETTINGS_FILE` | 必須 | `feedback-service-settings.v2` JSONのcontainer内absolute path |
+| `FEEDBACK_CONNECTOR_PROFILES_FILE` | 必須 | read-only Connector runtime catalog JSONのcontainer内absolute path |
+| `FEEDBACK_PUBLIC_ORIGIN` | 必須 | Feedbackを利用するSPAのoriginだけ。path、query、credentialは不可 |
+| `FEEDBACK_SERVICE_BASE_PATH` | 任意 | v2 API base path。既定は`/internal/feedback/v2` |
+| `FEEDBACK_MAXIMUM_REQUEST_BYTES` | 任意 | request body上限。既定は`8388608`、範囲は1024〜1073741824 bytes |
+| `FEEDBACK_OPERATION_TIMEOUT_MILLISECONDS` | 任意 | providerを含む一操作のhard deadline。既定は`30000`、範囲は100〜60000 ms |
+| `FEEDBACK_SERVICE_HOST` | 任意 | listen host。既定はloopbackの`127.0.0.1` |
+| `FEEDBACK_SERVICE_PORT` | 任意 | listen port。既定は`8080` |
+
+settingsは不変な`serviceId`、read-only provider profile file一覧、signed grant issuer allowlist、remote authorization profile、上限付きJWKS cache設定だけを持ちます。profileやsettingsへcredential、HMAC key、tokenを埋め込まず、`{ "kind": "server-secret", "id": "..." }`でserver-side secretを参照します。
+
+fixtureで使用する次のIDはsecret値ではなく、secret manager／orchestrator側の名前です。実配備ではprofileが参照するIDと注入名を一致させ、値に既定値を設けません。
+
+```text
+FEEDBACK_JIRA_CLOUD_CREDENTIAL
+FEEDBACK_ENVELOPE_KEY_RING
+FEEDBACK_PARTICIPANT_CREDENTIAL_KEY_RING
+FEEDBACK_PARTICIPANT_ID_DERIVATION_KEY
+```
+
+`FEEDBACK_ENVELOPE_KEY_RING`と`FEEDBACK_PARTICIPANT_CREDENTIAL_KEY_RING`は別の32 bytes以上のkey materialを持つring、`FEEDBACK_PARTICIPANT_ID_DERIVATION_KEY`はさらに独立した32 bytes以上のkeyです。provider profileの`maximumMetadataBytes`と`creationFields`はread-only設定であり、環境変数ではありません。
+
+key ring secretは次のexact JSONとする。`activeKid`は新規署名に一つだけ使用し、`keys`内の他の鍵は検証専用として扱う。`key`は32 bytes以上のcanonical base64urlで、値に既定値はない。
+
+```json
+{
+  "activeKid": "2026-09",
+  "keys": [
+    { "kid": "2026-09", "key": "BASE64URL_SECRET" },
+    { "kid": "2026-06", "key": "OLD_BASE64URL_SECRET" }
+  ]
+}
+```
+
+provider credential secretはConnectorごとに次のexact JSONとする。Jira CloudはAtlassian account emailとAPI token、Redmineは専用integration userのAPI keyを使う。Forge CLI tokenはJira Connector credentialとして再利用しない。
+
+```json
+{ "kind": "jira-cloud-basic", "email": "service-account@example.com", "apiToken": "SECRET" }
+```
+
+```json
+{ "kind": "redmine-api-key", "apiKey": "SECRET" }
+```
+
+`/readyz`はprovider credentialのexact JSON、Envelope／participant credential key ringのactive一鍵・最大8鍵・32 bytes以上のcanonical base64url、participant ID導出鍵を実際にparseする。不正または不足したsecretでは`ready: false`とHTTP 503を返す。secret値やparse errorの入力値はresponseへ含めない。
+
+`public-profile` browserのparticipant credentialは環境変数では配布しない。同一originの発行APIへ端末内browser profile UUIDを渡して取得し、browser側で当該profileのwrite requestだけへ付与する。
+
+Connector runtime catalogはsecretを持たず、provider profileの`connectorProfileRef`から一意に参照する。Jira entryは`siteUrl`、`application`、`environment`、`issueTypeId`、attachment上限、content type、timeout、page size、回収待ちを持つ。Redmine entryはこれらに相当する値とworkspace／project／tracker／v2 custom field IDを持つ。schema、実装、運用例のdriftは`scripts/check-feedback-phase5.sh`で検査する。
+
+standalone listenerへ`remote-authorization` profileを設定する場合、任意headerではなく認証済みsubjectを返すhost adapterをcode compositionで注入する。adapterなしでは起動に失敗する。subject用header名や共有secretに暗黙の既定値はない。
+
+### Jira Cloud managed acceptance専用
+
+次はPhase 5の管理された開発site受け入れ試験だけに一時設定する。通常のFeedback Service processへ渡さない。credentialはshellまたはFIFOから注入し、repo file、fixture、logへ保存しない。
+
+| 変数 | 必須 | 指定する値 |
+| --- | --- | --- |
+| `FEEDBACK_JIRA_ACCEPTANCE_SITE_URL` | 必須 | 許可済みJira Cloud開発siteのHTTPS origin |
+| `FEEDBACK_JIRA_ACCEPTANCE_PROJECT_KEY` | 必須 | 許可済みtest project key |
+| `FEEDBACK_JIRA_ACCEPTANCE_EMAIL` | FIFO未指定時 | test利用者のAtlassian account email |
+| `FEEDBACK_JIRA_ACCEPTANCE_API_TOKEN` | FIFO未指定時 | test利用者の一時API token |
+| `FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO` | credential環境変数未指定時 | 上記emailとAPI tokenを各1行で一度だけ渡すFIFO。指定時は2つのcredential環境変数より優先する |
+| `FEEDBACK_JIRA_ACCEPTANCE_CLEANUP_POLICY` | 必須 | `delete-run-owned`固定 |
+| `FEEDBACK_JIRA_ACCEPTANCE_ISSUE_TYPE_ID` | 任意 | 未指定時はcreate metadataから非subtaskのTaskまたは先頭候補を選ぶ |
+
+受け入れscriptはrun ID付きissueを一件だけ作成し、comment、revision、attachment、property検索を検証後、そのissueだけを削除する。既存issue、project、Forge installationは削除しない。FIFOは読み取り後に閉じるが削除しないため、呼出元が専用一時directoryとFIFOを削除する。
+
+Phase 2 Jira contract spikeのForge／Jira credentialは利用者のWSL shellへ一時注入して使用し、repo file、fixture、Feedback Service設定へ保存していません。Phase 3でも新しい固定secret環境変数名は追加しておらず、profileのsecret reference IDと同名の環境変数だけをdeploy環境で必須解決します。Forge CLIのlogin情報をFeedback Serviceのsecret名として再利用しません。
+
+Jira Connector配下の`forge-app`はentity property index専用の独立deploy artifactです。Forge CLIの認証／environmentはそのdeploy操作だけに使用し、Feedback Service processへ環境変数やForge runtime bindingを追加しません。
+
 ## Redmine gateway
 
 標準配布gatewayで使用する設定です。

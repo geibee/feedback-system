@@ -253,6 +253,6 @@ function stringMap(value: unknown, name: string): void {
 function invalid(name: string): Error { return new Error(`Redmine responseの${name}が不正です`); }
 
 const activityFields = ["status", "assignee", "priority", "tracker", "subject", "description", "attachment"];
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const customProviderPattern = /^[a-z0-9][a-z0-9._-]{0,99}$/u;
 const metadataKeyPattern = /^[A-Za-z][A-Za-z0-9_.-]*$/u;

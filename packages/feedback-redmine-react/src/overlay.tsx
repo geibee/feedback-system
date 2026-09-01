@@ -375,7 +375,7 @@ export const RedmineFeedbackOverlay = forwardRef<
     const fromQuery = url.searchParams.get("feedbackThread");
     const fromHash = /(?:^|[&#])feedbackThread=([0-9a-f-]{36})(?:&|$)/iu.exec(url.hash.slice(1))?.[1] ?? null;
     const threadId = fromQuery ?? fromHash;
-    if (threadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(threadId)) {
+    if (threadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(threadId)) {
       void openCurrentThread(threadId);
     }
   }, [openCurrentThread]);

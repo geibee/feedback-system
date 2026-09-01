@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-attachment-marker.v2.json",
+  "title": "FeedbackAttachmentMarkerV2",
+  "description": "stable attachment IDをprovider attachmentへ対応付けるserver-only署名marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "threadId",
+    "messageId",
+    "attachmentId",
+    "intentId",
+    "requestHash",
+    "providerBinding",
+    "providerAttachmentId",
+    "filename",
+    "contentType",
+    "sizeBytes",
+    "contentHash",
+    "createdAt",
+    "signature"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "threadId": { "type": "string", "format": "uuid" },
+    "messageId": { "type": "string", "format": "uuid" },
+    "attachmentId": { "type": "string", "format": "uuid" },
+    "intentId": { "type": "string", "format": "uuid" },
+    "requestHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "providerBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "installationId", "objectId"],
+      "properties": {
+        "profileId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "installationId": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "objectId": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "providerAttachmentId": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "contentType": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "sizeBytes": { "type": "integer", "minimum": 1 },
+    "contentHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "kid", "value"],
+      "properties": {
+        "alg": { "const": "HS256" },
+        "kid": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+        "value": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    }
+  }
+}

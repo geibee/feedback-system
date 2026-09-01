@@ -1,0 +1,2 @@
+Feedback System Phase 2 synthetic attachment fixture.
+This file contains no tenant data or credentials.

@@ -1,0 +1,18 @@
+{
+  "name": "feedback-web-component-vanilla-fixture",
+  "version": "1.0.0-alpha.7",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build --manifest"
+  },
+  "dependencies": {
+    "@geibee/feedback-controller": "1.0.0-alpha.7",
+    "@geibee/feedback-web-component": "1.0.0-alpha.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "8.2.1"
+  }
+}

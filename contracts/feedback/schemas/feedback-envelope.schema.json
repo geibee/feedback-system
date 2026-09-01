@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-envelope.v2.json",
+  "title": "FeedbackEnvelopeV2",
+  "description": "ticket管理systemへ保存する署名付きFeedback thread Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "threadId",
+    "intentId",
+    "requestHash",
+    "providerBinding",
+    "scope",
+    "createdBy",
+    "createdAt",
+    "signature"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "threadId": { "$ref": "#/$defs/StableId" },
+    "intentId": { "$ref": "#/$defs/StableId" },
+    "requestHash": { "$ref": "#/$defs/RequestHash" },
+    "providerBinding": { "$ref": "#/$defs/ProviderBinding" },
+    "scope": { "$ref": "#/$defs/StoredScope" },
+    "createdBy": { "$ref": "#/$defs/CreatedBy" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "release": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "perspective": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "location": { "$ref": "#/$defs/ScalarObject" },
+    "target": { "$ref": "#/$defs/Target" },
+    "signature": { "$ref": "#/$defs/Signature" }
+  },
+  "$defs": {
+    "StableId": { "type": "string", "format": "uuid" },
+    "RequestHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "StableKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "ProviderBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "installationId", "objectId"],
+      "properties": {
+        "profileId": { "$ref": "#/$defs/StableKey" },
+        "installationId": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "objectId": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "ResourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/StableKey" },
+        "key": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "StoredScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace", "resource", "application", "environment"],
+      "properties": {
+        "workspace": { "$ref": "#/$defs/StableKey" },
+        "resource": { "$ref": "#/$defs/ResourceRef" },
+        "application": { "$ref": "#/$defs/StableKey" },
+        "environment": { "$ref": "#/$defs/StableKey" }
+      }
+    },
+    "CreatedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participantId"],
+      "properties": { "participantId": { "$ref": "#/$defs/StableId" } }
+    },
+    "Scalar": {
+      "oneOf": [
+        { "type": "string", "maxLength": 2000 },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "ScalarObject": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": { "$ref": "#/$defs/Scalar" }
+    },
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "targetKey"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/StableKey" },
+        "provider": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "targetKey": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "metadata": { "$ref": "#/$defs/ScalarObject" }
+      }
+    },
+    "Signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "kid", "value"],
+      "properties": {
+        "alg": { "const": "HS256" },
+        "kid": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ COPY packages/feedback-controller/package.json packages/feedback-controller/pack
 COPY packages/feedback-web-component/package.json packages/feedback-web-component/package.json
 COPY packages/feedback-react/package.json packages/feedback-react/package.json
 COPY packages/feedback-connector-jira-cloud/package.json packages/feedback-connector-jira-cloud/package.json
+COPY packages/feedback-connector-backlog/package.json packages/feedback-connector-backlog/package.json
 COPY packages/feedback-connector-redmine/package.json packages/feedback-connector-redmine/package.json
 COPY packages/feedback-dom-capture/package.json packages/feedback-dom-capture/package.json
 COPY packages/feedback-react-ui/package.json packages/feedback-react-ui/package.json
@@ -35,6 +36,7 @@ COPY packages/feedback-connector-sdk packages/feedback-connector-sdk
 COPY packages/feedback-envelope packages/feedback-envelope
 COPY packages/feedback-gateway packages/feedback-gateway
 COPY packages/feedback-connector-jira-cloud packages/feedback-connector-jira-cloud
+COPY packages/feedback-connector-backlog packages/feedback-connector-backlog
 COPY packages/feedback-connector-redmine packages/feedback-connector-redmine
 COPY apps/feedback-service apps/feedback-service
 COPY apps/feedback-service-runtime apps/feedback-service-runtime
@@ -43,6 +45,7 @@ RUN npm --workspace @geibee/feedback-contracts run build \
  && npm --workspace @geibee/feedback-envelope run build \
  && npm --workspace @geibee/feedback-gateway run build \
  && npm --workspace @geibee/feedback-connector-jira-cloud run build \
+ && npm --workspace @geibee/feedback-connector-backlog run build \
  && npm --workspace @geibee/feedback-connector-redmine run build \
  && npm --workspace @geibee/feedback-service run build \
  && npm --workspace @geibee/feedback-service-runtime run build
@@ -65,6 +68,8 @@ COPY --from=build --chown=node:node /workspace/packages/feedback-gateway/package
 COPY --from=build --chown=node:node /workspace/packages/feedback-gateway/dist /app/node_modules/@geibee/feedback-gateway/dist
 COPY --from=build --chown=node:node /workspace/packages/feedback-connector-jira-cloud/package.json /app/node_modules/@geibee/feedback-connector-jira-cloud/package.json
 COPY --from=build --chown=node:node /workspace/packages/feedback-connector-jira-cloud/dist /app/node_modules/@geibee/feedback-connector-jira-cloud/dist
+COPY --from=build --chown=node:node /workspace/packages/feedback-connector-backlog/package.json /app/node_modules/@geibee/feedback-connector-backlog/package.json
+COPY --from=build --chown=node:node /workspace/packages/feedback-connector-backlog/dist /app/node_modules/@geibee/feedback-connector-backlog/dist
 COPY --from=build --chown=node:node /workspace/packages/feedback-connector-redmine/package.json /app/node_modules/@geibee/feedback-connector-redmine/package.json
 COPY --from=build --chown=node:node /workspace/packages/feedback-connector-redmine/dist /app/node_modules/@geibee/feedback-connector-redmine/dist
 EXPOSE 8080

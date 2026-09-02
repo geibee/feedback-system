@@ -25,6 +25,7 @@ fixtureで使用する次のIDはsecret値ではなく、secret manager／orches
 
 ```text
 FEEDBACK_JIRA_CLOUD_CREDENTIAL
+FEEDBACK_BACKLOG_CREDENTIAL
 FEEDBACK_ENVELOPE_KEY_RING
 FEEDBACK_PARTICIPANT_CREDENTIAL_KEY_RING
 FEEDBACK_PARTICIPANT_ID_DERIVATION_KEY
@@ -44,7 +45,7 @@ key ring secretは次のexact JSONとする。`activeKid`は新規署名に一�
 }
 ```
 
-provider credential secretはConnectorごとに次のexact JSONとする。Jira CloudはAtlassian account emailとAPI token、Redmineは専用integration userのAPI keyを使う。Forge CLI tokenはJira Connector credentialとして再利用しない。
+provider credential secretはConnectorごとに次のexact JSONとする。Jira CloudはAtlassian account emailとAPI token、RedmineとBacklogは専用integration userのAPI keyを使う。Forge CLI tokenはJira Connector credentialとして再利用しない。
 
 ```json
 { "kind": "jira-cloud-basic", "email": "service-account@example.com", "apiToken": "SECRET" }
@@ -54,11 +55,41 @@ provider credential secretはConnectorごとに次のexact JSONとする。Jira 
 { "kind": "redmine-api-key", "apiKey": "SECRET" }
 ```
 
-`/readyz`はprovider credentialのexact JSON、Envelope／participant credential key ringのactive一鍵・最大8鍵・32 bytes以上のcanonical base64url、participant ID導出鍵を実際にparseする。不正または不足したsecretでは`ready: false`とHTTP 503を返す。secret値やparse errorの入力値はresponseへ含めない。
+```json
+{ "kind": "backlog-api-key", "apiKey": "SECRET" }
+```
+
+`/readyz`はprovider credentialのexact JSON、Envelope／participant credential key ringのactive一鍵・最大8鍵・32 bytes以上のcanonical base64url、participant ID導出鍵を実際にparseする。Backlog profileではさらにproject、`feedback.threadId`、`feedback.intentId`、`feedback.requestHash`、`feedback.resourceKey`の4 Text custom field、issue type、priorityをprovider APIで確認する。不正、不足、provisioning driftでは`ready: false`とHTTP 503を返す。secret値やparse errorの入力値はresponseへ含めない。
 
 `public-profile` browserのparticipant credentialは環境変数では配布しない。同一originの発行APIへ端末内browser profile UUIDを渡して取得し、browser側で当該profileのwrite requestだけへ付与する。
 
-Connector runtime catalogはsecretを持たず、provider profileの`connectorProfileRef`から一意に参照する。Jira entryは`siteUrl`、`application`、`environment`、`issueTypeId`、attachment上限、content type、timeout、page size、回収待ちを持つ。Redmine entryはこれらに相当する値とworkspace／project／tracker／v2 custom field IDを持つ。schema、実装、運用例のdriftは`scripts/check-feedback-phase5.sh`で検査する。
+Connector runtime catalogはsecretを持たず、provider profileの`connectorProfileRef`から一意に参照する。Jira entryは`siteUrl`、`application`、`environment`、`issueTypeId`、attachment上限、content type、timeout、page size、回収待ちを持つ。Redmine entryはこれらに相当する値とworkspace／project／tracker／v2 custom field IDを持つ。Backlog entryはHTTPS origin、単一workspace／project、issue type、priority、4 Text custom field ID、metadata上限、timeout、page size、回収待ちを持つ。Backlog attachmentは非対応なので`maximumAttachmentBytes=1`、`attachmentContentTypes=[]`へ固定する。schema、実装、運用例のdriftは検証scriptで検査する。
+
+### Backlog Stage A managed acceptance専用
+
+次はBacklog SaaS Stage Aのrun-owned検証だけに一時設定する。credentialをrepo file、fixture、logへ保存しない。
+
+| 変数 | 必須 | 指定する値 |
+| --- | --- | --- |
+| `BACKLOG_STAGE_A_BASE_URL` | 必須 | 許可済みBacklog SaaS spaceのHTTPS origin |
+| `BACKLOG_STAGE_A_API_KEY` | 必須 | test利用者のAPI key。transportは`Backlog-API-Key` headerへ変換する |
+| `BACKLOG_STAGE_A_PROJECT_KEY` | 必須 | cleanup可能な専用project key |
+| `BACKLOG_STAGE_A_CLEANUP_POLICY` | 必須 | `delete-run-owned`固定 |
+
+`scripts/run-feedback-backlog-stage-a.mjs`はrun固有issue、comment、attachmentだけを作成し、fault境界と別process再構築を確認後にすべて削除する。`BACKLOG_STAGE_A_RECONSTRUCT_INPUT`と`BACKLOG_STAGE_A_SIGNING_SECRET`はrunnerが別processへ一時注入する内部値であり、利用者が設定または永続化しない。
+
+### Backlog Stage B live Conformance専用
+
+次は実Backlog Connectorのrun-owned受け入れ試験だけに一時設定する。通常のFeedback Service processへ渡さず、credentialをrepo file、fixture、logへ保存しない。
+
+| 変数 | 必須 | 指定する値 |
+| --- | --- | --- |
+| `FEEDBACK_BACKLOG_ACCEPTANCE_BASE_URL` | 必須 | 許可済みBacklog SaaS spaceのHTTPS origin |
+| `FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY` | 必須 | test利用者のAPI key。URL queryへ含めず`Backlog-API-Key` headerだけへ変換する |
+| `FEEDBACK_BACKLOG_ACCEPTANCE_PROJECT_KEY` | 必須 | 4 Text custom fieldをprovisionし、cleanup可能な専用project key |
+| `FEEDBACK_BACKLOG_ACCEPTANCE_CLEANUP_POLICY` | 必須 | `delete-run-owned`固定 |
+
+`bash scripts/check-feedback-backlog-live.sh`は実Connectorでcreate、reply、append-only revisionのcommit後応答喪失、thread／resource検索、別process再構築、unsupported operation、cleanupを検証する。`FEEDBACK_BACKLOG_RECONSTRUCT_INPUT`と`FEEDBACK_BACKLOG_SIGNING_SECRET`はrunnerが別processへ一時注入する内部値であり、利用者が設定または永続化しない。
 
 standalone listenerへ`remote-authorization` profileを設定する場合、任意headerではなく認証済みsubjectを返すhost adapterをcode compositionで注入する。adapterなしでは起動に失敗する。subject用header名や共有secretに暗黙の既定値はない。
 

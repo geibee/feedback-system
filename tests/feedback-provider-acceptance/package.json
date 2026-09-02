@@ -10,6 +10,7 @@
   "dependencies": {
     "@geibee/feedback-client": "1.0.0-alpha.7",
     "@geibee/feedback-connector-jira-cloud": "1.0.0-alpha.7",
+    "@geibee/feedback-connector-sdk": "1.0.0-alpha.7",
     "@geibee/feedback-contracts": "1.0.0-alpha.7",
     "@geibee/feedback-controller": "1.0.0-alpha.7",
     "@geibee/feedback-envelope": "1.0.0-alpha.7",

@@ -43,6 +43,17 @@ export const nodeRedmineFetch: RedmineFetch = async (input, init) => {
   }
 };
 
+export const nodeBacklogFetch: BacklogFetch = async (input, init) => {
+  const response = await fetch(input, {
+    method: init.method,
+    headers: { ...init.headers },
+    ...(init.body === undefined ? {} : { body: init.body }),
+    ...(init.signal ? { signal: init.signal as AbortSignal } : {}),
+    ...(init.redirect ? { redirect: init.redirect } : {})
+  });
+  return { status: response.status, headers: response.headers, text: () => response.text() };
+};
+
 async function* readableStream(stream: ReadableStream<Uint8Array>): AsyncIterable<Uint8Array> {
   const reader = stream.getReader();
   try {
@@ -55,3 +66,4 @@ async function* readableStream(stream: ReadableStream<Uint8Array>): AsyncIterabl
     reader.releaseLock();
   }
 }
+import type { BacklogFetch } from "@geibee/feedback-connector-backlog";

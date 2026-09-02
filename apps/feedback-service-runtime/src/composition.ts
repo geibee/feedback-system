@@ -1,15 +1,7 @@
-import type { FeedbackRepositoryPort } from "@geibee/feedback-connector-sdk";
 import type { FeedbackProviderProfileV2 } from "@geibee/feedback-contracts/v2/server";
-import {
-  createFeedbackJiraCloudConnector,
-  createJiraCloudFetchTransport,
-  type JiraCloudFetch
-} from "@geibee/feedback-connector-jira-cloud";
-import {
-  createFeedbackRedmineConnector,
-  createFeedbackRedmineRestTransport,
-  type RedmineFetch
-} from "@geibee/feedback-connector-redmine";
+import type { BacklogFetch } from "@geibee/feedback-connector-backlog";
+import type { JiraCloudFetch } from "@geibee/feedback-connector-jira-cloud";
+import type { RedmineFetch } from "@geibee/feedback-connector-redmine";
 import { FeedbackGatewayProblem } from "@geibee/feedback-gateway";
 import {
   createFeedbackService,
@@ -20,15 +12,13 @@ import {
 import {
   loadFeedbackConnectorCatalog,
   validateConnectorCatalogBindings,
-  type FeedbackConnectorCatalog,
-  type FeedbackConnectorRuntimeProfile
+  type FeedbackConnectorCatalog
 } from "./catalog.js";
-import { nodeJiraCloudFetch, nodeRedmineFetch } from "./fetch-adapters.js";
+import { createFeedbackConnectorAdapterRegistry } from "./connector-registry.js";
 import { createProductionFeedbackProjectionVerifier } from "./projection.js";
 import {
   loadFeedbackEnvelopeCodec,
-  participantIdForAuthorization,
-  resolveProviderAuthorization
+  participantIdForAuthorization
 } from "./secrets.js";
 
 export type FeedbackProductionRuntime = {
@@ -44,6 +34,7 @@ export async function createFeedbackProductionRuntime(input: {
   environment: Readonly<Record<string, string | undefined>>;
   jiraFetch?: JiraCloudFetch;
   redmineFetch?: RedmineFetch;
+  backlogFetch?: BacklogFetch;
   authorizationHttpClient?: FeedbackHttpClientPort;
 }): Promise<FeedbackProductionRuntime> {
   const environment = input.environment;
@@ -52,13 +43,18 @@ export async function createFeedbackProductionRuntime(input: {
   const basePath = basePathValue(environment.FEEDBACK_SERVICE_BASE_PATH ?? "/internal/feedback/v2");
   const maximumRequestBytes = integer(environment.FEEDBACK_MAXIMUM_REQUEST_BYTES ?? "8388608", "FEEDBACK_MAXIMUM_REQUEST_BYTES", 1024, 1_073_741_824);
   const operationTimeoutMilliseconds = integer(environment.FEEDBACK_OPERATION_TIMEOUT_MILLISECONDS ?? "30000", "FEEDBACK_OPERATION_TIMEOUT_MILLISECONDS", 100, 60_000);
+  const registry = createFeedbackConnectorAdapterRegistry({
+    ...(input.jiraFetch ? { jiraFetch: input.jiraFetch } : {}),
+    ...(input.redmineFetch ? { redmineFetch: input.redmineFetch } : {}),
+    ...(input.backlogFetch ? { backlogFetch: input.backlogFetch } : {})
+  });
   const configuration = await loadFeedbackConfigurationFromEnvironment({ environment });
   const [catalog, profiles] = await Promise.all([
-    loadFeedbackConnectorCatalog(connectorProfilesFile),
+    loadFeedbackConnectorCatalog(connectorProfilesFile, registry),
     configuration.profileLoader.loadProfiles()
   ]);
-  validateConnectorCatalogBindings(catalog, profiles);
-  profiles.forEach((profile) => validateCapabilityDrift(profile, catalog));
+  validateConnectorCatalogBindings(catalog, profiles, registry);
+  profiles.forEach((profile) => validateCapabilityDrift(profile, catalog, registry));
   const byProfileId = new Map(profiles.map((profile) => [profile.profileId, profile]));
   const projectionVerifier = createProductionFeedbackProjectionVerifier({
     catalog,
@@ -76,6 +72,16 @@ export async function createFeedbackProductionRuntime(input: {
     basePath,
     maximumRequestBytes,
     operationTimeoutMilliseconds,
+    providerCredentialValidator: {
+      async validate({ profile, secret }) {
+        const reference = profile.connectorProfileRef;
+        const runtimeProfile = reference ? catalog.profiles.get(reference) : undefined;
+        if (!runtimeProfile || runtimeProfile.connectorKey !== profile.connectorKey) throw new Error("Connector runtime profile bindingが不正です");
+        const adapter = registry.require(profile.connectorKey);
+        const credential = adapter.validateCredential(secret);
+        await adapter.validateReadiness?.(runtimeProfile, credential);
+      }
+    },
     ...(input.authorizationHttpClient ? { httpClient: input.authorizationHttpClient } : {}),
     async repositoryResolver(resolution) {
       const reference = resolution.profile.connectorProfileRef;
@@ -100,22 +106,18 @@ export async function createFeedbackProductionRuntime(input: {
         derivationSecretId: resolution.profile.secretRefs.participantIdDerivationKey.id,
         secretResolver: configuration.secretResolver
       });
-      const [credential, envelopeCodec] = await Promise.all([
-        resolveProviderAuthorization({
-          secretResolver: configuration.secretResolver,
-          secretId: resolution.profile.secretRefs.providerCredential.id,
-          connectorKey: runtimeProfile.connectorKey
-        }),
+      const [credentialSecret, envelopeCodec] = await Promise.all([
+        configuration.secretResolver.resolve(resolution.profile.secretRefs.providerCredential.id),
         loadFeedbackEnvelopeCodec(configuration.secretResolver, resolution.profile.secretRefs.envelopeKeyRing.id)
       ]);
-      return createRepository({
+      const adapter = registry.require(runtimeProfile.connectorKey);
+      const credential = adapter.validateCredential(credentialSecret);
+      return adapter.createRepository({
         runtimeProfile,
         profile: resolution.profile,
         participantId,
         credential,
-        envelopeCodec,
-        jiraFetch: input.jiraFetch ?? nodeJiraCloudFetch,
-        redmineFetch: input.redmineFetch ?? nodeRedmineFetch
+        envelopeCodec
       });
     }
   });
@@ -129,93 +131,32 @@ export async function createFeedbackProductionRuntime(input: {
   });
 }
 
-function createRepository(input: {
-  runtimeProfile: FeedbackConnectorRuntimeProfile;
-  profile: FeedbackProviderProfileV2;
-  participantId: string;
-  credential: string;
-  envelopeCodec: Awaited<ReturnType<typeof loadFeedbackEnvelopeCodec>>;
-  jiraFetch: JiraCloudFetch;
-  redmineFetch: RedmineFetch;
-}): FeedbackRepositoryPort {
-  if (input.runtimeProfile.connectorKey === "jira-cloud") {
-    return createFeedbackJiraCloudConnector({
-      configuration: {
-        profileId: input.profile.profileId,
-        installationId: input.profile.installationId,
-        application: input.runtimeProfile.application,
-        environment: input.runtimeProfile.environment,
-        participantId: input.participantId,
-        issueTypeId: input.runtimeProfile.issueTypeId,
-        maximumAttachmentBytes: input.runtimeProfile.maximumAttachmentBytes,
-        attachmentContentTypes: input.runtimeProfile.attachmentContentTypes,
-        pageSize: input.runtimeProfile.pageSize,
-        recoveryRetryAfterSeconds: input.runtimeProfile.recoveryRetryAfterSeconds
-      },
-      transport: createJiraCloudFetchTransport({
-        baseUrl: input.runtimeProfile.siteUrl,
-        authorization: input.credential,
-        fetch: input.jiraFetch,
-        timeoutMilliseconds: input.runtimeProfile.timeoutMilliseconds
-      }),
-      envelopeCodec: input.envelopeCodec
-    });
-  }
-  return createFeedbackRedmineConnector({
-    profile: {
-      profileId: input.profile.profileId,
-      installationId: input.profile.installationId,
-      displayName: input.profile.displayName,
-      applicationKey: input.runtimeProfile.applicationKey,
-      environmentKey: input.runtimeProfile.environmentKey,
-      workspaceId: input.runtimeProfile.workspaceId,
-      workspaceDisplayName: input.runtimeProfile.workspaceDisplayName,
-      projectId: input.runtimeProfile.projectId,
-      trackerId: input.runtimeProfile.trackerId,
-      isPrivate: input.runtimeProfile.isPrivate,
-      ...(input.runtimeProfile.defaultPriorityId ? { defaultPriorityId: input.runtimeProfile.defaultPriorityId } : {}),
-      participantId: input.participantId,
-      participantDisplayName: "Feedback participant",
-      customFieldIds: input.runtimeProfile.customFieldIds,
-      maximumAttachmentBytes: input.runtimeProfile.maximumAttachmentBytes,
-      attachmentContentTypes: input.runtimeProfile.attachmentContentTypes
-    },
-    transport: createFeedbackRedmineRestTransport({
-      baseUrl: input.runtimeProfile.baseUrl,
-      apiKey: input.credential,
-      fetch: input.redmineFetch
-    }),
-    envelopeCodec: input.envelopeCodec
-  });
-}
-
-function validateCapabilityDrift(profile: FeedbackProviderProfileV2, catalog: FeedbackConnectorCatalog): void {
+function validateCapabilityDrift(profile: FeedbackProviderProfileV2, catalog: FeedbackConnectorCatalog, registry: ReturnType<typeof createFeedbackConnectorAdapterRegistry>): void {
   const runtime = profile.connectorProfileRef ? catalog.profiles.get(profile.connectorProfileRef) : undefined;
   if (!runtime) throw new Error(`Connector runtime profileがありません: ${profile.profileId}`);
-  const backendGuarantees = {
-    create: "recoverable",
-    reply: "recoverable",
-    revision: "best-effort",
-    attachmentUpload: "best-effort"
-  } as const;
+  const backend = registry.require(runtime.connectorKey).backendCapabilities(runtime);
+  const backendGuarantees = backend.operationGuarantees;
   for (const operation of Object.keys(backendGuarantees) as Array<keyof typeof backendGuarantees>) {
     const backend = backendGuarantees[operation];
     const configured = profile.capabilities.operationGuarantees[operation];
     const allowed = backend === "recoverable"
       ? new Set(["recoverable", "best-effort", "unsupported"])
-      : new Set(["best-effort", "unsupported"]);
+      : backend === "best-effort"
+        ? new Set(["best-effort", "unsupported"])
+        : new Set(["unsupported"]);
     if (!allowed.has(configured)) {
       throw new Error(`operation guaranteeがConnector実装より強く設定されています: ${profile.profileId}:${operation}`);
     }
   }
-  const backendOperations = new Set([
-    "feedback:read", "feedback:create", "feedback:reply", "feedback:revise",
-    "feedback:attachment:read", "feedback:attachment:upload"
-  ]);
-  if (profile.capabilities.operations.some((operation) => !backendOperations.has(operation))) {
+  if (profile.capabilities.operations.some((operation) => !backend.operations.has(operation))) {
     throw new Error(`operation capabilityがConnector実装とdriftしています: ${profile.profileId}`);
   }
-  if (runtime.maximumAttachmentBytes < 1 || runtime.attachmentContentTypes.length === 0) {
+  if (profile.capabilities.discovery.workspaces === "supported" && backend.discovery.workspaces !== "supported" ||
+      profile.capabilities.discovery.resources === "supported" && backend.discovery.resources !== "supported") {
+    throw new Error(`discovery capabilityがConnector実装とdriftしています: ${profile.profileId}`);
+  }
+  if (backend.operations.has("feedback:attachment:upload") &&
+      (runtime.maximumAttachmentBytes < 1 || runtime.attachmentContentTypes.length === 0)) {
     throw new Error(`attachment設定が不正です: ${profile.profileId}`);
   }
 }

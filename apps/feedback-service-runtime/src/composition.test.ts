@@ -91,6 +91,64 @@ describe("Feedback Service production composition", () => {
     expect(redmineFetch).not.toHaveBeenCalled();
   });
 
+  it("Backlogも同じadapter registryでcredentialとcapabilityを解決する", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "feedback-runtime-backlog-"));
+    directories.push(directory);
+    const profileFile = join(directory, "profile.json");
+    const settingsFile = join(directory, "settings.json");
+    const catalogFile = join(directory, "connectors.json");
+    const key = Buffer.alloc(32, 6).toString("base64url");
+    const ring = JSON.stringify({ activeKid: "current", keys: [{ kid: "current", key }] });
+    await writeFile(profileFile, JSON.stringify(backlogProviderProfile()), { mode: 0o600 });
+    await writeFile(settingsFile, JSON.stringify({
+      schemaVersion: "2", serviceId: "stage-b-backlog", profileFiles: [profileFile],
+      signedGrantIssuers: [], remoteAuthorizationProfiles: [],
+      jwksCache: { maximumIssuers: 1, maximumKeysPerIssuer: 1, maximumTtlSeconds: 60 }
+    }), { mode: 0o600 });
+    await writeFile(catalogFile, JSON.stringify({ schemaVersion: "1", profiles: [backlogRuntimeProfile()] }), { mode: 0o600 });
+    const backlogFetch = vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      const body = path === "/api/v2/projects/1"
+        ? { id: 1, projectKey: "FBSTAGEA", name: "Feedback", archived: false }
+        : path === "/api/v2/projects/1/customFields"
+          ? [
+            { id: 11, typeId: 1, name: "feedback.threadId", required: false },
+            { id: 12, typeId: 1, name: "feedback.intentId", required: false },
+            { id: 13, typeId: 1, name: "feedback.requestHash", required: false },
+            { id: 14, typeId: 1, name: "feedback.resourceKey", required: false }
+          ]
+          : path === "/api/v2/projects/1/issueTypes"
+            ? [{ id: 2, name: "Task" }]
+            : [{ id: 3, name: "Normal" }];
+      return { status: 200, headers: new Headers({ "content-type": "application/json" }), async text() { return JSON.stringify(body); } };
+    });
+    const runtime = await createFeedbackProductionRuntime({
+      environment: {
+        FEEDBACK_SERVICE_SETTINGS_FILE: settingsFile,
+        FEEDBACK_CONNECTOR_PROFILES_FILE: catalogFile,
+        FEEDBACK_PUBLIC_ORIGIN: "https://app.example",
+        PROVIDER: JSON.stringify({ kind: "backlog-api-key", apiKey: "token" }),
+        ENVELOPE: ring,
+        PARTICIPANT: ring,
+        DERIVATION: key
+      },
+      backlogFetch
+    });
+    await expect(runtime.service.readiness()).resolves.toEqual({ ready: true, profileCount: 1 });
+    const response = await runtime.service.handle(new Request(
+      "https://app.example/internal/feedback/v2/profiles/backlog?workspaceId=FBSTAGEA&resourceKind=record&resourceKey=order-001"
+    ));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      profile: {
+        profileId: "backlog",
+        effectivePermissions: ["feedback:read"],
+        capabilities: { discovery: { resources: "unsupported" } }
+      }
+    });
+    expect(backlogFetch).toHaveBeenCalledTimes(4);
+  });
+
   it("remote-authorization profileを認証済みsubject adapterなしでlistenさせない", () => {
     expect(() => createFeedbackNodeServer({
       runtime: {
@@ -183,5 +241,35 @@ function redmineRuntimeProfile() {
     },
     maximumAttachmentBytes: 1024,
     attachmentContentTypes: ["text/plain"]
+  };
+}
+
+function backlogProviderProfile() {
+  return {
+    ...providerProfile(),
+    profileId: "backlog",
+    displayName: "Backlog",
+    connectorKey: "backlog",
+    installationId: "backlog-1",
+    connectorProfileRef: "backlog-runtime",
+    workspacePolicy: { workspaceIds: ["FBSTAGEA"], workspaceDiscovery: "supported", resourceDiscovery: "unsupported" },
+    capabilities: {
+      operations: ["feedback:read", "feedback:create", "feedback:reply", "feedback:revise"],
+      discovery: { workspaces: "supported", resources: "unsupported" },
+      operationGuarantees: { create: "recoverable", reply: "recoverable", revision: "recoverable", attachmentUpload: "unsupported" },
+      creationFields: [], maximumMetadataBytes: 32768,
+      projectionValidation: "envelope-required", uniqueThreadLookup: true
+    }
+  };
+}
+
+function backlogRuntimeProfile() {
+  return {
+    id: "backlog-runtime", connectorKey: "backlog", baseUrl: "https://example.backlog.com",
+    application: "inventory", environment: "production", workspaceId: "FBSTAGEA",
+    workspaceDisplayName: "Feedback", projectId: 1, issueTypeId: 2, priorityId: 3,
+    maximumAttachmentBytes: 1, attachmentContentTypes: [], maximumMetadataBytes: 32768,
+    timeoutMilliseconds: 30000, pageSize: 100, recoveryRetryAfterSeconds: 5,
+    customFieldIds: { threadId: 11, intentId: 12, requestHash: 13, resourceKey: 14 }
   };
 }

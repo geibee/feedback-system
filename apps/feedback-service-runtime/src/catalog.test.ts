@@ -40,6 +40,20 @@ describe("read-only Connector catalog", () => {
     expect(() => (catalog.profiles.get("jira-runtime")!.attachmentContentTypes as string[]).push("image/png")).toThrow();
   });
 
+  it("Backlog profileを同じregistryから読込み4 custom fieldをfreezeする", async () => {
+    const backlog = {
+      id: "backlog-runtime", connectorKey: "backlog", baseUrl: "https://example.backlog.com",
+      application: "inventory", environment: "production", workspaceId: "FBSTAGEA",
+      workspaceDisplayName: "Feedback", projectId: 1, issueTypeId: 2, priorityId: 3,
+      maximumAttachmentBytes: 1, attachmentContentTypes: [], maximumMetadataBytes: 32768,
+      timeoutMilliseconds: 30000, pageSize: 100, recoveryRetryAfterSeconds: 5,
+      customFieldIds: { threadId: 11, intentId: 12, requestHash: 13, resourceKey: 14 }
+    };
+    const catalog = await loadFeedbackConnectorCatalog(await catalogFile({ schemaVersion: "1", profiles: [backlog] }));
+    expect(catalog.profiles.get("backlog-runtime")).toMatchObject({ connectorKey: "backlog", workspaceId: "FBSTAGEA" });
+    expect(() => ((catalog.profiles.get("backlog-runtime") as typeof backlog).customFieldIds.threadId = 99)).toThrow();
+  });
+
   it("unknown field、HTTP site、重複profileを起動前に拒否する", async () => {
     await expect(loadFeedbackConnectorCatalog(await catalogFile({ schemaVersion: "1", profiles: [{ ...jira, extra: true }] }))).rejects.toThrow("unknown field");
     await expect(loadFeedbackConnectorCatalog(await catalogFile({ schemaVersion: "1", profiles: [{ ...jira, siteUrl: "http://example.test" }] }))).rejects.toThrow("HTTPS URL");

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1",
+  "kind": "backlog-stage-a-live-acceptance",
+  "contractVersion": "2.0.0-alpha.2",
+  "implementationDigest": "sha256:21e867f4d449651803585c38eaac907a59f694bc50536970b4f6e3f5fde65488",
+  "executedAt": "2026-09-02T09:06:27.772Z",
+  "api": "Backlog API v2",
+  "siteType": "Backlog SaaS free trial",
+  "tenantIdentifiersRemoved": true,
+  "credentialWire": "Backlog-API-Key header",
+  "provisioning": {
+    "projectAccessible": true,
+    "credentialSubjectIsProjectAdministrator": true,
+    "textCustomFieldsReady": true
+  },
+  "firstThreadWrite": {
+    "bodyAndRecoveryTripletSingleRequest": true,
+    "directReadRoundtrip": true,
+    "signedEnvelopeBoundAfterProviderIdentityResolution": true
+  },
+  "threadLookup": {
+    "zeroExactHitsDecision": "pending",
+    "oneExactHitRecoveredAfterResponseLoss": true,
+    "multipleExactHitsDecision": "repair_required",
+    "exactPostFilterApplied": true,
+    "visibilityMilliseconds": 24751
+  },
+  "comments": {
+    "zeroMarkerHitsDecision": "pending",
+    "replyBodyAndMarkerSingleRequest": true,
+    "replyRecoveredAfterResponseLoss": true,
+    "multipleMarkerHitsDecision": "repair_required",
+    "revisionAppendOnly": true,
+    "revisionRecoveredAfterResponseLoss": true
+  },
+  "attachment": {
+    "initialUploadResponseDiscarded": true,
+    "initialUploadAutomaticRetry": false,
+    "discardedUploadAttachedByCleanupHarness": true,
+    "temporaryUploadSucceeded": true,
+    "metadataAndAttachSingleCommentRequest": true,
+    "finalCommentRecoveredAfterResponseLoss": true,
+    "temporaryAndFinalProviderIdEqual": false,
+    "binaryHashRoundtrip": true,
+    "capabilityClassification": "unsupported",
+    "unknownInitialUploadDecision": "repair_required",
+    "automaticBinaryRetry": false
+  },
+  "restartReconstruction": {
+    "separateProcess": true,
+    "providerIdentifiersPassedToProcess": false,
+    "threadEnvelopeVerified": true,
+    "replyVerified": true,
+    "revisionVerified": true,
+    "attachmentVerified": false
+  },
+  "hardGate": {
+    "status": "passed",
+    "passed": true,
+    "recoverableOperations": [
+      "create",
+      "reply",
+      "revision"
+    ],
+    "unsupportedOperations": [
+      "attachment-read",
+      "attachment-upload"
+    ]
+  },
+  "automaticWriteRetry": false,
+  "cleanup": "deleted-all-run-owned-issues"
+}

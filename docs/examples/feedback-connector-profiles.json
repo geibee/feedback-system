@@ -40,6 +40,30 @@
       },
       "maximumAttachmentBytes": 5242880,
       "attachmentContentTypes": ["image/png", "text/plain"]
+    },
+    {
+      "id": "backlog-inventory-production",
+      "connectorKey": "backlog",
+      "baseUrl": "https://example.backlog.com",
+      "application": "inventory",
+      "environment": "production",
+      "workspaceId": "FEEDBACK",
+      "workspaceDisplayName": "Feedback",
+      "projectId": 20,
+      "issueTypeId": 21,
+      "priorityId": 3,
+      "customFieldIds": {
+        "threadId": 201,
+        "intentId": 202,
+        "requestHash": 203,
+        "resourceKey": 204
+      },
+      "maximumAttachmentBytes": 1,
+      "attachmentContentTypes": [],
+      "maximumMetadataBytes": 32768,
+      "timeoutMilliseconds": 30000,
+      "pageSize": 100,
+      "recoveryRetryAfterSeconds": 5
     }
   ]
 }

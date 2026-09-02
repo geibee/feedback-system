@@ -135,6 +135,10 @@ async function validateProviderCredential(input: {
   secret: string;
   customValidator?: FeedbackProviderCredentialValidatorPort;
 }): Promise<void> {
+  if (input.customValidator) {
+    await input.customValidator.validate({ profile: input.profile, secret: input.secret });
+    return;
+  }
   if (input.profile.connectorKey === "jira-cloud") {
     const credential = exactObject(parseJson(input.secret, "Jira Cloud credential"), [
       "kind", "email", "apiToken"
@@ -152,10 +156,7 @@ async function validateProviderCredential(input: {
     assertBoundedString(credential.apiKey, "Redmine API key", 1, 4096);
     return;
   }
-  if (!input.customValidator) {
-    throw new Error(`provider credential validatorがありません: ${input.profile.connectorKey}`);
-  }
-  await input.customValidator.validate({ profile: input.profile, secret: input.secret });
+  throw new Error(`provider credential validatorがありません: ${input.profile.connectorKey}`);
 }
 
 function validateSigningKeyRing(source: string, name: string): void {

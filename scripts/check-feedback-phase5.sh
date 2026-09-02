@@ -11,6 +11,7 @@ docker buildx version >/dev/null 2>&1 || fail "Docker Buildxが見つかりま�
 
 required_files=(
   apps/feedback-service-runtime/src/composition.ts
+  apps/feedback-service-runtime/src/connector-registry.ts
   apps/feedback-service-runtime/src/projection.ts
   apps/feedback-service-runtime/src/listener.ts
   apps/feedback-service-runtime/Dockerfile
@@ -20,6 +21,12 @@ required_files=(
   scripts/check-feedback-phase5-live.sh
   tests/fixtures/jira-cloud-phase5/live-acceptance.json
   tests/fixtures/jira-cloud-phase5/forge-deployment.json
+  packages/feedback-connector-backlog/src/connector.ts
+  packages/feedback-connector-backlog/src/contract-fixture.ts
+  scripts/run-feedback-backlog-live-conformance.mjs
+  scripts/check-feedback-backlog-live.sh
+  tests/fixtures/backlog-stage-a/live-gate.json
+  tests/fixtures/backlog-stage-b/live-conformance.json
   docs/phase5/compatibility-matrix.md
   docs/phase5/deployment.md
   docs/phase5/storage-migration.md
@@ -79,6 +86,52 @@ current_live_digest=$(node -e '
 
 jq -e '
   .schemaVersion == "1" and
+  .kind == "backlog-stage-b-live-conformance" and
+  .contractVersion == "2.0.0-alpha.2" and
+  (.implementationDigest | test("^sha256:[a-f0-9]{64}$")) and
+  .api == "Backlog API v2" and
+  .siteType == "Backlog SaaS free trial" and
+  .tenantIdentifiersRemoved == true and
+  (.provisioning | [.[]] | all) and
+  (.capabilities | [.[]] | all) and
+  .recovery.zeroCreateHitPending == true and
+  .recovery.createResponseLostAfterCommit == true and
+  .recovery.createRecoveredFromProvider == true and
+  .recovery.replyResponseLostAfterCommit == true and
+  .recovery.replyRecoveredFromProvider == true and
+  .recovery.revisionResponseLostAfterCommit == true and
+  .recovery.revisionRecoveredFromProvider == true and
+  .recovery.duplicateThreadRepairRequired == true and
+  .recovery.automaticWriteRetry == false and
+  (.roundtrip | [.[]] | all) and
+  .restartReconstruction.separateProcess == true and
+  .restartReconstruction.providerObjectIdentifiersPassed == false and
+  .restartReconstruction.threadRecovered == true and
+  .restartReconstruction.intentsRecovered == true and
+  .restartReconstruction.resourceProjectionRecovered == true and
+  .cleanup == "deleted-all-run-owned-issues"
+' tests/fixtures/backlog-stage-b/live-conformance.json >/dev/null || fail "Backlog Stage B live evidenceが不正です"
+
+current_backlog_live_digest=$(node -e '
+  const { createHash } = require("node:crypto");
+  const { readFileSync } = require("node:fs");
+  const files = [
+    "packages/feedback-connector-backlog/src/connector.ts",
+    "packages/feedback-connector-backlog/src/http-transport.ts",
+    "packages/feedback-connector-backlog/src/provisioning.ts",
+    "packages/feedback-connector-backlog/src/rest-v2-client.ts",
+    "packages/feedback-connector-backlog/src/types.ts",
+    "scripts/run-feedback-backlog-live-conformance.mjs"
+  ];
+  const digest = createHash("sha256");
+  for (const file of files) digest.update(file).update("\0").update(readFileSync(file)).update("\0");
+  process.stdout.write(`sha256:${digest.digest("hex")}`);
+')
+[[ "$(jq -r .implementationDigest tests/fixtures/backlog-stage-b/live-conformance.json)" == "$current_backlog_live_digest" ]] \
+  || fail "保存済みBacklog Stage B live evidenceが現Connector実装へbindingされていません。scripts/check-feedback-backlog-live.shを再実行してください"
+
+jq -e '
+  .schemaVersion == "1" and
   .kind == "jira-cloud-phase5-forge-deployment" and
   .environment == "development" and
   .siteType == "Forge development demo" and
@@ -96,7 +149,7 @@ const serviceDependencies = Object.keys({ ...(service.dependencies || {}), ...(s
 if (serviceDependencies.some((name) => /connector-(?:jira-cloud|redmine)|forge/u.test(name))) {
   throw new Error("provider非依存Feedback Serviceへproduction Connectorが混入しています");
 }
-for (const required of ["@geibee/feedback-service", "@geibee/feedback-connector-jira-cloud", "@geibee/feedback-connector-redmine"]) {
+for (const required of ["@geibee/feedback-service", "@geibee/feedback-connector-jira-cloud", "@geibee/feedback-connector-redmine", "@geibee/feedback-connector-backlog"]) {
   if (runtime.dependencies?.[required] !== "1.0.0-alpha.7") throw new Error(`runtime composition dependencyがありません: ${required}`);
 }
 const forbidden = /(prisma|sequelize|typeorm|mongoose|postgres|mysql|sqlite|redis|bull|queue|kafka|amqp|rabbit|memcached|cache|storage|s3|r2|blob|forge)/iu;
@@ -118,8 +171,18 @@ if rg -n "from ['\"](?:node:sqlite|pg|mysql|redis|bull|kafkajs|amqplib)|writeFil
   apps/feedback-service-runtime/src --glob '!*.test.ts'; then
   fail "production runtimeへ永続化、upload storage、Forge実装が混入しています"
 fi
-if rg -n "feedback-connector-(?:jira-cloud|redmine)|@forge|forge-app" apps/feedback-service/src; then
+if rg -n "feedback-connector-(?:jira-cloud|redmine|backlog)|@forge|forge-app" apps/feedback-service/src; then
   fail "provider非依存Feedback ServiceへConnector／Forge実装が混入しています"
+fi
+if rg -ni '\bbacklog\b' \
+  apps/feedback-service/src packages/feedback-gateway/src packages/feedback-client/src \
+  packages/feedback-controller/src packages/feedback-react/src packages/feedback-web-component/src \
+  --glob '!*.test.ts'; then
+  fail "provider非依存共通層またはUIへBacklog分岐が混入しています"
+fi
+if rg -n "from ['\"](?:node:sqlite|pg|mysql|redis|bull|kafkajs|amqplib)|writeFile|mkdir|createWriteStream|uploadDirectory" \
+  packages/feedback-connector-backlog/src --glob '!*.test.ts'; then
+  fail "Backlog Connectorへ補助storage実装が混入しています"
 fi
 for field in threadId intentId requestHash; do
   rg -Fq "path: $field" packages/feedback-connector-jira-cloud/forge-app/manifest.yml || fail "Forge index fieldがありません: $field"
@@ -143,6 +206,7 @@ packages=(
   @geibee/feedback-service
   @geibee/feedback-connector-redmine
   @geibee/feedback-connector-jira-cloud
+  @geibee/feedback-connector-backlog
   @geibee/feedback-controller
   @geibee/feedback-react
   @geibee/feedback-web-component

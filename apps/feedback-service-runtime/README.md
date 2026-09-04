@@ -11,6 +11,14 @@ npm run build:feedback:v2
 npm --workspace @geibee/feedback-service-runtime run start
 ```
 
+release候補はrootと全workspaceを同じversionへ揃えたsourceからmulti-architecture OCIとして生成する。生成物にはBacklog Connectorを含むruntime、CycloneDX SBOM、HIGH／CRITICAL脆弱性report、checksum、live evidence bindingを持つmanifestが含まれる。
+
+```sh
+bash scripts/build-feedback-service-release.sh \
+  --output /tmp/feedback-service-1.0.0-rc.1 \
+  --version 1.0.0-rc.1
+```
+
 standalone listenerは`public-profile`と`signed-grant`を扱う。`remote-authorization`は認証済みsubjectを供給するhost adapterが必要なため、adapterなしでは起動をfail-closedにする。任意HTTP headerをsubjectとして信頼しない。
 
 `GET /healthz`はprocess liveness、`GET /readyz`は設定とsecret解決のreadinessである。Backlog profileだけはproject、4 Text custom field、issue type、priorityのprovisioningをAPIで確認し、不一致または到達不能時はreadyにしない。provider障害中のoffline readは保証しない。

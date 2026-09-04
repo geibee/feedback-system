@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-rc.1 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-02
+
+- Backlog初回release candidateは既存の公開wire／domain契約を変更せず、provider能力差を既存capabilityとoperation保証で表現した。
+- attachment read／uploadを`unsupported`として縮退し、Backlog固有DTO、credential、provider内部IDを公開契約へ追加していない。
+
 ## 1.0.0-alpha.7 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-01
 
 - `public-profile` browserがparticipant credentialを取得できるsame-origin発行endpointを追加した。

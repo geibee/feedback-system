@@ -421,7 +421,8 @@ provider profileはread-only設定fileまたは起動時環境設定から読み
 | 製品 | 現行機能維持の目安 | 評価 |
 |---|---:|---|
 | Redmine | 100% | 現行基準 |
-| Jira Cloud / Data Center | 97〜99% | 非常に高い |
+| Jira Cloud | 97〜99% | 非常に高い。contract／Connector検証済み |
+| Jira Data Center | 97〜99% | 事前評価。案件時に対象versionでStage Aが必要 |
 | Azure DevOps Boards / Server | 96〜98% | 非常に高い |
 | YouTrack | 95〜98% | 高い |
 | ServiceNow | 95〜98% | 高いが導入重い |
@@ -460,7 +461,7 @@ GitHubの値はGitHub全体であり、GitHub Issues単体の市場シェアで�
 - custom field、JQL、comment、attachmentが揃う
 - 現行機能をほぼそのまま維持可能
 
-**Redmineの次に実装する第一候補。**
+Jira CloudはRedmineの次にcontract検証と正式Connector実装を完了している。この完了はJira Data Centerの互換性または実装着手を意味しない。
 
 ### Azure DevOps Boards
 
@@ -476,7 +477,7 @@ GitHubの値はGitHub全体であり、GitHub Issues単体の市場シェアで�
 
 ### Backlog
 
-日本市場では優先度が高い。非エンジニアも使いやすく、UAT / 顧客確認用途とも相性が良い。
+日本市場では優先度が高い。非エンジニアも使いやすく、UAT / 顧客確認用途とも相性が良い。Redmine／Jira Cloudに続く第三providerとして、既存抽象の汎用性を検証する最初の後続Connectorとする。
 
 ### ServiceNow
 
@@ -484,7 +485,7 @@ GitHubの値はGitHub全体であり、GitHub Issues単体の市場シェアで�
 
 ### Linear
 
-SaaS / AI / product engineering企業で成長しているが、現時点ではJira / Azure DevOps / Backlogより後。
+SaaS / AI / product engineering企業で成長しているが、現時点ではJira Cloud / Azure DevOps / Backlogより後。
 
 ### 要望ベース
 
@@ -504,21 +505,23 @@ Connector SDKを公開し、需要が出た段階で対応する。
 
 ```text
 Redmine
-Jira
+Jira Cloud
+Backlog
 Azure DevOps
 GitLab
 GitHub Issues
 ```
 
-この5系統で主要な開発組織のかなり広い範囲をカバーできる。
+この範囲で主要な開発組織と日本市場のかなり広い範囲をカバーできる。
 
 ### 市場別追加
 
 ```text
-日本市場        → Backlog
 グローバルSaaS → Linear
 大企業ITSM      → ServiceNow
 ```
+
+Jira Data Centerは常設の実装順序へ含めず、self-hosted Jiraが導入条件となる案件または明示的な利用要望がある場合に追加する。
 
 ### SDK / Community Connector
 
@@ -542,16 +545,16 @@ Zendesk
 初期契約検証・正式Connector
   1. Jira Cloud
 
-初期汎用化後
-  2. Jira Data Center
+最初の後続Connector
+  2. Backlog
+
+その後の公式Connector候補
   3. Azure DevOps
   4. GitLab
   5. GitHub Issues
 
-日本市場向け追加
-  6. Backlog
-
 案件・市場次第
+  Jira Data Center
   ServiceNow
   Linear
 
@@ -561,7 +564,7 @@ SDK / Community
   Zendesk
 ```
 
-Jira Cloudを契約freeze前のfixture spikeに使い、正式Connectorも最初に実装する。Jira Data CenterはCloudと同じ実装へ条件分岐で混在させず、独立した互換検証対象とする。Azure DevOpsはその次に異なるWork Itemモデルを検証する。
+Jira Cloudを契約freeze前のfixture spikeに使い、正式Connectorも最初に実装する。次はBacklogを第三providerとして検証・実装し、Redmine／Jira Cloudで確立した共通層を再利用できることを確認する。Jira Data CenterはCloud対応の完了を理由に着手せず、導入案件または明示的な利用要望がある場合だけ、対象versionを固定したDBレスcontract applicability spikeから開始する。Cloud ConnectorへData Center固有の条件分岐を追加せず、Connector固有実装の要否はspike結果から決定する。
 
 GitHub Issuesは制約が強いため、抽象設計が特定製品へ過適合していないかを検証する第二段階のテストベッドとして有効。
 
@@ -610,7 +613,9 @@ partial writeを含むcompatibility matrix、provider acceptance、browser E2E�
 
 ### 後続Connector
 
-Jira Data Center、Azure DevOps、GitLab、GitHub、Backlogの順でprovider差を検証する。GitHubではattachment、custom field、検索制約がある環境でも成立するfallbackを検証する。
+Backlogを最初の後続Connectorとしてprovider差を検証する。その後はAzure DevOps、GitLab、GitHubの順を候補とし、GitHubではattachment、custom field、検索制約がある環境でも成立するfallbackを検証する。Jira Data Centerは案件・利用要望がある場合だけStage Aから評価し、既定の実装順序には含めない。
+
+後続ConnectorはRedmine／Jira Cloudで確立した共通契約と実装を優先し、providerごとの縦割り実装を増やさない。まずDBレスcontract applicability spikeで、ticket管理システムだけを正本として最初のwrite、検索、操作回復、attachment mappingが成立するかを確認する。通過後はprovider非依存処理を共通packageとserver-side adapter registryへ置き、Connector固有実装をHTTP transport、credential wire形式、DTO mapper、検索構文、metadata保存位置、provisioningへ限定する。provider能力の不足はcapabilityと保証水準で表現し、補完用DBやprovider外storageを追加しない。
 
 ---
 

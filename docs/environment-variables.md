@@ -86,10 +86,11 @@ Connector runtime catalogはsecretを持たず、provider profileの`connectorPr
 | --- | --- | --- |
 | `FEEDBACK_BACKLOG_ACCEPTANCE_BASE_URL` | 必須 | 許可済みBacklog SaaS spaceのHTTPS origin |
 | `FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY` | 必須 | test利用者のAPI key。URL queryへ含めず`Backlog-API-Key` headerだけへ変換する |
+| `FEEDBACK_BACKLOG_ACCEPTANCE_CREDENTIAL_FIFO` | 任意 | API keyを1行だけ渡す一回限りのnamed pipe。指定時は`FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY`より優先する |
 | `FEEDBACK_BACKLOG_ACCEPTANCE_PROJECT_KEY` | 必須 | 4 Text custom fieldをprovisionし、cleanup可能な専用project key |
 | `FEEDBACK_BACKLOG_ACCEPTANCE_CLEANUP_POLICY` | 必須 | `delete-run-owned`固定 |
 
-`bash scripts/check-feedback-backlog-live.sh`は実Connectorでcreate、reply、append-only revisionのcommit後応答喪失、thread／resource検索、別process再構築、unsupported operation、cleanupを検証する。`FEEDBACK_BACKLOG_RECONSTRUCT_INPUT`と`FEEDBACK_BACKLOG_SIGNING_SECRET`はrunnerが別processへ一時注入する内部値であり、利用者が設定または永続化しない。
+`bash scripts/check-feedback-backlog-live.sh`は実Connectorでcreate、reply、append-only revisionのcommit後応答喪失、thread／resource検索、別process再構築、unsupported operation、cleanupを検証する。API keyは環境変数へ直接設定するより、mode 600のFIFOから一回だけ渡す方法を推奨する。`FEEDBACK_BACKLOG_RECONSTRUCT_INPUT`と`FEEDBACK_BACKLOG_SIGNING_SECRET`はrunnerが別processへ一時注入する内部値であり、利用者が設定または永続化しない。
 
 standalone listenerへ`remote-authorization` profileを設定する場合、任意headerではなく認証済みsubjectを返すhost adapterをcode compositionで注入する。adapterなしでは起動に失敗する。subject用header名や共有secretに暗黙の既定値はない。
 

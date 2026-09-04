@@ -50,28 +50,34 @@ RUN npm --workspace @geibee/feedback-contracts run build \
  && npm --workspace @geibee/feedback-service run build \
  && npm --workspace @geibee/feedback-service-runtime run build
 
-FROM docker.io/library/node:22.18.0-bookworm-slim@sha256:752ea8a2f758c34002a0461bd9f1cee4f9a3c36d48494586f60ffce1fc708e0e
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="Feedback Service runtime" \
+  org.opencontainers.image.version="$VERSION" \
+  org.opencontainers.image.revision="$REVISION" \
+  org.opencontainers.image.source="https://github.com/geibee/feedback-system"
 ENV NODE_ENV=production
-USER node
 WORKDIR /app
-COPY --from=build --chown=node:node /workspace/apps/feedback-service-runtime/package.json /app/apps/feedback-service-runtime/package.json
-COPY --from=build --chown=node:node /workspace/apps/feedback-service-runtime/dist /app/apps/feedback-service-runtime/dist
-COPY --from=build --chown=node:node /workspace/apps/feedback-service/package.json /app/node_modules/@geibee/feedback-service/package.json
-COPY --from=build --chown=node:node /workspace/apps/feedback-service/dist /app/node_modules/@geibee/feedback-service/dist
-COPY --from=build --chown=node:node /workspace/contracts/feedback/package.json /app/node_modules/@geibee/feedback-contracts/package.json
-COPY --from=build --chown=node:node /workspace/contracts/feedback/dist /app/node_modules/@geibee/feedback-contracts/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-sdk/package.json /app/node_modules/@geibee/feedback-connector-sdk/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-sdk/dist /app/node_modules/@geibee/feedback-connector-sdk/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-envelope/package.json /app/node_modules/@geibee/feedback-envelope/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-envelope/dist /app/node_modules/@geibee/feedback-envelope/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-gateway/package.json /app/node_modules/@geibee/feedback-gateway/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-gateway/dist /app/node_modules/@geibee/feedback-gateway/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-jira-cloud/package.json /app/node_modules/@geibee/feedback-connector-jira-cloud/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-jira-cloud/dist /app/node_modules/@geibee/feedback-connector-jira-cloud/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-backlog/package.json /app/node_modules/@geibee/feedback-connector-backlog/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-backlog/dist /app/node_modules/@geibee/feedback-connector-backlog/dist
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-redmine/package.json /app/node_modules/@geibee/feedback-connector-redmine/package.json
-COPY --from=build --chown=node:node /workspace/packages/feedback-connector-redmine/dist /app/node_modules/@geibee/feedback-connector-redmine/dist
+COPY --from=build /workspace/apps/feedback-service-runtime/package.json /app/apps/feedback-service-runtime/package.json
+COPY --from=build /workspace/apps/feedback-service-runtime/dist /app/apps/feedback-service-runtime/dist
+COPY --from=build /workspace/apps/feedback-service/package.json /app/node_modules/@geibee/feedback-service/package.json
+COPY --from=build /workspace/apps/feedback-service/dist /app/node_modules/@geibee/feedback-service/dist
+COPY --from=build /workspace/contracts/feedback/package.json /app/node_modules/@geibee/feedback-contracts/package.json
+COPY --from=build /workspace/contracts/feedback/dist /app/node_modules/@geibee/feedback-contracts/dist
+COPY --from=build /workspace/packages/feedback-connector-sdk/package.json /app/node_modules/@geibee/feedback-connector-sdk/package.json
+COPY --from=build /workspace/packages/feedback-connector-sdk/dist /app/node_modules/@geibee/feedback-connector-sdk/dist
+COPY --from=build /workspace/packages/feedback-envelope/package.json /app/node_modules/@geibee/feedback-envelope/package.json
+COPY --from=build /workspace/packages/feedback-envelope/dist /app/node_modules/@geibee/feedback-envelope/dist
+COPY --from=build /workspace/packages/feedback-gateway/package.json /app/node_modules/@geibee/feedback-gateway/package.json
+COPY --from=build /workspace/packages/feedback-gateway/dist /app/node_modules/@geibee/feedback-gateway/dist
+COPY --from=build /workspace/packages/feedback-connector-jira-cloud/package.json /app/node_modules/@geibee/feedback-connector-jira-cloud/package.json
+COPY --from=build /workspace/packages/feedback-connector-jira-cloud/dist /app/node_modules/@geibee/feedback-connector-jira-cloud/dist
+COPY --from=build /workspace/packages/feedback-connector-backlog/package.json /app/node_modules/@geibee/feedback-connector-backlog/package.json
+COPY --from=build /workspace/packages/feedback-connector-backlog/dist /app/node_modules/@geibee/feedback-connector-backlog/dist
+COPY --from=build /workspace/packages/feedback-connector-redmine/package.json /app/node_modules/@geibee/feedback-connector-redmine/package.json
+COPY --from=build /workspace/packages/feedback-connector-redmine/dist /app/node_modules/@geibee/feedback-connector-redmine/dist
+USER nonroot
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=3s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
-CMD ["node", "apps/feedback-service-runtime/dist/main.js"]
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+CMD ["/app/apps/feedback-service-runtime/dist/main.js"]

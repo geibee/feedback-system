@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.1 - 2026-09-02
 
 - DBレスのRedmine production Connector、REST transport、provider provisioning planを追加した。
 - v1-only reader、stable ID復元、署名済みEnvelope／projection／message／attachment mapperを追加した。

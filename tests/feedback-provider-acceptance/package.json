@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-provider-acceptance",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,16 +8,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@geibee/feedback-client": "1.0.0-alpha.7",
-    "@geibee/feedback-connector-jira-cloud": "1.0.0-alpha.7",
-    "@geibee/feedback-connector-sdk": "1.0.0-alpha.7",
-    "@geibee/feedback-contracts": "1.0.0-alpha.7",
-    "@geibee/feedback-controller": "1.0.0-alpha.7",
-    "@geibee/feedback-envelope": "1.0.0-alpha.7",
-    "@geibee/feedback-react": "1.0.0-alpha.7",
-    "@geibee/feedback-service": "1.0.0-alpha.7",
-    "@geibee/feedback-service-runtime": "1.0.0-alpha.7",
-    "@geibee/feedback-web-component": "1.0.0-alpha.7"
+    "@geibee/feedback-client": "1.0.0-rc.1",
+    "@geibee/feedback-connector-jira-cloud": "1.0.0-rc.1",
+    "@geibee/feedback-connector-sdk": "1.0.0-rc.1",
+    "@geibee/feedback-contracts": "1.0.0-rc.1",
+    "@geibee/feedback-controller": "1.0.0-rc.1",
+    "@geibee/feedback-envelope": "1.0.0-rc.1",
+    "@geibee/feedback-react": "1.0.0-rc.1",
+    "@geibee/feedback-service": "1.0.0-rc.1",
+    "@geibee/feedback-service-runtime": "1.0.0-rc.1",
+    "@geibee/feedback-web-component": "1.0.0-rc.1"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

@@ -7,8 +7,16 @@ cd "$ROOT"
 
 fail() { echo "[feedback-backlog-live] FAIL: $*" >&2; exit 1; }
 for command in node npm jq mktemp; do command -v "$command" >/dev/null 2>&1 || fail "$command が見つかりません"; done
+credential_fifo=${FEEDBACK_BACKLOG_ACCEPTANCE_CREDENTIAL_FIFO:-}
+api_key=${FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY:-}
+if [[ -n "$credential_fifo" ]]; then
+  [[ -p "$credential_fifo" ]] || fail "credential FIFOではありません"
+  exec 3<"$credential_fifo"
+  IFS= read -r api_key <&3 || fail "FIFOからBacklog API keyを読めません"
+  exec 3<&-
+fi
 [[ -n "${FEEDBACK_BACKLOG_ACCEPTANCE_BASE_URL:-}" ]] || fail "Backlog acceptance base URLがありません"
-[[ -n "${FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY:-}" ]] || fail "Backlog acceptance API keyがありません"
+[[ -n "$api_key" ]] || fail "Backlog acceptance API keyがありません"
 [[ -n "${FEEDBACK_BACKLOG_ACCEPTANCE_PROJECT_KEY:-}" ]] || fail "Backlog acceptance project keyがありません"
 [[ "${FEEDBACK_BACKLOG_ACCEPTANCE_CLEANUP_POLICY:-}" == "delete-run-owned" ]] || fail "cleanup policyはdelete-run-owned固定です"
 
@@ -16,10 +24,12 @@ temp_dir=$(mktemp -d /tmp/feedback-backlog-live.XXXXXX)
 chmod 700 "$temp_dir"
 trap 'rm -f "$temp_dir/evidence.json"; rmdir "$temp_dir" 2>/dev/null || true' EXIT
 
-npm --workspace @geibee/feedback-envelope run build
-npm --workspace @geibee/feedback-connector-sdk run build
-npm --workspace @geibee/feedback-connector-backlog run build
-node scripts/run-feedback-backlog-live-conformance.mjs >"$temp_dir/evidence.json"
+npm --workspace @geibee/feedback-envelope run build >&2
+npm --workspace @geibee/feedback-connector-sdk run build >&2
+npm --workspace @geibee/feedback-connector-backlog run build >&2
+FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY=$api_key \
+  node scripts/run-feedback-backlog-live-conformance.mjs >"$temp_dir/evidence.json"
+unset api_key
 
 jq -e '
   .schemaVersion == "1" and
@@ -50,6 +60,8 @@ jq -e '
   (.executedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"))
 ' "$temp_dir/evidence.json" >/dev/null || fail "Backlog live Conformance evidenceが不正です"
 
+# JavaScript template literalはshellで展開しない。
+# shellcheck disable=SC2016
 current_digest=$(node -e '
   const { createHash } = require("node:crypto");
   const { readFileSync } = require("node:fs");

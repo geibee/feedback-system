@@ -1,14 +1,24 @@
 {
   "name": "@geibee/feedback-service-runtime",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-rc.1",
   "description": "Feedback Serviceとprovider ConnectorのDBレスproduction composition",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md", "CHANGELOG.md", "Dockerfile"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "Dockerfile"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
@@ -16,14 +26,14 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@geibee/feedback-connector-backlog": "1.0.0-alpha.7",
-    "@geibee/feedback-connector-jira-cloud": "1.0.0-alpha.7",
-    "@geibee/feedback-connector-redmine": "1.0.0-alpha.7",
-    "@geibee/feedback-connector-sdk": "1.0.0-alpha.7",
-    "@geibee/feedback-contracts": "1.0.0-alpha.7",
-    "@geibee/feedback-envelope": "1.0.0-alpha.7",
-    "@geibee/feedback-gateway": "1.0.0-alpha.7",
-    "@geibee/feedback-service": "1.0.0-alpha.7"
+    "@geibee/feedback-connector-backlog": "1.0.0-rc.1",
+    "@geibee/feedback-connector-jira-cloud": "1.0.0-rc.1",
+    "@geibee/feedback-connector-redmine": "1.0.0-rc.1",
+    "@geibee/feedback-connector-sdk": "1.0.0-rc.1",
+    "@geibee/feedback-contracts": "1.0.0-rc.1",
+    "@geibee/feedback-envelope": "1.0.0-rc.1",
+    "@geibee/feedback-gateway": "1.0.0-rc.1",
+    "@geibee/feedback-service": "1.0.0-rc.1"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

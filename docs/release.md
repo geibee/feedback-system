@@ -1,6 +1,6 @@
 # Release手順
 
-この文書はrelease担当者向けです。通常のreleaseはGitHub Actionsから行い、ローカルのpublish scriptは障害復旧時だけ使用します。
+この文書はrelease担当者向けです。通常のreleaseはGitHub Actionsから行い、ローカルのpublish scriptは障害復旧時だけ使用します。Redmine npm／OCIに加え、Feedback Service runtime OCIを同じmonorepo versionで扱います。
 
 ## 1. versionを更新する
 
@@ -28,6 +28,8 @@ bash scripts/verify-feedback.sh
 
 Feedback Service／Jira Connectorをreleaseする場合は、同じrelease候補sourceで管理Jira Cloud開発site向けの`bash scripts/check-feedback-phase5-live.sh`も実行する。正規verify内の保存済みevidence検査は外部writeを再実行しないため、明示live Gateの代用にはならない。run-owned issueのcleanup成功と、出力`implementationDigest`が保存済みevidenceおよび現sourceに一致することを確認する。
 
+Backlog Connectorを含むFeedback Service runtimeをreleaseする場合は、同じrelease候補sourceで`bash scripts/check-feedback-backlog-live.sh`を実行する。create／reply／append-only revisionの回収、別process再構築、attachmentの`unsupported`境界、全run-owned issueのcleanupを確認する。API keyは`FEEDBACK_BACKLOG_ACCEPTANCE_CREDENTIAL_FIFO`から一回だけ渡す方法を推奨する。
+
 release候補をローカルで確認したい場合だけ、空directoryを指定して生成します。Node.js、npm、Docker Buildx、Trivy、jq、tar、`sha256sum`が必要です。
 
 Redmine browser releaseにはv1互換packageに加え、`@geibee/feedback-redmine-react`のv2互換exportが参照する`@geibee/feedback-client`、`@geibee/feedback-controller`、`@geibee/feedback-react`を依存順で含めます。標準`@geibee/feedback-web-component`、provider Connector、Feedback Service runtimeはPhase 5で統合検証するが、このRedmine npm／OCI release集合へ暗黙に含めません。Feedback Service runtimeは[`docs/phase5/deployment.md`](./phase5/deployment.md)の独立deploy手順を使います。
@@ -44,7 +46,22 @@ jq '{version, packages: [.packages[].name], images: [.images[] | {name, indexDig
   release-manifest.json
 ```
 
+Backlogを含むFeedback Service runtime候補は別の空directoryへ生成します。
+
+```bash
+mkdir "/tmp/feedback-service-${FEEDBACK_RELEASE_VERSION}"
+bash scripts/build-feedback-service-release.sh \
+  --output "/tmp/feedback-service-${FEEDBACK_RELEASE_VERSION}" \
+  --version "${FEEDBACK_RELEASE_VERSION}"
+
+cd "/tmp/feedback-service-${FEEDBACK_RELEASE_VERSION}"
+sha256sum --check feedback-service-SHA256SUMS
+jq '{version, contractVersion, providers: .runtime.providers, backlogCapabilities, images: [.images[] | {name, indexDigest, platforms}]}' \
+  feedback-service-release-manifest.json
+```
+
 出力先が既に存在して中身がある場合、builderは停止します。別の空directoryを使ってください。
+release manifestの`sourceTreeState`が`dirty`の候補は内容確認専用です。publisherはfail-closedで拒否するため、公開workflowではcleanなtag checkoutから再生成します。
 
 ## 3. tagをpushする
 
@@ -61,10 +78,10 @@ git push origin "v${FEEDBACK_RELEASE_VERSION}"
 
 1. tagと全packageのversion一致を確認する。
 2. `bash scripts/verify-feedback.sh`を実行する。
-3. npm tarball、multi-architecture OCI image、SBOM、脆弱性report、`release-manifest.json`、`SHA256SUMS`を生成する。
+3. Redmine npm tarball／OCIと、Backlog Connectorを含むFeedback Service runtime OCI、SBOM、脆弱性report、各manifest／checksumを生成する。
 4. GitHub Release draftへartifactを添付する。
 5. npm trusted publishing（GitHub OIDC）でnpmjsへ公開する。
-6. GitHub PackagesとGHCRへ公開する。
+6. GitHub PackagesとGHCRへRedmine artifactを公開し、Feedback Service runtimeを独立したGHCR imageとして公開する。
 7. GitHub Releaseを公開する。
 
 `release` environmentの承認画面では、version、変更内容、未修正のHIGH/CRITICAL脆弱性がある場合の判断を確認します。tagを作り直したり、同じversionへ異なるartifactを手動publishしたりしないでください。

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.1 - 2026-09-02
 
 - frozen v2 OpenAPIを`FeedbackClientPort`へ写像するgeneric HTTP／fetch transportを実装した。
 - wire problemの型付きmapping、multipart uploadの一回消費、attachment download streamingを追加した。

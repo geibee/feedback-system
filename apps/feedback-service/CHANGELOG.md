@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-rc.1 - 2026-09-02
+
+- provider非依存Service境界を維持したまま、runtime adapter registryからBacklog Connectorをrequest scopeで解決できるようにした。
+- Backlog固有DTO、credential、provider分岐をServiceへ持ち込まず、DBレスtopologyとAuthorization Mode fallback禁止を維持した。
+
 ## 1.0.0-alpha.7 - 2026-08-31
 
 - Phase 1のDBレスcomposition rootとfake profile loaderを追加した。

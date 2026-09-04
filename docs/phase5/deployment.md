@@ -38,3 +38,5 @@ Jira Cloud／Redmine readinessは設定とsecret解決を検査する。Backlog�
 保存済みevidenceのboolean確認だけではlive Gate通過としない。release候補sourceで`bash scripts/check-feedback-phase5-live.sh`を明示実行し、run-owned issueの作成、回収、comment、revision、attachment、再読込、cleanupを同じrunで完了させる。credentialは`FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO`または一時的なprocess環境からだけ渡し、fixtureへ保存しない。出力の`implementationDigest`はOpenAPI、attachment schema、Jira Connector、REST client、live runnerへ束縛し、`scripts/check-feedback-phase5.sh`で現sourceと再比較する。
 
 Backlog Stage A live Gateは`tests/fixtures/backlog-stage-a/live-gate.json`、4つ目の`feedback.resourceKey`を含むStage B live Conformanceは`tests/fixtures/backlog-stage-b/live-conformance.json`へ匿名化して保存する。release候補では`bash scripts/check-feedback-backlog-live.sh`を実行し、現Backlog Connectorのsource digest、回復、再構築、cleanupを更新する。Stage Aで確認した一時attachment IDと最終IDの不一致を理由にattachmentを有効化してはならない。
+
+release用runtimeは`bash scripts/build-feedback-service-release.sh`で`linux/amd64`／`linux/arm64` OCI、SBOM、脆弱性report、checksum、provider live evidence bindingを一組として生成する。`feedback-service-release-manifest.json`の`indexDigest`を配備時に固定し、tagだけを配備参照にしない。

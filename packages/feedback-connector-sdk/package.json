@@ -1,25 +1,37 @@
 {
   "name": "@geibee/feedback-connector-sdk",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-rc.1",
   "description": "Feedback Connector向けserver-only port契約",
   "private": true,
   "type": "module",
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./testing": { "types": "./dist/testing.d.ts", "import": "./dist/testing.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
   },
-  "publishConfig": { "access": "restricted" },
+  "publishConfig": {
+    "access": "restricted"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-alpha.7"
+    "@geibee/feedback-contracts": "1.0.0-rc.1"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

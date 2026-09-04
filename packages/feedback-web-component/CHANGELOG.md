@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.1 - 2026-09-02
 
 - submit／reply／reviseの最小Shadow DOM UIとbrowser command compositionを追加した。
 - capture成功sourceをattachment uploadへ渡し、cancelまたはthread変更後はuploadしないcharacterization testを追加した。

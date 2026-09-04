@@ -25,6 +25,10 @@ required_files=(
   packages/feedback-connector-backlog/src/contract-fixture.ts
   scripts/run-feedback-backlog-live-conformance.mjs
   scripts/check-feedback-backlog-live.sh
+  scripts/build-feedback-service-release.sh
+  scripts/check-feedback-service-release.sh
+  scripts/check-feedback-service-publish.sh
+  scripts/publish-feedback-service-release.sh
   tests/fixtures/backlog-stage-a/live-gate.json
   tests/fixtures/backlog-stage-b/live-conformance.json
   docs/phase5/compatibility-matrix.md
@@ -37,8 +41,13 @@ required_files=(
   docs/phase5/contract-freeze.sha256
 )
 for file in "${required_files[@]}"; do [[ -f "$file" ]] || fail "必須fileがありません: $file"; done
+for script in scripts/build-feedback-service-release.sh scripts/check-feedback-service-release.sh \
+  scripts/check-feedback-service-publish.sh \
+  scripts/publish-feedback-service-release.sh scripts/check-feedback-backlog-live.sh; do
+  bash -n "$script" || fail "release scriptの構文が不正です: $script"
+done
 
-phase5_plan=$(sed -n '/^### Phase 5:/,/^## 10\./p' feedback-system-generalization-plan.md)
+phase5_plan=$(sed -n '/^### Phase 5:/,/^### 後続Connector追加計画/p' feedback-system-generalization-plan.md | sed '$d')
 if rg -n -- '- \[ \]' <<<"$phase5_plan"; then fail "Phase 5 checklistに未完了項目があります"; fi
 if rg -n 'TODO|TBD|決定待ち|未決(事項|欄|項目)' docs/phase5; then fail "Phase 5文書に未決表現があります"; fi
 sha256sum -c docs/phase5/contract-freeze.sha256
@@ -79,7 +88,7 @@ current_live_digest=$(node -e '
   ];
   const hash = createHash("sha256");
   for (const file of files) hash.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write(`sha256:${hash.digest("hex")}`);
+  process.stdout.write("sha256:" + hash.digest("hex"));
 ')
 [[ "$(jq -r .implementationDigest tests/fixtures/jira-cloud-phase5/live-acceptance.json)" == "$current_live_digest" ]] \
   || fail "保存済みJira live evidenceが現acceptance実装へbindingされていません。scripts/check-feedback-phase5-live.shを再実行してください"
@@ -125,7 +134,7 @@ current_backlog_live_digest=$(node -e '
   ];
   const digest = createHash("sha256");
   for (const file of files) digest.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write(`sha256:${digest.digest("hex")}`);
+  process.stdout.write("sha256:" + digest.digest("hex"));
 ')
 [[ "$(jq -r .implementationDigest tests/fixtures/backlog-stage-b/live-conformance.json)" == "$current_backlog_live_digest" ]] \
   || fail "保存済みBacklog Stage B live evidenceが現Connector実装へbindingされていません。scripts/check-feedback-backlog-live.shを再実行してください"
@@ -145,12 +154,13 @@ node <<'NODE'
 const { readFileSync } = require("node:fs");
 const service = JSON.parse(readFileSync("apps/feedback-service/package.json", "utf8"));
 const runtime = JSON.parse(readFileSync("apps/feedback-service-runtime/package.json", "utf8"));
+const releaseVersion = JSON.parse(readFileSync("package.json", "utf8")).version;
 const serviceDependencies = Object.keys({ ...(service.dependencies || {}), ...(service.optionalDependencies || {}) });
 if (serviceDependencies.some((name) => /connector-(?:jira-cloud|redmine)|forge/u.test(name))) {
   throw new Error("provider非依存Feedback Serviceへproduction Connectorが混入しています");
 }
 for (const required of ["@geibee/feedback-service", "@geibee/feedback-connector-jira-cloud", "@geibee/feedback-connector-redmine", "@geibee/feedback-connector-backlog"]) {
-  if (runtime.dependencies?.[required] !== "1.0.0-alpha.7") throw new Error(`runtime composition dependencyがありません: ${required}`);
+  if (runtime.dependencies?.[required] !== releaseVersion) throw new Error(`runtime composition dependencyがrelease versionと一致しません: ${required}`);
 }
 const forbidden = /(prisma|sequelize|typeorm|mongoose|postgres|mysql|sqlite|redis|bull|queue|kafka|amqp|rabbit|memcached|cache|storage|s3|r2|blob|forge)/iu;
 for (const dependency of Object.keys(runtime.dependencies || {})) {

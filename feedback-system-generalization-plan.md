@@ -78,13 +78,23 @@ Ticket System Connector
 
 ### 4.2 後続対象
 
-1. Jira Data Center Connector
+1. Backlog Connector
 2. Azure DevOps Connector
 3. GitLab Connector
 4. GitHub Issues Connector
-5. Backlog Connector
-6. 案件に応じたServiceNow／Linear Connector
-7. Community Connector向けSDKと文書
+5. 案件・利用要望に応じたJira Data Center／ServiceNow／Linear Connector
+6. Community Connector向けSDKと文書
+
+BacklogをRedmine／Jira Cloudに続く最初の後続Connectorとする。Jira Data CenterはJira Cloud対応の完了から自動的に着手せず、導入案件または明示的な利用要望がある場合だけStage Aから評価する。上記の順序は実装優先順位であり、未検証providerの互換性を示すものではない。
+
+#### 後続Connectorの共通化原則
+
+- 後続Connectorは、Redmine／Jira Cloudで固定したv2 wire／domain契約、`FeedbackRepositoryPort`、Envelope、Authorization Mode、Connector TCKをそのまま適用することから始める。providerごとの公開API、browser DTO、controller command、renderer分岐を追加しない。
+- Feedback Service、gateway application service、client、controller、rendererへprovider名による`if`／`switch`を追加しない。Connector追加はserver-side registryへのadapter登録だけで完結させる。
+- Envelope検証、stable ID、intent回収状態、request hash照合、署名済みattachment mapping、stream上限、共通error正規化のようなprovider非依存処理は、`feedback-envelope`、`feedback-connector-sdk`、`feedback-gateway`またはruntime共通層へ置く。
+- 各Connectorが所有するのは、provider固有のHTTP transport、credential wire形式、provider DTOの検証／変換、検索構文、metadata保存位置、必要なprovisioningに限定する。
+- Redmine／Jira Cloudと同じ意味を持つ処理を新Connectorへ複製しない。二つ以上のConnectorで成立する処理は共通層へ抽出し、Backlogを含む第三のproviderで抽象の妥当性を検証する。一方、provider固有の事実を将来予測だけで共通契約へ持ち上げない。
+- provider能力が共通契約を満たさない場合は、capability、creation field、`recoverable`／`best-effort`／`unsupported`で表現する。補完用DB、queue、永続cache、object storage、host DB参照は追加しない。
 
 ### 4.3 初期対象外
 
@@ -94,7 +104,7 @@ Ticket System Connector
 - membership DB、idempotency DB、provider検索indexの新設
 - hostアプリのDBや内部認証sessionへの直接依存
 - v1 APIと既存Redmine packageの即時削除
-- Jira CloudとData Centerを一つの実装で同時に成立させること
+- Jira Data Center Connector、およびJira CloudとData Centerを一つの実装で同時に成立させること
 - 複数端末間でのdraft、follow、unread同期
 
 ### 4.4 初期v2の保証範囲
@@ -171,8 +181,9 @@ effective permissions
 ### 5.4 Jira検証対象
 
 - 最初の抽象検証先はJira Cloudに固定する。
-- Jira Data Centerは初期契約freezeの対象外とし、Cloud Connector後の独立Connector／compatibility検証として扱う。
-- CloudとData CenterのREST API、property、検索、認証差を共通実装内の条件分岐で吸収しない。
+- Jira Cloudのcontract spikeおよび正式Connectorの完了を、Jira Data Center実装の着手条件とはしない。
+- Jira Data Centerは既定ロードマップへ含めず、導入案件または明示的な利用要望がある場合だけ、後続Connector追加計画のStage Aで対象versionと互換性を検証する。
+- Stage A前にCloud互換を仮定せず、Cloud ConnectorへData Center固有の条件分岐を追加しない。既存のprovider非依存処理を再利用したうえで、Connector固有実装の要否と最小境界をStage Aの事実から決定する。
 
 ## 6. 契約freezeに必要な正本
 
@@ -616,6 +627,52 @@ Phase 4 Gateの証跡は`docs/phase4/phase4-gate.md`、fail-closed検証入口�
 - [x] readinessでkey ring、導出鍵、provider credentialの形式を解析し、不正設定をHTTP 503とする。
 - [x] actual HTTP client、Feedback Service、Gateway、production projection verifier、Jira Connectorを通るin-process acceptanceと、現source digestへ束縛した明示Jira Cloud live Gateを追加する。
 
+### 後続Connector追加計画
+
+後続Connectorはproviderごとに独立した多数のPhaseへ分割せず、次の二段階で追加する。最初にBacklogへこの手順を適用し、既存の汎用層を優先して利用する。BacklogのStage AがHard Gateを通過したら、そのままStage Bへ進める。Jira Data Centerは案件・利用要望が発生するまで着手せず、発生時もStage Aを省略しない。
+
+#### Stage A: DBレスcontract applicability spike／Hard Gate
+
+- 既存v2契約とConnector TCKを変更せずに適用し、provider APIの事実をfixtureへ記録する。
+- Feedback本文、会話、revision、証跡、attachment metadata、操作回復metadataをproviderだけへ保存し、Feedback Service再起動後にローカル状態なしで一意に再解決できることを確認する。
+- 最初のthread writeへ本文と`threadId`、`intentId`、`requestHash`を同時に保存できることを確認する。後続writeまたは補助DBが必要ならDBレスcreate要件は不成立とする。
+- create、reply、revision、attachment uploadごとに、同一writeへのmarker保存、provider検索、結果不明時の安全な回収可否を確認し、保証水準を決定する。
+- Authorization Modeは既存三方式から選び、provider credentialはserver-side secretだけから解決する。membership、認可decision、操作状態をFeedback Serviceへ保存しない。
+- Redmine／Jira Cloud／対象providerのmappingを比較し、既存共通部品で処理できる範囲と、共通層へ抽出すべきprovider非依存処理を確定する。
+- Hard Gateを満たせない操作は`best-effort`または`unsupported`とし、DBやprovider外storageによる穴埋めを設計案へ含めない。
+
+Stage Aの成果物は、provider事実fixture、capability／保証水準表、既存共通部品の再利用表、Connector固有実装の最小一覧とする。実装packageはこのGate通過前に作らない。
+
+#### Stage B: 共通基盤拡張＋thin Connector実装／Conformance Gate
+
+Backlogへ適用する実装境界は次に固定する。他の後続Connectorも同じ分類を使用する。
+
+| 分類 | 配置 | 内容 |
+|---|---|---|
+| そのまま再利用 | `contracts/feedback`、`feedback-envelope`、`feedback-gateway`、`feedback-client`、`feedback-controller`、renderer | wire／domain DTO、署名、認可、操作回復結果、browser状態、UI |
+| 共通拡張 | `feedback-connector-sdk`、runtime adapter registry、必要な共通server utility | 三provider以上で同じ意味を持つmetadata検証、回復判定、stream制御、error分類。Redmine／Jira Cloudも同じ実装へ移行する |
+| Connector固有の最小実装 | `feedback-connector-backlog` | Backlog API transport、credentialのwire変換、Backlog DTO検証／mapping、Backlog検索構文、metadata保存位置、必要なprovisioning |
+| 禁止 | Feedback Service、gateway、client、controller、renderer、補助storage | Backlog分岐、Backlog DTO、共通処理の再実装、DB／queue／永続cache／object storageによる機能補完 |
+
+- Stage Aで必要性が確認できたprovider非依存処理だけを共通packageへ追加し、Redmine／Jira Cloudでも同じ実装を利用するregression testを先に追加する。
+- runtimeは`connectorKey`、runtime profile検証、credential解決、`FeedbackRepositoryPort` factoryをserver-side adapter registryへ登録する。新provider追加のたびにcomposition、catalog、secret resolverへprovider分岐を増やさない。
+- 対象Connector packageには、provider固有transport、DTO mapper、検索／metadata mapping、provisioningだけを実装する。Envelope、認可、操作回復state machine、browser state、rendererを再実装しない。
+- 既存の共通Connector TCK、fault fixture、署名改ざん、0件／複数件検索、partial write、stream上限の検証を、新旧すべてのConnectorへ同じ期待値で適用する。
+- Conformance Gateでは、generic packageへのprovider DTO／secret／URL／内部ID漏出がないこと、provider分岐と共通処理の複製が増えていないこと、Feedback ServiceがDBレスのままであることをfail-closedに検査する。
+- Connector追加PRは変更ファイルを上表のいずれかへ分類し、Connector固有packageへ置いた処理が共通層で成立しない理由を記録する。理由を示せない独自実装は受け入れない。
+
+#### Backlog release candidate Gate
+
+- [x] Stage A Hard GateとStage B live Conformanceの能力境界を維持し、公開契約を変更しない。
+- [x] root、全workspace、内部workspace依存を`1.0.0-rc.1`へ揃える。
+- [x] Backlog Connectorを含むFeedback Service runtimeをnonroot distrolessのmulti-architecture OCIとして生成する。
+- [x] OCI digest、SBOM、HIGH／CRITICAL脆弱性report、checksum、provider live evidence bindingをrelease manifestへ記録する。
+- [x] tag起点workflowへFeedback Service runtimeのartifact生成と独立GHCR公開を追加する。
+- [x] release候補sourceでBacklog live Conformanceを再実行し、全run-owned issueのcleanupを確認する。
+- [x] `bash scripts/verify-feedback.sh`をskipなしで完走する。
+
+実公開、tag、push、deploymentはrelease candidate Gateに含めない。
+
 ## 10. 目標package構成と依存DAG
 
 名称はPhase 0 ADRで確定し、Phase 1の単一PRで全skeletonを作成する。
@@ -792,7 +849,8 @@ Phase 3の4並列では、root／integration ownerがLane Aを兼務し、3つ�
 
 - Redmineの既存version matrix
 - Jira Cloud fixtureと管理環境acceptance test
-- Jira Data Center以降のcloud／self-hosted対象matrix
+- Backlogを最初の後続providerとするfixture、管理環境acceptance test、capability／保証水準表
+- Jira Data Centerは案件・利用要望がある場合だけ、対象versionを固定したcloud／self-hosted compatibility matrix
 
 ## 13. Releaseと互換性
 

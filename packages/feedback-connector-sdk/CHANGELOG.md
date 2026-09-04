@@ -1,6 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.1 - 2026-09-02
+
 - `FeedbackConnectorProblem`へ、OpenAPIの404 problem codeと一致する`feedback.not_found`を追加した。
+- Redmine／Jira Cloud／Backlogへ同じ`FeedbackRepositoryPort`とoperation recovery結果を適用した。
 
 ## 1.0.0-alpha.7 - 2026-08-31
 

@@ -21,5 +21,7 @@ bash scripts/check-feedback-phase3.sh
 bash scripts/check-feedback-phase4.sh
 FEEDBACK_VERIFY_SKIP_NPM_CI=1 bash scripts/verify-feedback-redmine.sh
 bash scripts/check-feedback-phase5.sh
+bash scripts/check-feedback-service-publish.sh
+bash scripts/check-feedback-service-release.sh
 
 echo "[feedback-verify] PASS"

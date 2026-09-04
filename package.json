@@ -1,6 +1,6 @@
 {
   "name": "feedback-system",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-rc.1",
   "private": true,
   "engines": {
     "node": ">=22.12 <25"
@@ -54,7 +54,8 @@
     "test:feedback:phase1": "bash scripts/check-feedback-phase1.sh",
     "smoke:redmine": "bash scripts/smoke-feedback-redmine.sh",
     "feedback:redmine:local": "bash scripts/start-feedback-redmine-local.sh",
-    "release:redmine": "bash scripts/build-feedback-redmine-release.sh"
+    "release:redmine": "bash scripts/build-feedback-redmine-release.sh",
+    "release:service": "bash scripts/build-feedback-service-release.sh"
   },
   "devDependencies": {
     "@stoplight/spectral-cli": "^6.16.1"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.1 - 2026-09-02
 
 - Jira Cloud REST API v3のissue、comment、property、attachment clientを実装した。
 - JQL projection検索、direct property再読込、intent回収、paginationを実装した。

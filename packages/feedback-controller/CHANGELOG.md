@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.1 - 2026-09-02
 
 - ClientStateV2、利用者scope付きbrowser local storage、v1 draft／follow readerを実装した。
 - Headless Controller、visible polling、unread ordering、pending intent回収、capture／navigation cancellation、stale commit防止を実装した。

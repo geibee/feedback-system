@@ -250,11 +250,12 @@ function validSignature(value: unknown): value is FeedbackEnvelopeV2["signature"
 function isEnvelopePayload(value: unknown): value is Omit<FeedbackEnvelopeV2, "signature"> {
   if (!record(value) || !exactKeys(value,
     ["schemaVersion", "threadId", "intentId", "requestHash", "providerBinding", "scope", "createdBy", "createdAt"],
-    ["release", "perspective", "location", "target"])) return false;
+    ["release", "perspective", "location", "target", "initialBodyHash"])) return false;
   return value.schemaVersion === "2" && typeof value.threadId === "string" && uuid.test(value.threadId) &&
     typeof value.intentId === "string" && uuid.test(value.intentId) && typeof value.requestHash === "string" && hash.test(value.requestHash) &&
     validBinding(value.providerBinding) && validStoredScope(value.scope) && validCreatedBy(value.createdBy) && validDateTime(value.createdAt) &&
     optionalString(value.release, 200) && optionalString(value.perspective, 100) &&
+    (value.initialBodyHash === undefined || typeof value.initialBodyHash === "string" && hash.test(value.initialBodyHash)) &&
     (value.location === undefined || validScalarObject(value.location)) && (value.target === undefined || validTarget(value.target));
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 未リリース - 2026-09-06 セキュリティ修正
+
+- server-only Envelopeへ任意の`initialBodyHash`を追加し、生成型を同期した。新規作成の既知本文だけを署名し、hashのない旧Envelope／first-write結果不明からの補修ではprovider本文を本人の検証済み本文へ昇格しない。
+- profileの許可集合照会と自己編集時のread／revise認可を明記した。browser wire DTOとRedmine v1契約は変更しない。
+- 旧DB保存版の互換・移行機能は提供しない。Redmine v1 ticket形式の互換はDB版とは独立して保持する。
+
 ## 1.0.0-rc.1 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-02
 
 - Backlog初回release candidateは既存の公開wire／domain契約を変更せず、provider能力差を既存capabilityとoperation保証で表現した。

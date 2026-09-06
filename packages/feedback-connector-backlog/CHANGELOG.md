@@ -1,5 +1,9 @@
 # 変更履歴
 
+## 未リリース - 2026-09-06
+
+- 既知の初期本文の署名hashを検証し、旧Envelope／応答喪失回収時の未検証本文を本人へ帰属させない。署名済みrevisionの互換性は保持する。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - Backlog SaaS Stage A Hard GateとStage B live Conformanceを通過した初回release candidateとした。

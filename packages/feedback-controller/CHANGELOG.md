@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- 最初のwrite前にpending intentを保存し、切断後も回収用ID／hashを保持する。保存例外時は送信しない。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - ClientStateV2、利用者scope付きbrowser local storage、v1 draft／follow readerを実装した。

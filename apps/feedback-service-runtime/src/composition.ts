@@ -79,7 +79,8 @@ export async function createFeedbackProductionRuntime(input: {
         if (!runtimeProfile || runtimeProfile.connectorKey !== profile.connectorKey) throw new Error("Connector runtime profile bindingが不正です");
         const adapter = registry.require(profile.connectorKey);
         const credential = adapter.validateCredential(secret);
-        await adapter.validateReadiness?.(runtimeProfile, credential);
+        // providerの一時的な疎通障害を全profileのreadinessへ伝播させない。
+        // provisioningは配備前の専用検査で確認する。
       }
     },
     ...(input.authorizationHttpClient ? { httpClient: input.authorizationHttpClient } : {}),

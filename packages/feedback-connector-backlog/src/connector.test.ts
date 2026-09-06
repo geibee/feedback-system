@@ -8,6 +8,17 @@ const participantId = randomUUID();
 const scope = { profileId: "backlog-test", installationId: "space-test", workspaceId: "FB", resource: { kind: "record", key: "order-1" } };
 
 describe("Feedback Backlog Connector", () => {
+  it("初期本文の署名hashとprovider本文を照合する", async () => {
+    const provider = new FakeBacklog();
+    const connector = createConnector(provider);
+    const threadId = randomUUID();
+    await connector.createThread({ ...scope, command: { threadId, intentId: randomUUID(),
+      requestHash: hash({ body: "本文" }), resource: scope.resource, title: "title", body: "本文" } });
+    const candidates = await connector.findThreadCandidatesById({ ...scope, threadId });
+    expect((await connector.readCandidate(candidates[0]!)).thread.messages[0]?.author.kind).toBe("participant");
+    provider.issues[0]!.description = provider.issues[0]!.description.replace("本文", "改変");
+    await expect(connector.readCandidate(candidates[0]!)).rejects.toMatchObject({ code: "feedback.integrity_error" });
+  });
   it("create応答喪失、reply応答喪失、append-only revisionをprovider metadataだけから回収する", async () => {
     const provider = new FakeBacklog();
     const connector = createConnector(provider);

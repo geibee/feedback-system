@@ -73,20 +73,24 @@ export async function mapRedmineIssue(
   const providerBinding = { profileId: profile.profileId, installationId: profile.installationId, objectId };
   const createdAt = dateTime(issue.created_on, "issue.created_on");
   const updatedAt = dateTime(issue.updated_on ?? issue.created_on, "issue.updated_on");
+  const initialBody = initialBodyFromDescription(issue.description);
+  if (envelope?.initialBodyHash && envelope.initialBodyHash !== calculateFeedbackCommandHash({ body: initialBody })) {
+    integrity("Redmine initial本文が署名済みhashと一致しません");
+  }
   const initialMessage: FeedbackMessageV2 = {
     messageId: threadId,
     body: initialBodyFromDescription(issue.description),
-    author: envelope
+    author: envelope?.initialBodyHash
       ? participantAuthor(envelope.createdBy.participantId, profile)
-      : legacy.participantId && validStableId(legacy.participantId)
-        ? participantAuthor(legacy.participantId, profile)
-        : providerAuthor(issue.author),
+      : providerAuthor(issue.author),
     createdAt,
     orderingKey: { occurredAt: createdAt, eventId: threadId },
     revisions: [{ revisionId: threadId, body: initialBodyFromDescription(issue.description), revisedAt: createdAt, orderingKey: { occurredAt: createdAt, eventId: threadId } }],
     attachments: []
   };
   const messages = new Map<string, FeedbackMessageV2>([[threadId, initialMessage]]);
+  // Redmine v1 ticket互換は保持するが、未検証v1 eventをv2 messageの編集として適用しない。
+  const v2MessageIds = new Set<string>(envelope ? [threadId] : []);
   const attachmentMappings = new Map<string, FeedbackAttachmentMarkerV2>();
 
   for (const journal of array(issue.journals)) {
@@ -123,16 +127,28 @@ export async function mapRedmineIssue(
         warnings.push(`journal ${journalId}のlegacy markerとv2 markerが異なるためv2を優先しました`);
       }
       if (marker.eventKind === "reply") {
-        if (!messages.has(marker.messageId)) {
+        if (!messages.has(marker.messageId) || !v2MessageIds.has(marker.messageId)) {
           messages.set(marker.messageId, messageFromV2(marker.messageId, marker.eventId, marked.body, occurredAt,
             participantAuthor(marker.participantId, profile)));
         }
+        v2MessageIds.add(marker.messageId);
       } else {
+        const target = messages.get(marker.messageId);
+        const owner = marker.messageId === threadId && envelope
+          ? participantAuthor(envelope.createdBy.participantId, profile) : target?.author;
+        if (owner?.kind !== "participant" || owner.participantId !== marker.participantId) {
+          integrity("Redmine revision participantが元message authorと一致しません");
+        }
         appendRevision(messages, marker.messageId, marker.eventId, marker.expectedRevisionId!, marked.body, occurredAt);
+        target!.author = owner;
       }
       continue;
     }
 
+    if (v2MessageIds.has(marked.metadata.messageId)) {
+      warnings.push(`journal ${journalId}の未検証v1 markerはv2 messageへ適用しません`);
+      continue;
+    }
     mapLegacyMarkedJournal(messages, issue.id, journalId, occurredAt, marked, item.user);
   }
 
@@ -205,9 +221,7 @@ function mapLegacyMarkedJournal(
   const messageId = validStableId(marked.metadata.messageId)
     ? marked.metadata.messageId
     : deriveRedmineStableId("legacy-message", issueId, marked.metadata.messageId || journalId);
-  const participant = validStableId(marked.metadata.participantId)
-    ? { kind: "participant" as const, participantId: marked.metadata.participantId, displayName: marked.metadata.participantName || "Feedback participant", isCurrentParticipant: false }
-    : providerAuthor(rawAuthor);
+  const participant = providerAuthor(rawAuthor);
   if (marked.metadata.kind === "reply") {
     if (!messages.has(messageId)) messages.set(messageId, messageFromLegacy(messageId, marked.body, occurredAt, participant));
     return;

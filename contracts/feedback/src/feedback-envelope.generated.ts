@@ -13,6 +13,10 @@ export interface FeedbackEnvelopeV2 {
   threadId: StableId;
   intentId: StableId;
   requestHash: RequestHash;
+  /**
+   * 作成要求で確認した初期本文のhash。旧Envelopeでは省略可能だが、省略時のprovider本文をparticipant本人の検証済み本文として扱わない。
+   */
+  initialBodyHash?: string;
   providerBinding: ProviderBinding;
   scope: StoredScope;
   createdBy: CreatedBy;

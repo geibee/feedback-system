@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- profile取得時に現在の認可・policy・backend能力による許可集合を返し、任意の拒否operationを必須にしない。
+
 ## 1.0.0-alpha.7 - 2026-08-31
 
 - 3つのAuthorization Mode、profile loader、projection verifierを含むPhase 1 contract skeletonを追加した。

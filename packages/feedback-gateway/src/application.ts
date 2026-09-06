@@ -236,6 +236,7 @@ export class FeedbackGatewayApplicationService {
     profileId: string;
     target: FeedbackAuthorizationTarget;
     requiredOperations: readonly FeedbackOperationV2[];
+    requestedOperations?: readonly FeedbackOperationV2[];
     access: FeedbackGatewayAccess;
   }): Promise<ResolvedAccess> {
     const profile = await this.#profile(input.profileId);
@@ -259,7 +260,7 @@ export class FeedbackGatewayApplicationService {
     const port = selectFeedbackAuthorizationPort(profile, this.#composition.authorizationPorts);
     const request: FeedbackAuthorizationRequest = {
       target: input.target,
-      requestedOperations: input.requiredOperations,
+      requestedOperations: input.requestedOperations ?? input.requiredOperations,
       grant: input.access.grant
     };
     let authorization: FeedbackAuthorizationDecision;
@@ -283,7 +284,9 @@ export class FeedbackGatewayApplicationService {
       });
     }
 
-    const repository = await this.#repository(profile, authorization, input.access);
+    // capability照会では、候補operationを実行要求と誤認させない。
+    const repository = await this.#repository(profile, input.requestedOperations
+      ? { ...authorization, allowedOperations: input.requiredOperations } : authorization, input.access);
     const capabilities = await repository.getCapabilities(repositoryOptions(input.access.signal));
     const configuredBackend = intersectFeedbackOperations(
       profile.capabilities.operations,
@@ -308,11 +311,19 @@ export class FeedbackGatewayApplicationService {
   }
 
   async getProfile(input: ResourceInput & { access: FeedbackGatewayAccess }): Promise<FeedbackProfileV2> {
+    const profile = await this.#profile(input.profileId);
+    // profileは操作の実行ではなく許可集合の照会。拒否された任意操作を必須にしない。
+    const candidates = input.access.grant.mode === "signed-grant"
+      ? input.access.grant.allowedOperations : profile.policy.operations;
+    const requestedOperations = [...new Set<FeedbackOperationV2>(["feedback:read", ...candidates.filter(
+      (operation) => profile.policy.operations.includes(operation) && profile.capabilities.operations.includes(operation)
+    )])];
     const target: FeedbackAuthorizationTarget = { level: "resource", ...input, resource: input.resource };
     const resolved = await this.#authorize({
       profileId: input.profileId,
       target,
       requiredOperations: ["feedback:read"],
+      requestedOperations,
       access: input.access
     });
     return {

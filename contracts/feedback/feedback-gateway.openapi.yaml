@@ -6,6 +6,8 @@ info:
     契約済みticket管理systemを正本とする、provider非依存のFeedback API契約draft。
     server profileごとに固定したAuthorization Modeを使用し、requestによるmode選択やfallbackを許可しない。
     provider内部ID、URL、projection、credential、署名情報はbrowserへ公開しない。
+    profileのeffectivePermissionsはread要求単独ではなく、現在の認可・policy・backend能力の許可集合を返す。
+    自己編集はreadによる所有者確認とreviseをそれぞれ認可する。署名済み初期本文hashのない旧Envelopeは本人本文の証明に使用しない。
 servers:
   - url: /internal/feedback/v2
     description: 業務applicationと同一originの相対path

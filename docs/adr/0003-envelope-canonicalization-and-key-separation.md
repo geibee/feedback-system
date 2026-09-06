@@ -70,4 +70,8 @@ fixtureのkey materialはtest専用であり、配備設定へ使用してはな
 
 ## 帰結
 
+### 2026-09-06 初期本文の完全性補足
+
+Envelopeの任意field `initialBodyHash`を署名対象へ追加する。正常な新規作成は既知の入力本文からhashを計算し、読取り時にprovider本文と照合する。Redmine本文は現行v1 readerと同じ正規化を使用する。旧Envelopeと初回write応答喪失後の本文なし回収では、このfieldを後からprovider本文だけで生成しない。表示とstable ID回収は維持するが、未検証の初期本文はprovider由来として扱い、本人の自己編集権限を付与しない。既存の署名済みrevisionは署名・所有者・body hash・chainを検証して復元できる。旧DB保存版との互換ではなく、Redmine v1 ticket形式の互換だけを維持する。
+
 最初のwriteで回復tripletを保存できても、完全Envelopeの補修が必要なproviderは存在する。補修途中の状態を新規作成成功と混同せず、`pending`または`repair_required`として扱う。HMAC keyを共有する複数instanceでは同じserver-side secret ringを配布する必要があるが、Feedback Service内にkey DBは追加しない。

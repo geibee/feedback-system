@@ -69,6 +69,17 @@ describe("Envelope codec", () => {
       .toEqual({ valid: false, reason: "unknown_kid" });
   });
 
+  it("初期本文hashを署名し、field削除による旧形式へのdowngradeを拒否する", async () => {
+    const fixture = vectors();
+    const codec = createFeedbackEnvelopeCodec([{ kid: fixture.testOnlyKey.kid, secret: key, state: "active" }]);
+    const payload = fixture.vectors.find((value) => value.purpose === "envelope")!.payload;
+    const signed = await codec.signEnvelope({ ...payload, initialBodyHash: `sha256:${"1".repeat(64)}` } as never);
+    expect(await codec.verifyEnvelope(signed, context)).toMatchObject({ valid: true });
+    const { initialBodyHash: _hash, ...downgraded } = signed;
+    expect(await codec.verifyEnvelope(downgraded, context)).toEqual({ valid: false, reason: "signature" });
+    await expect(codec.signEnvelope({ ...payload, initialBodyHash: "invalid" } as never)).rejects.toThrow();
+  });
+
   it("active keyを一つに固定し、旧keyは検証専用にできる", async () => {
     const fixture = vectors();
     const oldCodec = createFeedbackEnvelopeCodec([{ kid: "old", secret: key, state: "active" }]);

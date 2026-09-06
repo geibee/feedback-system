@@ -53,7 +53,7 @@ export function parseRedmineMessageNote(notes: unknown): {
   }
 }
 
-function normalizeBody(body: string): string {
+export function normalizeBody(body: string): string {
   const normalized = body.replace(/\r\n?/gu, "\n").trim();
   if (!normalized) throw new Error("Redmine message本文が空です");
   return normalized;

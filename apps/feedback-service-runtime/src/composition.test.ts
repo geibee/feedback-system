@@ -20,7 +20,9 @@ describe("Feedback Service production composition", () => {
     const catalogFile = join(directory, "connectors.json");
     const key = Buffer.alloc(32, 4).toString("base64url");
     const ring = JSON.stringify({ activeKid: "current", keys: [{ kid: "current", key }] });
-    await writeFile(profileFile, JSON.stringify(providerProfile()), { mode: 0o600 });
+    const writableProfile = providerProfile();
+    writableProfile.policy.operations.push("feedback:create");
+    await writeFile(profileFile, JSON.stringify(writableProfile), { mode: 0o600 });
     await writeFile(settingsFile, JSON.stringify({
       schemaVersion: "2",
       serviceId: "phase5-test",
@@ -50,7 +52,7 @@ describe("Feedback Service production composition", () => {
     ));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      profile: { profileId: "jira", effectivePermissions: ["feedback:read"] }
+      profile: { profileId: "jira", effectivePermissions: ["feedback:read", "feedback:create"] }
     });
     expect(jiraFetch).not.toHaveBeenCalled();
   });
@@ -146,7 +148,10 @@ describe("Feedback Service production composition", () => {
         capabilities: { discovery: { resources: "unsupported" } }
       }
     });
-    expect(backlogFetch).toHaveBeenCalledTimes(4);
+    expect(backlogFetch).not.toHaveBeenCalled();
+    backlogFetch.mockRejectedValue(new Error("一時的なprovider障害"));
+    await expect(runtime.service.readiness()).resolves.toEqual({ ready: true, profileCount: 1 });
+    expect(backlogFetch).not.toHaveBeenCalled();
   });
 
   it("remote-authorization profileを認証済みsubject adapterなしでlistenさせない", () => {

@@ -454,6 +454,37 @@ describe("Headless Feedback Controller", () => {
     expect(reloaded.getSnapshot().pendingIntents).toEqual([]);
   });
 
+  it("送信前にintentを永続化し、disconnect後も再接続で回収する", async () => {
+    const state = createMemoryFeedbackControllerState();
+    const deferred = createDeferredFeedbackClientResult<never>();
+    const fakeClient = client({ async createThread(query) {
+      expect(await state.loadPendingIntents(profileId)).toMatchObject([{ intentId: query.command.intentId }]);
+      return deferred.promise;
+    } });
+    const controller = createFeedbackController(dependencies({ client: fakeClient, state }));
+    await controller.dispatch({ type: "connect", scope });
+    const command = await controller.createWriteCommand({ type: "submit", title: "切断", body: "本文" });
+    const sending = controller.dispatch(command);
+    await vi.waitFor(() => expect(fakeClient.count("createThread")).toBe(1));
+    await controller.dispatch({ type: "disconnect" });
+    deferred.reject(new Error("commit後に応答喪失"));
+    await sending;
+    const restored = createFeedbackController(dependencies({ client: fakeClient, state }));
+    await restored.dispatch({ type: "connect", scope });
+    expect(restored.getSnapshot().pendingIntents).toMatchObject([{ operation: "feedback:create", retryPolicy: "recover-only" }]);
+    expect(fakeClient.count("createThread")).toBe(1);
+  });
+
+  it("pending保存が失敗した場合はproviderへ送信しない", async () => {
+    const state = createMemoryFeedbackControllerState();
+    state.savePendingIntents = async () => { throw new Error("保存不能"); };
+    const fakeClient = client();
+    const controller = createFeedbackController(dependencies({ client: fakeClient, state }));
+    await controller.dispatch({ type: "connect", scope });
+    await controller.dispatch(await controller.createWriteCommand({ type: "submit", title: "保存不能", body: "本文" }));
+    expect(fakeClient.count("createThread")).toBe(0);
+  });
+
   it("visibility復帰で即時refreshし、destroy通知後のasync callbackを禁止する", async () => {
     let visible = true;
     const visibilitySubscription: { current?: (visible: boolean) => void } = {};

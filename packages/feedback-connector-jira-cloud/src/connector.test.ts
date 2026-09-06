@@ -142,6 +142,18 @@ async function readOnlyCandidate(repository: ReturnType<typeof connector>) {
 }
 
 describe("Jira Cloud Connector managed acceptance fake", () => {
+  it("初期本文の改変を拒否し、旧Envelopeの本文を本人へ帰属させない", async () => {
+    const old = await boundProperty();
+    const oldRead = await readOnlyCandidate(connector(candidateReadTransport({ property: old })));
+    expect(oldRead.thread.messages[0]?.author.kind).toBe("provider-user");
+    const { signature: _signature, ...payload } = old.envelope;
+    const matching = { ...old, envelope: await codec.signEnvelope({ ...payload,
+      initialBodyHash: calculateFeedbackCommandHash({ body: "hello" }) }) };
+    expect((await readOnlyCandidate(connector(candidateReadTransport({ property: matching })))).thread.messages[0]?.author.kind).toBe("participant");
+    const changed = { ...old, envelope: await codec.signEnvelope({ ...payload,
+      initialBodyHash: calculateFeedbackCommandHash({ body: "original" }) }) };
+    await expect(readOnlyCandidate(connector(candidateReadTransport({ property: changed })))).rejects.toMatchObject({ code: "feedback.integrity_error" });
+  });
   it("Jira component discoveryをsigned grant互換のrecord resourceへ正規化する", async () => {
     const transport = new FakeTransport((request) => {
       if (request.path.startsWith("/rest/api/3/project/TEST/components?")) {

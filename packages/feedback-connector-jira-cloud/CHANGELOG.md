@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- 既知の初期本文を署名hashへ束縛し、旧Envelopeの未検証本文を本人へ帰属させない。ADFの空行とinline textを保持し、旧初期messageの署名済みrevisionを安全に再構築する。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - Jira Cloud REST API v3のissue、comment、property、attachment clientを実装した。

@@ -22,9 +22,9 @@ import {
 } from "@geibee/feedback-connector-sdk";
 import { calculateFeedbackCommandHash, type FeedbackEnvelopeCodecPort } from "@geibee/feedback-envelope";
 import { redmineContractFixture } from "./contract-fixture.js";
-import { deriveRedmineStableId } from "./legacy.js";
+import { deriveRedmineStableId, initialBodyFromDescription } from "./legacy.js";
 import { mapRedmineIssue, redmineProjectionCandidate } from "./mapper.js";
-import { buildDualWriteRedmineNote, buildRedmineAttachmentMappingNote, parseRedmineMessageNote } from "./markers.js";
+import { buildDualWriteRedmineNote, buildRedmineAttachmentMappingNote, parseRedmineMessageNote, normalizeBody } from "./markers.js";
 import { assertFeedbackRedmineProfile } from "./provisioning.js";
 import type {
   FeedbackRedmineProfileV2,
@@ -131,7 +131,7 @@ export function createFeedbackRedmineConnector(input: {
       const issue = createIssueInput(profile, query.command);
       try {
         const created = await transport.createIssue(issue, options?.signal);
-        await provisionCreatedIssue(created.issueId, query, query.command, options);
+        await provisionCreatedIssue(created.issueId, query, query.command, options, query.command.body);
         const mapped = await mapRedmineIssue(await transport.getIssue(created.issueId, options?.signal), profile, query, codec);
         return { disposition: "created", intentId: query.command.intentId, thread: mapped.thread };
       } catch (error) {
@@ -325,7 +325,8 @@ export function createFeedbackRedmineConnector(input: {
     issueId: number,
     scope: FeedbackRepositoryScope,
     command: FeedbackCreateThreadCommandV2,
-    options?: FeedbackRepositoryOptions
+    options?: FeedbackRepositoryOptions,
+    originalBody?: string
   ): Promise<void> {
     let created = await transport.getIssue(issueId, options?.signal);
     const createdAt = typeof created.created_on === "string" ? created.created_on : now();
@@ -334,6 +335,7 @@ export function createFeedbackRedmineConnector(input: {
       threadId: command.threadId,
       intentId: command.intentId,
       requestHash: command.requestHash,
+      ...(originalBody === undefined ? {} : { initialBodyHash: calculateFeedbackCommandHash({ body: initialBodyFromDescription(originalBody) }) }),
       providerBinding: binding(profile, issueId),
       scope: {
         workspace: scope.workspaceId,
@@ -548,7 +550,7 @@ async function signReplyMarker(
   return codec.signMessageMarker({
     schemaVersion: "2", threadId, eventId: command.messageId, eventKind: "reply", messageId: command.messageId,
     intentId: command.intentId, requestHash: command.requestHash, participantId: profile.participantId,
-    bodyHash: calculateFeedbackCommandHash({ body: command.body }), providerBinding: binding(profile, issueId), createdAt
+    bodyHash: calculateFeedbackCommandHash({ body: normalizeBody(command.body) }), providerBinding: binding(profile, issueId), createdAt
   });
 }
 
@@ -564,7 +566,7 @@ async function signRevisionMarker(
   return codec.signMessageMarker({
     schemaVersion: "2", threadId, eventId: command.revisionId, eventKind: "revision", messageId,
     expectedRevisionId: command.expectedRevisionId, intentId: command.intentId, requestHash: command.requestHash,
-    participantId: profile.participantId, bodyHash: calculateFeedbackCommandHash({ body: command.body }),
+    participantId: profile.participantId, bodyHash: calculateFeedbackCommandHash({ body: normalizeBody(command.body) }),
     providerBinding: binding(profile, issueId), createdAt
   });
 }

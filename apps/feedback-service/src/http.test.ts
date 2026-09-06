@@ -26,7 +26,9 @@ const profile: FeedbackProviderProfileV2 = {
   }
 };
 const settings: FeedbackServiceSettingsV2 = {
-  schemaVersion: "2", serviceId: "test", profileFiles: ["/profile.json"], signedGrantIssuers: [], remoteAuthorizationProfiles: [],
+  schemaVersion: "2", serviceId: "test", profileFiles: ["/profile.json"], signedGrantIssuers: [],
+  remoteAuthorizationProfiles: [{ id: "remote", endpoint: "https://auth.example/decision", timeoutMilliseconds: 2000,
+    credentialRef: { kind: "server-secret", id: "REMOTE" } }],
   jwksCache: { maximumIssuers: 1, maximumKeysPerIssuer: 1, maximumTtlSeconds: 1 }
 };
 const capabilities: FeedbackCapabilitiesV2 = {
@@ -43,18 +45,23 @@ function fixture(
   repository = createFakeFeedbackRepository({ async getCapabilities() { return capabilities; } }),
   operationTimeoutMilliseconds = 1000,
   bindParticipant?: Parameters<typeof createFeedbackHttpHandler>[0]["bindParticipant"],
-  activeProfile: FeedbackProviderProfileV2 = profile
+  activeProfile: FeedbackProviderProfileV2 = profile,
+  remoteHttp?: Parameters<typeof createFeedbackAuthorizationRuntime>[0]["httpClient"],
+  acceptProjection = false
 ) {
   const profileLoader = { async loadProfiles() { return [activeProfile]; } };
   const authorization = createFeedbackAuthorizationRuntime({
     settings, profileLoader, secretResolver,
-    httpClient: { async request() { throw new Error("unexpected HTTP"); } }
+    httpClient: remoteHttp ?? { async request() { throw new Error("unexpected HTTP"); } }
   });
   const gateway = new FeedbackGatewayApplicationService({
     profileLoader,
     authorizationPorts: authorization.ports,
     connectors: new Map([["fake", repository]]),
-    projectionVerifier: { async verify() { return { valid: false as const, reason: "signature" as const }; } }
+    projectionVerifier: { async verify(_candidate, record) {
+      return acceptProjection ? { valid: true as const, record: record as never }
+        : { valid: false as const, reason: "signature" as const };
+    } }
   });
   const handler = createFeedbackHttpHandler({
     gateway, authorization, profileLoader, secretResolver,
@@ -65,6 +72,66 @@ function fixture(
 }
 
 describe("Feedback Service v2 HTTP adapter", () => {
+  it("remote profileの許可集合を照会し、自己編集のread／reviseを別々に認可する", async () => {
+    const operations = ["feedback:read", "feedback:create", "feedback:revise"] as const;
+    const activeProfile: FeedbackProviderProfileV2 = { ...profile,
+      authorization: { mode: "remote-authorization", authorizationProfileRef: "remote", subjectSource: "authenticated-adapter" },
+      policy: { ...profile.policy, operations: [...operations] }, capabilities: { ...profile.capabilities, operations: [...operations] }
+    };
+    const threadId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5301";
+    const message = { messageId: threadId, body: "before", author: { kind: "participant" as const,
+      participantId: threadId, displayName: "本人", isCurrentParticipant: true }, createdAt: "2026-09-01T00:00:00Z",
+      orderingKey: { occurredAt: "2026-09-01T00:00:00Z", eventId: threadId }, revisions: [], attachments: [] };
+    const thread = { threadId, title: "title", resource, status: "open" as const, createdAt: message.createdAt,
+      updatedAt: message.createdAt, messageCount: 1, messages: [message] };
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() { return { ...capabilities, backendOperations: [...operations] }; },
+      async findThreadCandidatesById() { return [{ providerRef: { providerKey: "fake", objectId: "1" }, projection: {} as never }]; },
+      async readCandidate(candidate) { return { providerRef: candidate.providerRef, envelope: null, legacyMetadata: null, thread }; },
+      async appendRevision(query) { return { disposition: "created", intentId: query.command.intentId, message }; }
+    });
+    const requested: string[][] = [];
+    let denyRead = false;
+    const { handler } = fixture(repository, 1000, undefined, activeProfile, { async request(input) {
+      const request = JSON.parse(input.body!);
+      requested.push(request.requestedOperations);
+      return { status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ schemaVersion: "1",
+        target: request.target, subject: request.subject,
+        allowedOperations: request.requestedOperations.filter((op: string) => op === "feedback:revise" || op === "feedback:read" && !denyRead) }) };
+    } }, true);
+    const context = { authenticatedSubjectId: "host-user" };
+    const result = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`), context);
+    expect(await result.json()).toMatchObject({ profile: { effectivePermissions: ["feedback:read", "feedback:revise"] } });
+    const request = () => new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads/${threadId}/messages/${threadId}/revisions?resourceKind=record&resourceKey=order-001`, {
+      method: "POST", headers: { origin, "x-feedback-csrf": "1", "content-type": "application/json" },
+      body: JSON.stringify({ intentId: threadId, revisionId: threadId, expectedRevisionId: threadId, requestHash: `sha256:${"1".repeat(64)}`, body: "after" })
+    });
+    expect((await handler(request(), context)).status).toBe(201);
+    expect(requested).toEqual([[...operations], ["feedback:read"], ["feedback:revise"]]);
+    denyRead = true;
+    expect((await handler(request(), context)).status).toBe(403);
+    expect(repository.count("appendRevision")).toBe(1);
+  });
+
+  it("日本語添付名をASCII fallbackとfilename*で返す", async () => {
+    const operations = ["feedback:read", "feedback:attachment:read"] as const;
+    const activeProfile = { ...profile, policy: { ...profile.policy, operations: [...operations] },
+      capabilities: { ...profile.capabilities, operations: [...operations] } };
+    const repository = createFakeFeedbackRepository({
+      async getCapabilities() { return { ...capabilities, backendOperations: [...operations] }; },
+      async getAttachment() { return { filename: "証跡.png", contentType: "image/png", sizeBytes: 1,
+        body: (async function* () { yield Uint8Array.of(1); })() }; }
+    });
+    const { handler } = fixture(repository, 1000, undefined, activeProfile);
+    const participant = await issueFeedbackParticipantCredential({ profile: activeProfile,
+      browserProfileId: "018f0f58-c3d1-7a2b-8a4f-4c09571e5301", origin, secretResolver });
+    const id = "018f0f58-c3d1-7a2b-8a4f-4c09571e5301";
+    const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public/workspaces/OPS/threads/${id}/attachments/${id}/content?resourceKind=record&resourceKey=order-001`,
+      { headers: { "x-feedback-participant-credential": participant.credential } }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toBe(`attachment; filename="__.png"; filename*=UTF-8''${encodeURIComponent("証跡.png")}`);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(Uint8Array.of(1));
+  });
   it("public-profile participant credentialを公開routeから発行し、他modeへfallbackしない", async () => {
     const { handler } = fixture();
     const browserProfileId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5303";
@@ -98,7 +165,7 @@ describe("Feedback Service v2 HTTP adapter", () => {
     const response = await handler(new Request(`${origin}/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001`));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect((await response.json()) as object).toMatchObject({ profile: { effectivePermissions: ["feedback:read"] } });
+    expect((await response.json()) as object).toMatchObject({ profile: { effectivePermissions: ["feedback:read", "feedback:create"] } });
     expect(repository.count("getCapabilities")).toBe(1);
 
     const crossOrigin = await handler(new Request("https://evil.example/internal/feedback/v2/profiles/public?workspaceId=OPS&resourceKind=record&resourceKey=order-001"));

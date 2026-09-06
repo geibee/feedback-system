@@ -191,7 +191,7 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
       return this.recoverCreate(recoveryQuery(query, "feedback:create"), options);
     }
     try {
-      await this.bindEnvelope(created, query, seed, options);
+      await this.bindEnvelope(created, query, seed, options, query.command.body);
       const reread = await this.client.getIssue(created.id, options?.signal);
       const projection = projectionFromIssue(reread, this.config);
       const record = await this.readCandidate({ providerRef: providerRef(reread), projection }, options);
@@ -325,13 +325,15 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
     issue: BacklogIssue,
     scope: FeedbackRepositoryScope & { threadId?: string; command?: { threadId?: string; intentId: string; requestHash: string } },
     seed: RecoverySeed,
-    options?: FeedbackRepositoryOptions
+    options?: FeedbackRepositoryOptions,
+    originalBody?: string
   ): Promise<void> {
     const envelope = await this.codec.signEnvelope({
       schemaVersion: "2",
       threadId: seed.threadId,
       intentId: seed.intentId,
       requestHash: seed.requestHash,
+      ...(originalBody === undefined ? {} : { initialBodyHash: calculateFeedbackCommandHash({ body: originalBody }) }),
       providerBinding: bindingContext(scope, issue.id),
       scope: {
         workspace: scope.workspaceId,
@@ -430,13 +432,17 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
     const initial: FeedbackMessage = {
       messageId: threadId,
       body: visibleBody(issue.description),
-      author: envelopeParticipant(envelope, this.config.participantId),
+      author: envelope.initialBodyHash ? envelopeParticipant(envelope, this.config.participantId)
+        : { kind: "provider-user", displayName: "Backlog user" },
       createdAt: issue.created,
       orderingKey: { occurredAt: issue.created, eventId: threadId },
       revisions: [],
       attachments: []
     };
     const messages = new Map<string, FeedbackMessage>([[threadId, initial]]);
+    if (envelope.initialBodyHash !== undefined && envelope.initialBodyHash !== calculateFeedbackCommandHash({ body: initial.body })) {
+      throw integrity("Backlog initial本文が署名済みhashと一致しません");
+    }
     const revisions = new Map<string, RevisionEvent[]>();
     for (const comment of comments) {
       const marker = parseBlock(comment.content, backlogMarkerNames.message);
@@ -467,10 +473,11 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
       const target = messages.get(messageId);
       if (!target) throw integrity("Backlog revision対象messageがありません");
       const chain = orderRevisionChain(messageId, events);
-      if (target.author.kind !== "participant") {
+      const owner = messageId === threadId ? envelopeParticipant(envelope, this.config.participantId) : target.author;
+      if (owner.kind !== "participant") {
         throw integrity("Backlog revision participantが元message authorと一致しません");
       }
-      const participantId = target.author.participantId;
+      const participantId = owner.participantId;
       if (chain.some((event) => event.marker.participantId !== participantId)) {
         throw integrity("Backlog revision participantが元message authorと一致しません");
       }
@@ -480,7 +487,10 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
         revisedAt: event.comment.created,
         orderingKey: { occurredAt: event.comment.created, eventId: event.marker.eventId }
       }));
-      if (target.revisions.length > 0) target.body = target.revisions.at(-1)!.body;
+      if (target.revisions.length > 0) {
+        target.body = target.revisions.at(-1)!.body;
+        target.author = owner;
+      }
     }
     const ordered = [...messages.values()].sort((left, right) => compareOrdering(left.orderingKey, right.orderingKey));
     return {

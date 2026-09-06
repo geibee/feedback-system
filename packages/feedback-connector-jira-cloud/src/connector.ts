@@ -229,6 +229,7 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
       threadId: query.command.threadId,
       intentId: query.command.intentId,
       requestHash: query.command.requestHash,
+      initialBodyHash: calculateFeedbackCommandHash({ body: query.command.body }),
       providerBinding: { profileId: query.profileId, installationId: query.installationId, objectId: created.id },
       scope: {
         workspace: query.workspaceId,
@@ -592,10 +593,15 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
     const rawEnvelope = isRecord(envelope) ? envelope : {};
     const threadId = typeof rawEnvelope.threadId === "string" && uuid.test(rawEnvelope.threadId) ? rawEnvelope.threadId : stableId("issue", issue.id);
     const createdAt = dateString(issue.fields.created);
+    const initialBody = adfToText(issue.fields.description);
+    if (rawEnvelope.initialBodyHash !== undefined && rawEnvelope.initialBodyHash !== calculateFeedbackCommandHash({ body: initialBody })) {
+      throw integrity("Jira initial本文が署名済みhashと一致しません");
+    }
     const initial: FeedbackMessage = {
       messageId: threadId,
       body: adfToText(issue.fields.description),
-      author: envelopeParticipant(rawEnvelope, this.config.participantId),
+      author: rawEnvelope.initialBodyHash ? envelopeParticipant(rawEnvelope, this.config.participantId)
+        : { kind: "provider-user", displayName: "Jira user" },
       createdAt,
       orderingKey: { occurredAt: createdAt, eventId: threadId },
       revisions: [],
@@ -629,10 +635,11 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
       const target = messages.get(messageId);
       if (!target) throw integrity("revision対象messageがありません");
       const chain = orderRevisionChain(messageId, events);
-      if (target.author.kind !== "participant") {
+      const owner = messageId === threadId ? envelopeParticipant(rawEnvelope, this.config.participantId) : target.author;
+      if (owner.kind !== "participant") {
         throw integrity("revision participantが元message authorと一致しません");
       }
-      const originalParticipantId = target.author.participantId;
+      const originalParticipantId = owner.participantId;
       if (chain.some((event) => event.marker.participantId !== originalParticipantId)) {
         throw integrity("revision participantが元message authorと一致しません");
       }
@@ -642,7 +649,10 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
         revisedAt: event.comment.created,
         orderingKey: { occurredAt: event.comment.created, eventId: event.marker.eventId }
       }));
-      if (target.revisions.length > 0) target.body = target.revisions[target.revisions.length - 1]!.body;
+      if (target.revisions.length > 0) {
+        target.body = target.revisions[target.revisions.length - 1]!.body;
+        target.author = owner;
+      }
     }
     for (const item of attachmentMarkers) {
       const verification = await this.codec.verifyAttachmentMarker(item.marker, {
@@ -885,9 +895,9 @@ function adfToText(value: unknown): string {
   if (value.type === "text" && typeof value.text === "string") return value.text;
   if (value.type === "hardBreak") return "\n";
   if (!Array.isArray(value.content)) return "";
-  const separator = value.type === "doc" || value.type === "paragraph" ? "\n" : "";
+  const separator = value.type === "doc" ? "\n" : "";
   const text = value.content.map(adfToText).join(separator);
-  return value.type === "doc" ? text.replace(/\n{2,}/gu, "\n") : text;
+  return text;
 }
 
 function messageFromComment(comment: JiraCloudComment, marker: Record<string, unknown>, currentParticipantId: string): FeedbackMessage {

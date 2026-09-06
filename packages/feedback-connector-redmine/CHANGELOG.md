@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- 未検証v1 journalからv2 messageへの上書きを禁止し、reply／revisionの正規化と署名hashを統一した。既知の初期本文をhashで束縛し、hashのないprovider本文を本人へ昇格しない。現行Redmine v1単独版は変更しない。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - DBレスのRedmine production Connector、REST transport、provider provisioning planを追加した。

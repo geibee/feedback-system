@@ -21,6 +21,7 @@
     "threadId": { "$ref": "#/$defs/StableId" },
     "intentId": { "$ref": "#/$defs/StableId" },
     "requestHash": { "$ref": "#/$defs/RequestHash" },
+    "initialBodyHash": { "$ref": "#/$defs/RequestHash", "description": "作成要求で確認した初期本文のhash。旧Envelopeでは省略可能だが、省略時のprovider本文をparticipant本人の検証済み本文として扱わない。" },
     "providerBinding": { "$ref": "#/$defs/ProviderBinding" },
     "scope": { "$ref": "#/$defs/StoredScope" },
     "createdBy": { "$ref": "#/$defs/CreatedBy" },

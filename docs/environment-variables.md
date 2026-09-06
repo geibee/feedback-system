@@ -6,6 +6,8 @@ secretには既定値がありません。secret managerまたはorchestratorの
 
 ## Feedback Service v2
 
+2026-09-06修正では環境変数・secret形式を追加しない。readinessはローカルの設定・鍵・credential形式を検査し、Backlogを含むproviderへの疎通を要求しない。project、custom field、issue type、priorityのprovisioningは配備前に専用のmanaged検査で確認する。旧DB保存版の接続設定は使用しない。
+
 Phase 5の`@geibee/feedback-service-runtime`は次の非secret設定を読み、`feedback-service-settings.v2`、`feedback-provider-profile.v2`、Connector runtime catalogを起動前に検証します。Feedback Service本体はprovider非依存のまま、別deploy compositionがnetwork listenerとConnectorを接続します。
 
 | 変数 | 必須 | 指定する値 |

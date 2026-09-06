@@ -145,10 +145,15 @@ async function dispatch(
     ? validateCreateCommand(await readJson(request, dependencies.maximumRequestBytes))
     : null;
   const target = targetFor(route, query, createCommand?.resource);
+  const profileForDiscovery = route.kind === "profile" ? await loadProfile(dependencies.profileLoader, route.profileId) : null;
+  const requestedOperations = profileForDiscovery?.authorization.mode === "remote-authorization"
+    ? [...new Set([route.permission, ...profileForDiscovery.policy.operations.filter(
+      (operation) => profileForDiscovery.capabilities.operations.includes(operation)
+    )])] : [route.permission];
   const access = await dependencies.authorization.createAccess({
     profileId: route.profileId,
     target,
-    requestedOperations: [route.permission],
+    requestedOperations,
     bearerToken: bearerToken(request.headers.get("authorization")),
     authenticatedSubjectId: context.authenticatedSubjectId,
     signal
@@ -231,12 +236,19 @@ async function dispatch(
     return jsonResponse(result, commandStatus(result));
   }
   if (route.kind === "revision") {
+    // 所有者確認用readとrevisionは別々の認可要求へ束縛する。
+    const readAccess = await dependencies.authorization.createAccess({
+      profileId: route.profileId, target, requestedOperations: ["feedback:read"],
+      bearerToken: bearerToken(request.headers.get("authorization")),
+      authenticatedSubjectId: context.authenticatedSubjectId, signal
+    });
+    dependencies.bindParticipant?.({ access: readAccess, principal: participant });
     const thread = await dependencies.gateway.getThread({
       profileId: route.profileId,
       workspaceId: route.workspaceId!,
       resource: resource!,
       threadId: route.threadId!,
-      access
+      access: readAccess
     });
     if (participant) {
       assertParticipantOwnsMessage({ thread, messageId: route.messageId!, participantId: participant.participantId });
@@ -687,7 +699,7 @@ function asyncIterableBody(body: AsyncIterable<Uint8Array>): ReadableStream<Uint
 }
 
 function contentDisposition(filename: string): string {
-  const safe = filename.replace(/[\r\n"\\]/gu, "_");
+  const safe = filename.replace(/[^\x20-\x7e]|["\\]/gu, "_");
   return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 

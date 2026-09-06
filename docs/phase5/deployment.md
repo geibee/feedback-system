@@ -11,6 +11,8 @@ runtimeはDB、queue、persistent／shared application data cache、upload direc
 
 ## 配備順序
 
+2026-09-06修正ではBacklogのproject／custom field／issue type／priority疎通検査をmanaged provisioning検査に限定する。`/readyz`は全providerでローカルの設定・secret形式検証だけを行う。瞬間的なprovider障害を他profileのreadinessへ伝播させない。新しいEnvelope fieldを読むcodec／contracts／Connectorは同時に配備し、旧DB保存版の移行処理を追加しない。
+
 1. 対象Jira environmentへForge entity property artifactを`forge lint`後にdeployし、Jira siteへinstallまたはmajor-version upgradeする。
 2. entity property indexの`threadId`、`intentId`、`requestHash`完全一致検索をmanaged acceptanceで確認する。
 3. Redmine対象ではv2 custom field provisioning planをread-onlyで確認し、承認済みの別作業でapplyする。既存v1 fieldは変更しない。

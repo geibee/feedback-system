@@ -137,7 +137,7 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
   const savePending = async () => {
     const profileId = snapshot.profile?.profileId;
     if (!profileId || !pendingState) return;
-    try { await pendingState.savePendingIntents(profileId, snapshot.pendingIntents); } catch (error) { setProblem(error); }
+    await pendingState.savePendingIntents(profileId, snapshot.pendingIntents);
   };
   const visibility = dependencies.visibility ?? { isVisible: () => true, subscribe: () => () => undefined };
   const stopPolling = () => { cancelPoll?.(); cancelPoll = null; };
@@ -350,6 +350,11 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
     const session = sessionGeneration;
     const operation = createSignal();
     try {
+      // providerがcommitした直後の切断でも同じintentを回収できるよう、送信前に保存する。
+      await recordPending(input.scope, input.threadId, input.stableResultId, input.intentId, input.operation,
+        input.requestHash, { intentId: input.intentId, state: "pending", operation: input.operation,
+          retryAfterSeconds: 5, automaticWriteAllowed: false });
+      if (!isCurrentSession(session) || operation.signal.aborted) return;
       const result = await input.run(operation.options);
       if (!isCurrentSession(session) || operation.signal.aborted) return;
       if (isRecovery(result)) {

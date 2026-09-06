@@ -2,6 +2,8 @@
 
 確認日: 2026-09-01
 
+2026-09-06 security修正: ここでのv1／legacyはRedmine ticket形式であり、廃止済みDB版ではない。未検証v1 eventの表示は維持するが、v2 messageへの上書きとparticipant所有者への昇格は禁止する。`initialBodyHash`のない旧Envelopeはprovider本文として表示し、旧署名済みrevisionは検証して再構築する。詳細は[API互換性](../api-compatibility.md)を参照。
+
 Phase 2で固定した10行を、provider production fixture、Redmine実container conformance、v1 characterization、controller fault testへ対応付けた。unit fakeだけで完結する判断と、provider実環境で確認する判断を分け、後者はRedmine 5.1.12／6.0.10／6.1.3／7.0.0 containerまたは管理Jira Cloud開発siteで実行する。
 
 | matrix行 | provider／環境 | 実行証跡 | 合格条件 |

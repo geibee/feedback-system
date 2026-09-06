@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- profileの許可集合、remote自己編集のread／revise認可、日本語添付名のHTTP headerを修正した。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - provider非依存Service境界を維持したまま、runtime adapter registryからBacklog Connectorをrequest scopeで解決できるようにした。

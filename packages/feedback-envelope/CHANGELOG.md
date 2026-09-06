@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-06
+
+- 任意のinitialBodyHashを署名・検証対象へ追加し、旧Envelopeを読み取る互換性を保持した。
+
 ## 1.0.0-alpha.7 - 2026-08-31
 
 - Phase 1のEnvelope codec／key ring port skeletonを追加した。

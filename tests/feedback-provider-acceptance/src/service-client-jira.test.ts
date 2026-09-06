@@ -14,6 +14,7 @@ import {
 } from "@geibee/feedback-connector-jira-cloud";
 import { calculateFeedbackCommandHash, createFeedbackEnvelopeCodec } from "@geibee/feedback-envelope";
 import { createFeedbackService } from "@geibee/feedback-service";
+import { createFeedbackController, createMemoryFeedbackControllerState } from "@geibee/feedback-controller";
 import {
   createProductionFeedbackProjectionVerifier,
   type FeedbackConnectorCatalog,
@@ -45,8 +46,8 @@ const profile: FeedbackProviderProfileV2 = {
   connectorProfileRef: runtimeProfileId,
   workspacePolicy: {
     workspaceIds: [workspaceId],
-    workspaceDiscovery: "supported",
-    resourceDiscovery: "supported"
+    workspaceDiscovery: "unsupported",
+    resourceDiscovery: "unsupported"
   },
   authorization: { mode: "public-profile" },
   policy: {
@@ -55,7 +56,7 @@ const profile: FeedbackProviderProfileV2 = {
   },
   capabilities: {
     operations: ["feedback:read", "feedback:create"],
-    discovery: { workspaces: "supported", resources: "supported" },
+    discovery: { workspaces: "unsupported", resources: "unsupported" },
     operationGuarantees: {
       create: "recoverable",
       reply: "recoverable",
@@ -104,6 +105,7 @@ const catalog: FeedbackConnectorCatalog = {
 };
 
 class InMemoryJiraCloudTransport implements JiraCloudTransport {
+  constructor(readonly loseCreateResponse = true) {}
   readonly requests: JiraCloudRequest[] = [];
   createCalls = 0;
   searchCalls = 0;
@@ -124,13 +126,15 @@ class InMemoryJiraCloudTransport implements JiraCloudTransport {
       this.recoveryProperty = recovery.value;
       this.createdBody = fields.description;
       // Jiraがissueを保存した後にresponseを失った状態を再現する。
-      return response(503, { errorMessages: ["synthetic result unknown"] });
+      return this.loseCreateResponse ? response(503, { errorMessages: ["synthetic result unknown"] })
+        : response(201, { id: "10001", key: "FBT-1" });
     }
     if (request.method === "POST" && request.path === "/rest/api/3/search/jql") {
+      if (this.createdBody === undefined) return response(200, { issues: [], isLast: true });
       this.searchCalls += 1;
       // create直後の一度だけprojection indexを不可視にして明示回収へ進ませる。
       return response(200, {
-        issues: this.searchCalls === 1 ? [] : [this.issue(true)],
+        issues: this.loseCreateResponse && this.searchCalls === 1 ? [] : [this.issue(true)],
         isLast: true
       });
     }
@@ -202,8 +206,8 @@ class FeedbackServiceTransport implements FeedbackHttpTransport {
 }
 
 describe("Feedback client/service/Jira actual integration acceptance", () => {
-  it("public credential付きcreateの結果不明をintent回収し、検証済み本文をreadする", async () => {
-    const jira = new InMemoryJiraCloudTransport();
+  it.each([false, true])("Controllerからpublic createし、応答喪失=%sでも本文を安全にreadする", async (loseResponse) => {
+    const jira = new InMemoryJiraCloudTransport(loseResponse);
     const envelopeCodec = createFeedbackEnvelopeCodec([{
       kid: "envelope-current",
       secret: envelopeKey,
@@ -269,39 +273,33 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
     const participant = await client.issueParticipant({ profileId, browserProfileId });
     participantCredential = participant.credential;
 
+    const ids = [threadId, intentId];
+    const controller = createFeedbackController({ client, state: createMemoryFeedbackControllerState(),
+      capture: { async capture() { throw new Error("未使用"); }, cancel() {} },
+      clock: { now: () => new Date(createdAt) }, scheduler: { schedule: () => () => undefined },
+      createId: () => ids.shift()!, requestHash: { async calculate(value) { return calculateFeedbackCommandHash(value); } }
+    });
+    await controller.dispatch({ type: "connect", scope: { profileId, workspaceId, resource } });
+    expect(controller.getSnapshot().profile?.effectivePermissions).toEqual(["feedback:read", "feedback:create"]);
+
     const title = "Inventory feedback";
     const body = "Create response was lost, but this provider body is authoritative.";
-    const commandWithoutHash = { intentId, threadId, resource, title, body };
-    const requestHash = calculateFeedbackCommandHash(commandWithoutHash);
-    const pending = await client.createThread({
-      profileId,
-      workspaceId,
-      command: { ...commandWithoutHash, requestHash }
-    });
-    expect(pending).toEqual({
-      intentId,
-      state: "pending",
-      operation: "feedback:create",
-      retryAfterSeconds: 1,
-      automaticWriteAllowed: false
-    });
-    expect(jira.createCalls).toBe(1);
-
-    const recovered = await client.recoverIntent({
-      profileId,
-      workspaceId,
-      resource,
-      threadId,
-      intentId,
-      requestHash,
-      operation: "feedback:create"
-    });
-    expect(recovered).toEqual({
-      intentId,
-      state: "completed",
-      operation: "feedback:create",
-      stableResultId: threadId
-    });
+    const command = await controller.createWriteCommand({ type: "submit", title, body });
+    if (command.type !== "submit") throw new Error("submit commandが必要です");
+    const requestHash = command.command.requestHash;
+    await controller.dispatch(command);
+    if (loseResponse) {
+      expect(controller.getSnapshot().pendingIntents[0]?.recovery).toEqual({
+        intentId,
+        state: "pending",
+        operation: "feedback:create",
+        retryAfterSeconds: 1,
+        automaticWriteAllowed: false
+      });
+      expect(jira.createCalls).toBe(1);
+      await controller.dispatch({ type: "recover-intent", intentId });
+    }
+    expect(controller.getSnapshot().pendingIntents).toEqual([]);
     expect(jira.createCalls).toBe(1);
 
     const thread = await client.getThread({ profileId, workspaceId, resource, threadId });
@@ -313,7 +311,7 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
       messages: [{
         messageId: threadId,
         body,
-        author: {
+        author: loseResponse ? { kind: "provider-user" } : {
           kind: "participant",
           participantId: participant.participantId,
           isCurrentParticipant: true
@@ -335,7 +333,7 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
     });
     expect(http.requests.find((request) => request.path.endsWith("/threads"))?.headers)
       .toMatchObject({ "X-Feedback-Participant-Credential": participant.credential });
-    expect(jira.searchCalls).toBe(3);
+    expect(jira.searchCalls).toBe(loseResponse ? 4 : 1);
   });
 });
 

@@ -65,6 +65,49 @@ const revisionIntentId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5005";
 const revisionId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5006";
 
 describe("Redmine production Connector", () => {
+  it("未検証v1編集でv2の本文と所有者を上書きしない", async () => {
+    const provider = new MemoryRedmine();
+    const connector = repository(provider);
+    await connector.createThread({ ...scope, command: createCommand() });
+    await connector.reply({ ...scope, threadId, command: {
+      intentId: replyIntentId, requestHash: requestHash(replyIntentId), messageId, body: "署名済み返信"
+    } });
+    await provider.updateIssue(provider.onlyIssue().id, { notes: buildDualWriteRedmineNote("偽造本文", {
+      kind: "edit", messageId, participantId: profile.participantId, participantName: "偽装", version: 2,
+      intentId: revisionIntentId, signature: "INVALID"
+    }) });
+    const mapped = await mapRedmineIssue(provider.onlyIssue(), profile, scope, codec);
+    expect(mapped.thread.messages.find((message) => message.messageId === messageId)).toMatchObject({
+      body: "署名済み返信", author: { kind: "participant", participantId: profile.participantId }
+    });
+    expect(mapped.warnings).not.toHaveLength(0);
+  });
+
+  it("v1互換の空白正規化と署名本文hashをreply／revisionで一致させる", async () => {
+    const provider = new MemoryRedmine();
+    const connector = repository(provider);
+    await connector.createThread({ ...scope, command: createCommand() });
+    await expect(connector.reply({ ...scope, threadId, command: {
+      intentId: replyIntentId, requestHash: requestHash(replyIntentId), messageId, body: "  返信\r\n\r\n本文\r\n"
+    } })).resolves.toMatchObject({ message: { body: "返信\n\n本文" } });
+    await expect(connector.appendRevision({ ...scope, threadId, messageId, command: {
+      intentId: revisionIntentId, requestHash: requestHash(revisionIntentId), revisionId,
+      expectedRevisionId: messageId, body: " 改訂\r\n"
+    } })).resolves.toMatchObject({ message: { body: "改訂" } });
+  });
+
+  it("初期本文の改変を拒否し、hashのない旧Envelopeを本人本文へ昇格しない", async () => {
+    const provider = new MemoryRedmine();
+    await repository(provider).createThread({ ...scope, command: createCommand() });
+    const issue = provider.onlyIssue();
+    issue.description = "改変本文";
+    await expect(mapRedmineIssue(issue, profile, scope, codec)).rejects.toMatchObject({ code: "feedback.integrity_error" });
+    const field = (issue.custom_fields as Array<{ id: number; value: string }>).find((field) => field.id === ids.envelope)!;
+    const { signature: _signature, initialBodyHash: _hash, ...payload } = JSON.parse(field.value);
+    field.value = JSON.stringify(await codec.signEnvelope(payload));
+    const old = await mapRedmineIssue(issue, profile, scope, codec);
+    expect(old.thread.messages[0]).toMatchObject({ body: "改変本文", author: { kind: "provider-user" } });
+  });
   it("provider provisioningを明示し、不足とfield ID重複をfail-closedにする", () => {
     expect(feedbackRedmineV2ProvisioningFields.map((field) => field.key)).toEqual(Object.keys(ids));
     expect(inspectRedmineV2Provisioning(ids)).toEqual({ ready: true, missing: [], duplicateIds: [] });

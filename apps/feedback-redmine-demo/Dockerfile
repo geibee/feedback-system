@@ -57,7 +57,7 @@ RUN npm --workspace @geibee/feedback-contracts run build \
 
 FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:901e944d1f4fc2bd077e8f5568b98c1f6f8cdacf6b97a87747c43134a339b9a7
 USER root
-RUN apk upgrade --no-cache libcrypto3 libssl3 libexpat
+RUN apk upgrade --no-cache libcrypto3 libssl3 libexpat libuuid
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Feedback Redmine local demo" \

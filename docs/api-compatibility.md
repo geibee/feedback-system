@@ -1,5 +1,16 @@
 # API・packageの互換性
 
+## 2026-09-06 セキュリティ修正の互換境界
+
+- 旧DB保存版は廃止済みであり、DB用の互換・復元・migration経路は提供しない。本repositoryの`legacy` readerはRedmine v1 ticket形式のreaderであり、旧DB版ではない。
+- Redmine v1のOpenAPI、保存形式、公開package、自己編集署名、storage keyは変更しない。v2内で未検証のv1 journalはprovider由来の会話として保持し、v2 messageの本文・所有者へ適用しない。v1単独gatewayの動作は維持する。
+- Envelopeへ任意の`initialBodyHash`を追加した。新規作成の応答を得た経路は入力本文のhashを署名する。読取り時の改変はintegrity errorとし、hash欠落へfallbackしない。
+- hashのない旧Envelopeと、初回writeの応答喪失から本文なしで回収したEnvelopeは読めるが、初期本文をparticipantの検証済み本文へ昇格しない。したがってv2での自己編集対象にしない。既存の署名済みrevisionは所有者・本文hash・chainを検証して最新本文と所有者を復元する。信頼できないprovider本文への自動再署名は行わない。
+- browser wire DTOは変更しない。旧v2 readerは新しいEnvelope fieldを拒否し得るため、Connector／Envelope codec／contractsは同時配備する。Redmine v1 rollbackとは区別する。
+- profileは任意operationの許可集合を照会し、write権限をreadから推測しない。remote自己編集はread／reviseを別々に束縛し、どちらかの拒否時は書き込まない。
+- Controllerは通信前にpending intentを端末内へ保存し、切断・再読込後も同じID／hashで回収する。本文やbinaryの自動再送はしない。
+
+
 この文書は、API、JSON Schema、公開packageを変更する開発者向けのチェックリストです。個々のfieldやresponseはこの文書へ転記せず、次の正本を確認してください。
 
 汎用化開始時点のpackage export、browser storage key、runtime config、v1／UI characterization、明示的未検証項目は[`docs/phase0/compatibility-ledger.md`](./phase0/compatibility-ledger.md)に固定しています。公開契約の所有境界とv1／v2 security boundaryは[`ADR 0004`](./adr/0004-contract-ownership-and-v1-v2-boundary.md)を参照してください。

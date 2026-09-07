@@ -10,6 +10,33 @@ import {
 import { createFakeFeedbackClient, createTrackedUploadSource } from "./testing.js";
 
 describe("FeedbackClientPort契約", () => {
+  it("参照headerを全個別操作へ渡し、URL・command hash・bodyに混ぜない", async () => {
+    const requests: FeedbackHttpRequest[] = [];
+    const client = createFeedbackHttpClient({ transport: { async request(request) {
+      requests.push(request);
+      return { status: 200, headers: { "content-type": "application/json" }, async json() { return { thread: {} }; } };
+    } } });
+    const query = { profileId: "p", workspaceId: "w", resource: { kind: "record", key: "k" }, threadId: "id" };
+    const options = { threadReference: "ftr1.k.a.b.c" };
+    const command = { intentId: "intent", requestHash: "sha256:" + "1".repeat(64), messageId: "message", body: "本文" };
+    await client.getThread(query, options);
+    await client.reply({ ...query, command }, options);
+    await client.appendRevision({ ...query, messageId: "message", command: { ...command, revisionId: "revision", expectedRevisionId: "message" } }, options);
+    await client.recoverIntent({ ...query, intentId: command.intentId, requestHash: command.requestHash, operation: "feedback:reply" }, options);
+    await client.uploadAttachment({ ...query, command: { intentId: "intent", requestHash: command.requestHash, attachmentId: "attachment",
+      filename: "a.txt", contentType: "text/plain", sizeBytes: 1, contentHash: command.requestHash, purpose: "conversation" },
+      source: createTrackedUploadSource([Uint8Array.of(1)]) }, options);
+    await expect(client.getAttachment({ ...query, attachmentId: "attachment" }, options)).rejects.toThrow();
+    expect(requests).toHaveLength(6);
+    for (const request of requests) {
+      expect(request.headers["X-Feedback-Thread-Reference"]).toBe(options.threadReference);
+      expect(request.headers["X-Feedback-Accept-Thread-Reference"]).toBe("1");
+      expect(request.path).not.toContain(options.threadReference);
+      if (typeof request.body === "string") expect(request.body).not.toContain(options.threadReference);
+    }
+    expect(JSON.parse(requests[1]!.body as string)).toEqual(command);
+  });
+
   it("wire problemを型付きerrorとして保持する", () => {
     const error = new FeedbackClientProblem({
       type: "https://feedback.example/problems/forbidden",

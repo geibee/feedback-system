@@ -221,6 +221,15 @@ function validateLocalState(value: FeedbackControllerLocalState): FeedbackContro
     typeof value.unreadCountByThread !== "object" || value.unreadCountByThread === null) {
     throw new Error("ClientStateV2 local stateが不正です");
   }
+  if (value.threadReferences !== undefined) {
+    if (!Array.isArray(value.threadReferences) || value.threadReferences.length > 1000) throw new Error("thread参照一覧が不正です");
+    for (const entry of value.threadReferences) {
+      if (!entry || !entry.scope || !entry.scope.resource || !stableKey.test(entry.scope.profileId) ||
+          !stableKey.test(entry.scope.workspaceId) || !stableKey.test(entry.scope.resource.kind) ||
+          typeof entry.scope.resource.key !== "string" || !entry.scope.resource.key || entry.scope.resource.key.length > 512 ||
+          !uuid.test(entry.threadId) || !validReference(entry.threadReference)) throw new Error("thread参照bindingが不正です");
+    }
+  }
   const lastViewed: Record<string, { occurredAt: string; eventId: string }> = {};
   for (const [threadId, ordering] of Object.entries(value.lastViewedByThread)) {
     if (!uuid.test(threadId) || typeof ordering !== "object" || ordering === null ||
@@ -237,6 +246,7 @@ function validateLocalState(value: FeedbackControllerLocalState): FeedbackContro
     unread[threadId] = count;
   }
   return {
+    ...(value.threadReferences ? { threadReferences: value.threadReferences.map((entry) => ({ ...entry, scope: { ...entry.scope, resource: { ...entry.scope.resource } } })) } : {}),
     draft: value.draft,
     followedThreadIds: [...new Set(value.followedThreadIds)].sort(),
     lastViewedByThread: lastViewed,
@@ -246,6 +256,7 @@ function validateLocalState(value: FeedbackControllerLocalState): FeedbackContro
 
 function cloneState(value: FeedbackControllerLocalState): FeedbackControllerLocalState {
   return {
+    ...(value.threadReferences ? { threadReferences: value.threadReferences.map((entry) => ({ ...entry, scope: { ...entry.scope, resource: { ...entry.scope.resource } } })) } : {}),
     draft: value.draft,
     followedThreadIds: [...value.followedThreadIds],
     lastViewedByThread: Object.fromEntries(Object.entries(value.lastViewedByThread).map(([key, ordering]) => [key, { ...ordering }])),
@@ -275,6 +286,7 @@ function validatePendingIntents(
       (pending.recovery.state !== "repair_required" || pending.recovery.retryDirective !== "manual-confirmation")) {
       throw new Error("pending intentのretry policyが不正です");
     }
+    if (pending.threadReference !== undefined && !validReference(pending.threadReference)) throw new Error("pending参照が不正です");
     seen.add(pending.intentId);
   }
   return value;
@@ -286,4 +298,8 @@ function clonePending(value: readonly FeedbackPendingIntentSnapshot[]): readonly
     scope: { ...pending.scope, resource: { ...pending.scope.resource } },
     recovery: { ...pending.recovery }
   }));
+}
+
+function validReference(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 8192 && /^ftr1\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(value);
 }

@@ -1,5 +1,9 @@
 # 変更履歴
 
+## 未リリース - 2026-09-07
+
+- 共通参照契約alpha.3へ対応したService・Connectorを同梱する。live証跡は公開clientからService・projection・Connectorまでのsourceへ束縛する。
+
 ## 未リリース - 2026-09-06
 
 - Backlogの一時的な疎通障害をreadinessへ伝播させず、設定・secret形式検証と配備前provisioning検査を分離した。

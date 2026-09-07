@@ -109,8 +109,11 @@ standalone listenerへ`remote-authorization` profileを設定する場合、任�
 | `FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO` | credential環境変数未指定時 | 上記emailとAPI tokenを各1行で一度だけ渡すFIFO。指定時は2つのcredential環境変数より優先する |
 | `FEEDBACK_JIRA_ACCEPTANCE_CLEANUP_POLICY` | 必須 | `delete-run-owned`固定 |
 | `FEEDBACK_JIRA_ACCEPTANCE_ISSUE_TYPE_ID` | 任意 | 未指定時はcreate metadataから非subtaskのTaskまたは先頭候補を選ぶ |
+| `FEEDBACK_JIRA_ORPHAN_EXECUTED_AT` | orphan cleanup時だけ必須 | cleanup対象runのUTC ISO 8601開始時刻。専用summary、本文、recovery propertyと時刻±5分を照合し、一件以下だけを対象にする |
 
-受け入れscriptはrun ID付きissueを一件だけ作成し、comment、revision、attachment、property検索を検証後、そのissueだけを削除する。既存issue、project、Forge installationは削除しない。FIFOは読み取り後に閉じるが削除しないため、呼出元が専用一時directoryとFIFOを削除する。
+受け入れscriptはrun ID付きissueを二件作成する。一件目でConnectorのcomment、revision、attachment、property検索を、二件目で公開client→Service→Connectorの暗号化threadReference経路を検証し、追跡した二件だけを削除する。既存issue、project、Forge installationは削除しない。FIFOは読み取り後に閉じるが削除しないため、呼出元が専用一時directoryとFIFOを削除する。
+
+`scripts/cleanup-feedback-jira-live-orphan.mjs --delete-run-owned`は、失敗したlive runnerが作成IDを記録できなかった場合だけ使用する保守toolである。上記時刻に加え、`[feedback-phase5:<UUID>] HTTP reference acceptance`完全一致summary、既知の本文、Jira recovery propertyのworkspace／resource／tripletを照合する。候補が複数なら削除せず停止する。
 
 Phase 2 Jira contract spikeのForge／Jira credentialは利用者のWSL shellへ一時注入して使用し、repo file、fixture、Feedback Service設定へ保存していません。Phase 3でも新しい固定secret環境変数名は追加しておらず、profileのsecret reference IDと同名の環境変数だけをdeploy環境で必須解決します。Forge CLIのlogin情報をFeedback Serviceのsecret名として再利用しません。
 
@@ -195,3 +198,11 @@ FEEDBACK_RELEASE_BUILDER
 FEEDBACK_VERIFY_SKIP_NPM_CI
 FEEDBACK_VERIFY_SKIP_COMMON_CONTRACTS
 ```
+
+## 暗号化thread参照（v2 alpha.3、任意）
+
+provider profileに `secretRefs.threadReferenceKeyRing: { "kind": "server-secret", "id": "THREAD_REFERENCE_RING" }` を追加すると有効化する。`THREAD_REFERENCE_RING` は例示する環境変数名であり固定名ではない。既定値や自動鍵生成はない。未設定profileは従来の応答・検索経路を維持する。
+
+secret値は `{"activeKid":"current","keys":[{"kid":"current","key":"<32 bytesのrandom鍵をpaddingなしbase64urlで表現>"}]}`。鍵は厳密に32 bytes、kidは英数字・underscore・hyphenで1〜64文字、ringは最大8鍵でactiveは1鍵。Envelope／participant credential／participant ID導出とは別secret・別鍵を用意する。readinessはring構造・鍵長を検証する。
+
+参照寿命は30日固定。通常rotationは旧鍵を最終発行から30日保持する。緊急時は旧鍵を削除して全Service instanceを再起動／設定反映する。個別token失効は提供しない。鍵を失ったtokenから検索へ自動fallbackしない。reverse proxyのaccess logから `X-Feedback-Thread-Reference` を除外し、secretをブラウザ設定へ埋め込まない。

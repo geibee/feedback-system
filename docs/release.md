@@ -18,6 +18,10 @@ npm version "${FEEDBACK_RELEASE_VERSION}" \
 
 ## 2. 品質ゲートを通す
 
+alpha.3候補では先に承認済みtest tenantで下記live Gateを実行し、成功出力だけを対応するfixtureへ反映してから正規verifyを実行する。Jira／Backlog Stage Bの証跡は共通の`threadReference`経路を含む必要がある。Backlog Stage Aもdigestが不一致なら再実行する。version・lockfile・対象sourceを変更した後はlive証跡を再取得する。
+
+Backlogの検索件数が一件でも全体の一意性は保証しない。Stage Bは実際の回収呼出しで観測した件数と結果を照合し、別issueを作った状態で固定参照の操作先が分離されることを追加検証する。古い証跡のbooleanやdigestを手編集してGateを通さない。
+
 skip変数を設定せずに実行します。
 
 ```bash

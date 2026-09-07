@@ -27,18 +27,26 @@ Forge deploy／install credentialはFeedback Serviceへ渡さない。Jira REST 
 
 - provider profileの`connectorProfileRef`がcatalogに一件だけ存在し、`connectorKey`が一致する。
 - Redmine workspace bindingはprofile allowlistの単一workspaceと一致する。
-- Backlog workspace bindingはprofile allowlistの単一workspaceと一致し、project、4 Text custom field、issue type、priorityのprovider readinessが成功する。
+- Backlog workspace bindingはprofile allowlistの単一workspaceと一致する。project、4 Text custom field、issue type、priorityの疎通は配備前provisioning検査で確認する。
 - Authorization Modeごとのportが存在し、別modeへfallbackしない。
 - `remote-authorization`はhostの認証済みsubject adapterがない限りlistenしない。
 - Envelope／participant credential key ringはactive一鍵、最大8鍵、全鍵32 bytes以上のcanonical base64urlとしてparseでき、participant ID derivation鍵とsecret IDを分離する。
 - provider credentialはJira Cloudの`jira-cloud-basic`、Redmineの`redmine-api-key`、Backlogの`backlog-api-key` exact JSONとしてregistryでparseでき、署名鍵とprofile secret referenceをすべて解決できる。不正形式では`/readyz`を503にする。
 
-Jira Cloud／Redmine readinessは設定とsecret解決を検査する。Backlogはprovider側provisioning driftをfail-closedにするためAPI readも行う。orchestratorのrestart判定には`/healthz`を使い、Backlog瞬断だけでprocessを再起動しない。provider障害中のoffline readは提供しない。
+全providerのreadinessは設定とsecret形式だけを検査し、provider APIを呼ばない。orchestratorのrestart判定には`/healthz`を使い、Backlog瞬断だけでprocessを再起動しない。provider障害中のoffline readは提供しない。
+
+## alpha.3の固定参照を有効化する
+
+対象profileの`secretRefs.threadReferenceKeyRing`へ、他用途と鍵material・secret IDを分離したserver secretを設定する。active一鍵、最大8鍵、各鍵32 bytesのcanonical base64urlとし、既定鍵は作らない。未設定ではtokenを発行しない。[環境変数文書](../environment-variables.md)と[ADR 0005](../adr/0005-protected-thread-reference.md)に従い、30日の寿命と鍵rotationを運用する。Serviceを先に配備し、その後clientを更新する。tokenをlog・URLへ記録しない。
 
 ## release前live Gate
 
-保存済みevidenceのboolean確認だけではlive Gate通過としない。release候補sourceで`bash scripts/check-feedback-phase5-live.sh`を明示実行し、run-owned issueの作成、回収、comment、revision、attachment、再読込、cleanupを同じrunで完了させる。credentialは`FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO`または一時的なprocess環境からだけ渡し、fixtureへ保存しない。出力の`implementationDigest`はOpenAPI、attachment schema、Jira Connector、REST client、live runnerへ束縛し、`scripts/check-feedback-phase5.sh`で現sourceと再比較する。
+保存済みevidenceのboolean確認だけではlive Gate通過としない。release候補sourceで`bash scripts/check-feedback-phase5-live.sh`を明示実行し、run-owned issueの作成、回収、comment、revision、attachment、再読込、cleanupを同じrunで完了させる。credentialは`FEEDBACK_JIRA_ACCEPTANCE_CREDENTIAL_FIFO`または一時的なprocess環境からだけ渡し、fixtureへ保存しない。出力の`implementationDigest`は`scripts/lib/feedback-live-digest.mjs`で公開契約、schema、lockfile、HTTP client、Service、Gateway、Envelope、SDK、runtime、対象Connector、live runnerへ束縛し、`scripts/check-feedback-phase5.sh`で現sourceと再比較する。
 
 Backlog Stage A live Gateは`tests/fixtures/backlog-stage-a/live-gate.json`、4つ目の`feedback.resourceKey`を含むStage B live Conformanceは`tests/fixtures/backlog-stage-b/live-conformance.json`へ匿名化して保存する。release候補では`bash scripts/check-feedback-backlog-live.sh`を実行し、現Backlog Connectorのsource digest、回復、再構築、cleanupを更新する。Stage Aで確認した一時attachment IDと最終IDの不一致を理由にattachmentを有効化してはならない。
 
 release用runtimeは`bash scripts/build-feedback-service-release.sh`で`linux/amd64`／`linux/arm64` OCI、SBOM、脆弱性report、checksum、provider live evidence bindingを一組として生成する。`feedback-service-release-manifest.json`の`indexDigest`を配備時に固定し、tagだけを配備参照にしない。
+
+alpha.3のlive Gateでは、公開participant credential取得、暗号化参照の発行、Service再構成後のread／reply／revision／intent回収、改ざん・scope不一致・現在の認可取消しを実HTTP handlerで検査する。Jiraは添付往復、Backlogは同じthreadIdを持つ別issueを作った上で操作対象が分離されることも検査する。Serviceの設定・secretは試験process内のみで保持し、providerのwriteとcleanupは既存runnerが担当する。
+
+Backlogの重複試験は回収APIが実際に取得した一回の候補件数を記録する。0件はpending、複数件はrepair_required、一件はtriplet照合に従う。一件を全体の一意性証明とはせず、候補の事前検索と回収時の検索を同一視しない。

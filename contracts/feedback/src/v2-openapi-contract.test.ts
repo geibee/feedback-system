@@ -38,6 +38,25 @@ const ids = {
 const requestHash = `sha256:${"1".repeat(64)}`;
 
 describe("Feedback v2 OpenAPI freeze候補", () => {
+  it("参照はresponseだけの任意fieldであり、strict Threadもmessagesを許可する", () => {
+    const token = "ftr1.k.a.b.c";
+    const reference = componentValidator("ThreadReference");
+    expect(reference(token)).toBe(true);
+    expect(reference("plain-reference")).toBe(false);
+    expect(reference(token + "=")).toBe(false);
+    expect(reference("ftr1.k.a.b." + "x".repeat(8192))).toBe(false);
+    const thread = { threadId: ids.threadId, resource: { kind: "record", key: "order" }, title: "title",
+      status: "open", createdAt: "2026-09-07T00:00:00Z", updatedAt: "2026-09-07T00:00:00Z", messageCount: 1,
+      messages: [{ messageId: ids.messageId, body: "本文", author: { kind: "provider-user", displayName: "利用者" },
+        createdAt: "2026-09-07T00:00:00Z", orderingKey: { occurredAt: "2026-09-07T00:00:00Z", eventId: ids.messageId },
+        revisions: [], attachments: [] }] };
+    const validate = componentValidator("Thread");
+    expect(validate(thread), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...thread, threadReference: token }), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...thread, unknown: true })).toBe(false);
+    expect(componentValidator("ReplyCommand")({ intentId: ids.intentId, requestHash, messageId: ids.messageId, body: "返信", threadReference: token })).toBe(false);
+  });
+
   it.each([
     ["CreateThreadCommand", { intentId: ids.intentId, requestHash, threadId: ids.threadId, resource: { kind: "record", key: "order-001" }, title: "Phase 2", body: "本文" }],
     ["ReplyCommand", { intentId: ids.intentId, requestHash, messageId: ids.messageId, body: "返信" }],

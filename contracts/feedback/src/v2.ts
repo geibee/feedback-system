@@ -1,5 +1,7 @@
 import type { components as feedbackComponents } from "./feedback-gateway.generated.js";
 
+export type FeedbackThreadReferenceV2 = feedbackComponents["schemas"]["ThreadReference"];
+
 export const feedbackContractVersion = "2" as const;
 
 export type FeedbackOperationV2 = feedbackComponents["schemas"]["Operation"];

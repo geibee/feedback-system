@@ -24,6 +24,7 @@ import type {
   FeedbackRepositoryOptions,
   FeedbackRepositoryPort,
   FeedbackRepositoryScope,
+  ProviderRef,
   FeedbackUploadStreamSource
 } from "@geibee/feedback-connector-sdk";
 import {
@@ -76,6 +77,8 @@ export class FeedbackGatewayProblem extends Error {
 
 export type FeedbackGatewayAccess = {
   grant: FeedbackAuthorizationGrant;
+  threadReference?: string;
+  acceptThreadReferences?: boolean;
   signal?: FeedbackAbortSignal;
 };
 
@@ -101,7 +104,13 @@ export type FeedbackGatewayRepositoryResolver = (
   input: FeedbackGatewayRepositoryResolution
 ) => Promise<FeedbackRepositoryPort> | FeedbackRepositoryPort;
 
+export interface FeedbackThreadReferencePort {
+  seal(profile: FeedbackProviderProfileV2, scope: FeedbackRepositoryScope & { threadId: string }, reference: ProviderRef): Promise<string | undefined>;
+  open(profile: FeedbackProviderProfileV2, scope: FeedbackRepositoryScope & { threadId: string }, token: string): Promise<ProviderRef>;
+}
+
 export type FeedbackGatewayRuntimeComposition = FeedbackGatewayComposition & {
+  readonly threadReferences?: FeedbackThreadReferencePort;
   readonly repositoryResolver?: FeedbackGatewayRepositoryResolver;
 };
 
@@ -167,6 +176,34 @@ export class FeedbackGatewayApplicationService {
 
   constructor(composition: FeedbackGatewayRuntimeComposition) {
     this.#composition = composition;
+  }
+
+  async #referenceOptions(resolved: ResolvedAccess, input: ResourceInput & { access: FeedbackGatewayAccess }, threadId: string) {
+    const scope = { ...repositoryScope(resolved.profile, input), threadId };
+    const codec = this.#composition.threadReferences;
+    let reference: ProviderRef | undefined;
+    const options: FeedbackRepositoryOptions = { signal: input.access.signal,
+      onThreadResolved: (value) => {
+        if (options.threadRef && (value.providerKey !== options.threadRef.providerKey || value.objectId !== options.threadRef.objectId)) {
+          throw new FeedbackGatewayProblem({ code: "feedback.integrity_error", status: 409, message: "参照先が別ticketへ変わりました" });
+        }
+        reference = value;
+      }
+    };
+    if (input.access.threadReference !== undefined) {
+      if (!codec || !resolved.repository.supportsThreadReferences) throw new FeedbackGatewayProblem({ code: "feedback.integrity_error", status: 409, message: "thread参照を検証できません" });
+      options.threadRef = await codec.open(resolved.profile, scope, input.access.threadReference);
+    }
+    return {
+      options,
+      decorate: async <T extends object>(result: T, explicit?: ProviderRef): Promise<T & { threadReference?: string }> => {
+        const ref = explicit ?? reference;
+        if (explicit) options.onThreadResolved!(explicit);
+        if (!input.access.acceptThreadReferences || !codec || !ref || !resolved.repository.supportsThreadReferences) return result;
+        const token = await codec.seal(resolved.profile, scope, ref);
+        return token ? { ...result, threadReference: token } : result;
+      }
+    };
   }
 
   async #profile(profileId: string): Promise<FeedbackProviderProfileV2> {
@@ -443,18 +480,24 @@ export class FeedbackGatewayApplicationService {
         authorization: resolved.authorization,
         profile: resolved.profile
       });
-      if (verification.valid) items.push(summaryOf(verification.record.thread));
+      if (verification.valid) {
+        const refs = await this.#referenceOptions(resolved, input, verification.record.thread.threadId);
+        items.push(await refs.decorate(summaryOf(verification.record.thread), verification.record.providerRef));
+      }
     }
-    return { items, nextCursor: page.nextCursor };
+    const counts = new Map<string, number>();
+    for (const item of items) counts.set(item.threadId, (counts.get(item.threadId) ?? 0) + 1);
+    return { items: items.filter((item) => counts.get(item.threadId) === 1), nextCursor: page.nextCursor };
   }
 
   async getThread(input: ResourceInput & { threadId: string; access: FeedbackGatewayAccess }): Promise<FeedbackThreadV2> {
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: ["feedback:read"], access: input.access });
     const scope = repositoryScope(resolved.profile, input);
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
     const candidates = await resolved.repository.findThreadCandidatesById(
       { ...scope, threadId: input.threadId },
-      repositoryOptions(input.access.signal)
+      refs.options
     );
     if (candidates.length === 0) {
       throw new FeedbackGatewayProblem({ code: "feedback.not_found", status: 404, message: "threadが見つかりません" });
@@ -478,7 +521,7 @@ export class FeedbackGatewayApplicationService {
         message: `thread候補の検証に失敗しました: ${verification.valid ? "binding" : verification.reason}`
       });
     }
-    return verification.record.thread;
+    return refs.decorate(verification.record.thread, verification.record.providerRef);
   }
 
   async createThread(input: ResourceInput & { command: FeedbackCreateThreadCommandV2; access: FeedbackGatewayAccess }): Promise<FeedbackThreadCommandResultV2 | FeedbackIntentRecoveryResultFor<"feedback:create">> {
@@ -487,19 +530,27 @@ export class FeedbackGatewayApplicationService {
     }
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: ["feedback:create"], access: input.access });
-    return resolved.repository.createThread({ ...repositoryScope(resolved.profile, input), command: input.command }, repositoryOptions(input.access.signal));
+    const refs = await this.#referenceOptions(resolved, input, input.command.threadId);
+    const result = await resolved.repository.createThread({ ...repositoryScope(resolved.profile, input), command: input.command }, refs.options);
+    const decorated = await refs.decorate(result);
+    if ("thread" in decorated && decorated.threadReference) return { ...decorated, thread: { ...decorated.thread, threadReference: decorated.threadReference } };
+    return decorated;
   }
 
   async reply(input: ResourceInput & { threadId: string; command: FeedbackReplyCommandV2; access: FeedbackGatewayAccess }): Promise<FeedbackMessageCommandResultV2 | FeedbackIntentRecoveryResultFor<"feedback:reply">> {
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: ["feedback:reply"], access: input.access });
-    return resolved.repository.reply({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, command: input.command }, repositoryOptions(input.access.signal));
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
+    const result = await resolved.repository.reply({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, command: input.command }, refs.options);
+    return refs.decorate(result);
   }
 
   async appendRevision(input: ResourceInput & { threadId: string; messageId: string; command: FeedbackAppendRevisionCommandV2; access: FeedbackGatewayAccess }): Promise<FeedbackMessageCommandResultV2 | FeedbackIntentRecoveryResultFor<"feedback:revise">> {
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: ["feedback:revise"], access: input.access });
-    return resolved.repository.appendRevision({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, messageId: input.messageId, command: input.command }, repositoryOptions(input.access.signal));
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
+    const result = await resolved.repository.appendRevision({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, messageId: input.messageId, command: input.command }, refs.options);
+    return refs.decorate(result);
   }
 
   async recoverIntent(input: ResourceInput & {
@@ -514,13 +565,15 @@ export class FeedbackGatewayApplicationService {
     }
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: [input.operation], access: input.access });
-    return resolved.repository.recoverIntent({
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
+    const result = await resolved.repository.recoverIntent({
       ...repositoryScope(resolved.profile, input),
       threadId: input.threadId,
       intentId: input.intentId,
       requestHash: input.requestHash,
       operation: input.operation
-    }, repositoryOptions(input.access.signal));
+    }, refs.options);
+    return refs.decorate(result);
   }
 
   async uploadAttachment(input: ResourceInput & {
@@ -537,13 +590,17 @@ export class FeedbackGatewayApplicationService {
     if (!resolved.capabilities.attachmentContentTypes.includes(input.command.contentType)) {
       throw new FeedbackGatewayProblem({ code: "feedback.unsupported_media_type", status: 415, message: "attachment content typeは未対応です" });
     }
-    return resolved.repository.uploadAttachment({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, command: input.command, source: input.source }, repositoryOptions(input.access.signal));
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
+    const result = await resolved.repository.uploadAttachment({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, command: input.command, source: input.source }, refs.options);
+    return refs.decorate(result);
   }
 
   async getAttachment(input: ResourceInput & { threadId: string; attachmentId: string; access: FeedbackGatewayAccess }): Promise<FeedbackDownloadStream> {
     const target: FeedbackAuthorizationTarget = { level: "resource", profileId: input.profileId, workspaceId: input.workspaceId, resource: input.resource };
     const resolved = await this.#authorize({ profileId: input.profileId, target, requiredOperations: ["feedback:attachment:read"], access: input.access });
-    return resolved.repository.getAttachment({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, attachmentId: input.attachmentId }, repositoryOptions(input.access.signal));
+    const refs = await this.#referenceOptions(resolved, input, input.threadId);
+    const result = await resolved.repository.getAttachment({ ...repositoryScope(resolved.profile, input), threadId: input.threadId, attachmentId: input.attachmentId }, refs.options);
+    return result;
   }
 
   async authorizeLegacyV1(input: {

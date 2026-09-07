@@ -28,6 +28,7 @@ export function createFakeFeedbackRepository(
     calls.push({ method, query, options });
   };
   return {
+    ...(handlers.supportsThreadReferences ? { supportsThreadReferences: true as const } : {}),
     get calls() { return calls; },
     count: (method) => calls.filter((call) => call.method === method).length,
     async getCapabilities(options) {

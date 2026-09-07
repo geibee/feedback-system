@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+// @ts-expect-error live runnerと同じJavaScript digest実装を使用する。
+import { feedbackLiveDigest } from "../../../scripts/lib/feedback-live-digest.mjs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import liveConformance from "../../fixtures/backlog-stage-b/live-conformance.json";
@@ -9,7 +9,7 @@ describe("Backlog Connector Stage B live Conformance", () => {
     expect(liveConformance).toMatchObject({
       schemaVersion: "1",
       kind: "backlog-stage-b-live-conformance",
-      contractVersion: "2.0.0-alpha.2",
+      contractVersion: "2.0.0-alpha.3",
       tenantIdentifiersRemoved: true,
       provisioning: {
         fourTextCustomFieldsReady: true,
@@ -28,7 +28,7 @@ describe("Backlog Connector Stage B live Conformance", () => {
         replyRecoveredFromProvider: true,
         revisionResponseLostAfterCommit: true,
         revisionRecoveredFromProvider: true,
-        duplicateThreadRepairRequired: true,
+        observedDuplicateDecisionVerified: true,
         automaticWriteRetry: false
       },
       roundtrip: {
@@ -46,6 +46,10 @@ describe("Backlog Connector Stage B live Conformance", () => {
         intentsRecovered: true,
         resourceProjectionRecovered: true
       },
+      threadReference: { publicCredential: true, create: true, read: true, reply: true, revision: true, recovery: true,
+        serviceReconstruction: true, noSearchFallback: true, tamperRejected: true, scopeRejected: true,
+        currentAuthorization: true, duplicateTargetIsolated: true, attachment: "unsupported" },
+      duplicateObservation: { globalUniquenessProven: false },
       cleanup: "deleted-all-run-owned-issues"
     });
     expect(liveConformance.implementationDigest).toBe(implementationDigest());
@@ -53,15 +57,5 @@ describe("Backlog Connector Stage B live Conformance", () => {
 });
 
 function implementationDigest(): string {
-  const files = [
-    "packages/feedback-connector-backlog/src/connector.ts",
-    "packages/feedback-connector-backlog/src/http-transport.ts",
-    "packages/feedback-connector-backlog/src/provisioning.ts",
-    "packages/feedback-connector-backlog/src/rest-v2-client.ts",
-    "packages/feedback-connector-backlog/src/types.ts",
-    "scripts/run-feedback-backlog-live-conformance.mjs"
-  ];
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file).update("\0").update(readFileSync(resolve(process.cwd(), "../..", file))).update("\0");
-  return `sha256:${digest.digest("hex")}`;
+  return feedbackLiveDigest("backlog", resolve(process.cwd(), "../.."));
 }

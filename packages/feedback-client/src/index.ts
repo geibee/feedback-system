@@ -25,6 +25,7 @@ export interface FeedbackAbortSignal {
 
 export type FeedbackRequestOptions = {
   signal?: FeedbackAbortSignal;
+  threadReference?: import("@geibee/feedback-contracts/v2").FeedbackThreadReferenceV2;
 };
 
 export type FeedbackScopedQuery = {

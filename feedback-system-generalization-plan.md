@@ -968,3 +968,9 @@ Phase 3の4並列では、root／integration ownerがLane Aを兼務し、3つ�
 - Feedback Serviceが実行時にDB、queue、persistent／shared application data cache、upload directory、private object storageを必要としない。
 - v1／v2 compatibility matrix、partial write、rollback、key rotationが自動検証されている。
 - `bash scripts/verify-feedback.sh`がすべての必須検証を実行し、成功している。
+
+## 2026-09-07: DBレス参照拡張（alpha.3）
+
+利用者判断により、重複排除はbest-effortとする。[共通参照規約](contracts/feedback/thread-reference.md)と[ADR 0005](docs/adr/0005-protected-thread-reference.md)が、本文のprovider検索による全体的一意性を必須とする規約を更新する。可視の複数候補を拒否する規約は維持するが、検索1件を全体的一意性の証明とはしない。
+
+参照取得後は認証付き暗号化tokenにより同じticketへ直接アクセスする。初回writeのthreadId／intentId／requestHash同時保存、操作ごとのrecoverable／best-effort、projection検証、attachment upload独立権限は維持する。参照は権限・exactly-once・offline read・端末間同期を追加しない。Redmine v1は変更しない。鍵未設定profileは従来動作を維持し、有効化には独立secretとlive再検証が必要である。

@@ -58,7 +58,7 @@ matrix_rows=$(rg -c '^\| (v1-only ticket|v2 dual-write ticketのread|v1からdua
 jq -e '
   .schemaVersion == "1" and
   .kind == "jira-cloud-phase5-live-acceptance" and
-  .contractVersion == "2.0.0-alpha.2" and
+  .contractVersion == "2.0.0-alpha.3" and
   (.implementationDigest | test("^sha256:[a-f0-9]{64}$")) and
   .api == "Jira Cloud REST API v3" and
   .siteType == "Forge development demo" and
@@ -70,33 +70,31 @@ jq -e '
   .bodyIntegrityVerified == true and
   .attachmentRoundtrip == true and
   .attachmentMessageBindingVerified == true and
+  .threadReference.publicCredential == true and
+  .threadReference.create == true and
+  .threadReference.read == true and
+  .threadReference.reply == true and
+  .threadReference.revision == true and
+  .threadReference.recovery == true and
+  .threadReference.serviceReconstruction == true and
+  .threadReference.noSearchFallback == true and
+  .threadReference.tamperRejected == true and
+  .threadReference.scopeRejected == true and
+  .threadReference.currentAuthorization == true and
+  .threadReference.attachment == "verified" and
   .automaticWriteRetry == false and
   .cleanup == "deleted-run-owned-issue" and
   (.executedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"))
 ' tests/fixtures/jira-cloud-phase5/live-acceptance.json >/dev/null || fail "Jira Cloud Phase 5 live evidenceが不正です"
 
-current_live_digest=$(node -e '
-  const { createHash } = require("node:crypto");
-  const { readFileSync } = require("node:fs");
-  const files = [
-    "contracts/feedback/feedback-gateway.openapi.yaml",
-    "contracts/feedback/schemas/feedback-attachment-marker.schema.json",
-    "packages/feedback-connector-jira-cloud/src/connector.ts",
-    "packages/feedback-connector-jira-cloud/src/rest-v3-client.ts",
-    "packages/feedback-connector-jira-cloud/src/types.ts",
-    "scripts/run-feedback-jira-live-acceptance.mjs"
-  ];
-  const hash = createHash("sha256");
-  for (const file of files) hash.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write("sha256:" + hash.digest("hex"));
-')
+current_live_digest=$(node scripts/lib/feedback-live-digest.mjs jira-cloud)
 [[ "$(jq -r .implementationDigest tests/fixtures/jira-cloud-phase5/live-acceptance.json)" == "$current_live_digest" ]] \
   || fail "保存済みJira live evidenceが現acceptance実装へbindingされていません。scripts/check-feedback-phase5-live.shを再実行してください"
 
 jq -e '
   .schemaVersion == "1" and
   .kind == "backlog-stage-b-live-conformance" and
-  .contractVersion == "2.0.0-alpha.2" and
+  .contractVersion == "2.0.0-alpha.3" and
   (.implementationDigest | test("^sha256:[a-f0-9]{64}$")) and
   .api == "Backlog API v2" and
   .siteType == "Backlog SaaS free trial" and
@@ -110,7 +108,21 @@ jq -e '
   .recovery.replyRecoveredFromProvider == true and
   .recovery.revisionResponseLostAfterCommit == true and
   .recovery.revisionRecoveredFromProvider == true and
-  .recovery.duplicateThreadRepairRequired == true and
+  .recovery.observedDuplicateDecisionVerified == true and
+  .threadReference.publicCredential == true and
+  .threadReference.create == true and
+  .threadReference.read == true and
+  .threadReference.reply == true and
+  .threadReference.revision == true and
+  .threadReference.recovery == true and
+  .threadReference.serviceReconstruction == true and
+  .threadReference.noSearchFallback == true and
+  .threadReference.tamperRejected == true and
+  .threadReference.scopeRejected == true and
+  .threadReference.currentAuthorization == true and
+  .threadReference.duplicateTargetIsolated == true and
+  .threadReference.attachment == "unsupported" and
+  .duplicateObservation.globalUniquenessProven == false and
   .recovery.automaticWriteRetry == false and
   (.roundtrip | [.[]] | all) and
   .restartReconstruction.separateProcess == true and
@@ -121,21 +133,7 @@ jq -e '
   .cleanup == "deleted-all-run-owned-issues"
 ' tests/fixtures/backlog-stage-b/live-conformance.json >/dev/null || fail "Backlog Stage B live evidenceが不正です"
 
-current_backlog_live_digest=$(node -e '
-  const { createHash } = require("node:crypto");
-  const { readFileSync } = require("node:fs");
-  const files = [
-    "packages/feedback-connector-backlog/src/connector.ts",
-    "packages/feedback-connector-backlog/src/http-transport.ts",
-    "packages/feedback-connector-backlog/src/provisioning.ts",
-    "packages/feedback-connector-backlog/src/rest-v2-client.ts",
-    "packages/feedback-connector-backlog/src/types.ts",
-    "scripts/run-feedback-backlog-live-conformance.mjs"
-  ];
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write("sha256:" + digest.digest("hex"));
-')
+current_backlog_live_digest=$(node scripts/lib/feedback-live-digest.mjs backlog)
 [[ "$(jq -r .implementationDigest tests/fixtures/backlog-stage-b/live-conformance.json)" == "$current_backlog_live_digest" ]] \
   || fail "保存済みBacklog Stage B live evidenceが現Connector実装へbindingされていません。scripts/check-feedback-backlog-live.shを再実行してください"
 

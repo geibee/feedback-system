@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- 独立鍵ringによるAES-256-GCM threadReferenceの発行・検証、30日寿命、認可・scope束縛と検索fallback禁止を追加した。
+
 ## 未リリース - 2026-09-06
 
 - profileの許可集合、remote自己編集のread／revise認可、日本語添付名のHTTP headerを修正した。

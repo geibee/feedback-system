@@ -8,6 +8,39 @@ const participantId = randomUUID();
 const scope = { profileId: "backlog-test", installationId: "space-test", workspaceId: "FB", resource: { kind: "record", key: "order-1" } };
 
 describe("Feedback Backlog Connector", () => {
+  it("参照があれば検索なしで同じissueへread／reply／revision／回収し、欠損時はfallbackしない", async () => {
+    const provider = new FakeBacklog();
+    const connector = createConnector(provider);
+    const threadId = randomUUID();
+    const intentId = randomUUID();
+    let threadRef: { providerKey: string; objectId: string } | undefined;
+    await connector.createThread({ ...scope, command: { threadId, intentId, requestHash: hash("create"),
+      resource: scope.resource, title: "title", body: "本文" } }, { onThreadResolved: (ref) => { threadRef = ref; } });
+    expect(threadRef).toMatchObject({ providerKey: "backlog", objectId: "1" });
+    await connector.createThread({ ...scope, command: { threadId, intentId: randomUUID(), requestHash: hash("duplicate"),
+      resource: scope.resource, title: "duplicate", body: "別ticket" } });
+    expect(await connector.findThreadCandidatesById({ ...scope, threadId })).toHaveLength(2);
+    const request = provider.request.bind(provider);
+    provider.request = async (input) => {
+      if (input.method === "GET" && new URL(input.path, "https://test.backlog.com").pathname === "/api/v2/issues") throw new Error("検索は禁止");
+      return request(input);
+    };
+    const options = { threadRef: threadRef! };
+    const candidates = await connector.findThreadCandidatesById({ ...scope, threadId }, options);
+    expect((await connector.readCandidate(candidates[0]!)).thread.threadId).toBe(threadId);
+    const messageId = randomUUID();
+    await expect(connector.reply({ ...scope, threadId, command: { intentId: randomUUID(), messageId, requestHash: hash("reply"), body: "返信" } }, options))
+      .resolves.toMatchObject({ disposition: "created" });
+    await expect(connector.appendRevision({ ...scope, threadId, messageId, command: { intentId: randomUUID(), revisionId: randomUUID(),
+      expectedRevisionId: messageId, requestHash: hash("revision"), body: "改訂" } }, options)).resolves.toMatchObject({ message: { body: "改訂" } });
+    await expect(connector.recoverIntent({ ...scope, threadId, intentId, requestHash: hash("create"), operation: "feedback:create" }, options))
+      .resolves.toMatchObject({ state: "completed" });
+    await expect(connector.findThreadCandidatesById({ ...scope, threadId: randomUUID() }, options)).rejects.toMatchObject({ code: "feedback.integrity_error" });
+    expect(provider.comments.get(2) ?? []).toHaveLength(0);
+    provider.issues = [];
+    await expect(connector.findThreadCandidatesById({ ...scope, threadId }, options)).rejects.toMatchObject({ status: 404 });
+  });
+
   it("初期本文の署名hashとprovider本文を照合する", async () => {
     const provider = new FakeBacklog();
     const connector = createConnector(provider);

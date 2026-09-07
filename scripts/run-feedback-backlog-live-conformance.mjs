@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Backlog SaaSへrun-owned issueだけを作成し、実Connectorのlive Conformance後に削除する。
 import { spawn } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   assertFeedbackBacklogProvisioning,
   BacklogConnectorProblem,
@@ -11,6 +10,9 @@ import {
   createFeedbackBacklogConnector
 } from "@geibee/feedback-connector-backlog";
 import { calculateFeedbackCommandHash, createFeedbackEnvelopeCodec } from "@geibee/feedback-envelope";
+import { feedbackLiveDigest } from "./lib/feedback-live-digest.mjs";
+import { runFeedbackReferenceAcceptance } from "./lib/feedback-reference-acceptance.mjs";
+import { assertBestEffortDuplicateRecovery } from "./lib/feedback-duplicate-acceptance.mjs";
 
 const baseUrl = backlogOrigin(required("FEEDBACK_BACKLOG_ACCEPTANCE_BASE_URL"));
 const apiKey = required("FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY");
@@ -71,6 +73,23 @@ const connector = createFeedbackBacklogConnector({
   envelopeCodec: codec
 });
 
+// 回収と事前確認を同じ検索結果と誤認しないよう、実呼出しの候補件数だけを記録する。
+// provider ID、本文、credentialは診断出力へ含めない。検索結果や判定は変更しない。
+let threadObservationPhase = null;
+let duplicateRecoveryState = null;
+let replyResultState = null;
+const threadCandidateCounts = [];
+let duplicateRecoveryCandidates;
+const findThreadCandidates = connector.findThreadCandidatesById.bind(connector);
+connector.findThreadCandidatesById = async (...args) => {
+  const candidates = await findThreadCandidates(...args);
+  if (threadObservationPhase === "duplicate-recovery") duplicateRecoveryCandidates = candidates;
+  if (threadObservationPhase !== null) {
+    threadCandidateCounts.push({ phase: threadObservationPhase, count: candidates.length });
+  }
+  return candidates;
+};
+
 const createIntentId = randomUUID();
 const createRequestHash = commandHash("create", { runId, threadId, resource });
 const replyIntentId = randomUUID();
@@ -82,7 +101,7 @@ const revisionId = randomUUID();
 const evidence = {
   schemaVersion: "1",
   kind: "backlog-stage-b-live-conformance",
-  contractVersion: "2.0.0-alpha.2",
+  contractVersion: "2.0.0-alpha.3",
   implementationDigest: implementationDigest(),
   executedAt: new Date().toISOString(),
   api: "Backlog API v2",
@@ -105,7 +124,7 @@ const evidence = {
     replyRecoveredFromProvider: false,
     revisionResponseLostAfterCommit: false,
     revisionRecoveredFromProvider: false,
-    duplicateThreadRepairRequired: false,
+    observedDuplicateDecisionVerified: false,
     automaticWriteRetry: false
   },
   roundtrip: {
@@ -187,25 +206,27 @@ try {
   assert(candidate.providerRef.objectId === resourceCandidate.providerRef.objectId,
     "threadId検索とresource検索が同じBacklog issueを指しません");
   evidence.roundtrip.resourceProjection = true;
-
-  await waitForThreadCandidateCount(1, 5);
+  const resolvedOptions = { threadRef: candidate.providerRef };
   fault.loseNextCommentResponse = true;
+  threadObservationPhase = "reply";
   const replyResult = await connector.reply({
     ...scope,
     threadId,
     command: { intentId: replyIntentId, requestHash: replyRequestHash, messageId, body: "Backlog Stage B reply" }
-  });
+  }, resolvedOptions);
+  replyResultState = replyResult.state ?? replyResult.disposition;
+  threadObservationPhase = null;
   evidence.recovery.replyResponseLostAfterCommit = !fault.loseNextCommentResponse;
   await waitForCompleted(replyResult, {
     threadId,
     intentId: replyIntentId,
     requestHash: replyRequestHash,
     operation: "feedback:reply"
-  });
+  }, resolvedOptions);
   evidence.recovery.replyRecoveredFromProvider = true;
 
-  await waitForThreadCandidateCount(1, 5);
   fault.loseNextCommentResponse = true;
+  threadObservationPhase = "revision";
   const revisionResult = await connector.appendRevision({
     ...scope,
     threadId,
@@ -217,14 +238,15 @@ try {
       expectedRevisionId: messageId,
       body: "Backlog Stage B revised reply"
     }
-  });
+  }, resolvedOptions);
+  threadObservationPhase = null;
   evidence.recovery.revisionResponseLostAfterCommit = !fault.loseNextCommentResponse;
   await waitForCompleted(revisionResult, {
     threadId,
     intentId: revisionIntentId,
     requestHash: revisionRequestHash,
     operation: "feedback:revise"
-  });
+  }, resolvedOptions);
   evidence.recovery.revisionRecoveredFromProvider = true;
 
   const reread = await connector.readCandidate(candidate);
@@ -271,21 +293,46 @@ try {
       body: "Backlog Stage B duplicate candidate。削除対象。"
     }
   });
-  await waitForThreadCandidateCount(2, 3);
-  const duplicateResult = await connector.recoverIntent({
+  threadObservationPhase = "duplicate-recovery";
+  const duplicateQuery = {
     ...scope,
     threadId,
     intentId: createIntentId,
     requestHash: createRequestHash,
     operation: "feedback:create"
+  };
+  const duplicateResult = await connector.recoverIntent(duplicateQuery);
+  duplicateRecoveryState = duplicateResult.state;
+  threadObservationPhase = null;
+  assert(Array.isArray(duplicateRecoveryCandidates), "回収呼出しの候補観測がありません");
+  evidence.duplicateObservation = assertBestEffortDuplicateRecovery(duplicateRecoveryCandidates, duplicateQuery, duplicateResult);
+  evidence.recovery.observedDuplicateDecisionVerified = true;
+
+  let referenceDuplicate;
+  const referenceRepository = (currentParticipantId) => createFeedbackBacklogConnector({
+    configuration: { ...configuration, participantId: currentParticipantId },
+    transport: faultInjectingTransport(baseTransport), envelopeCodec: codec
   });
-  assert(duplicateResult.state === "repair_required" && duplicateResult.automaticWriteAllowed === false,
-    `Backlog duplicate thread判定がrepair_requiredではありません: ${JSON.stringify({
-      state: duplicateResult.state,
-      automaticWriteAllowed: duplicateResult.automaticWriteAllowed,
-      retryDirective: duplicateResult.retryDirective
-    })}`);
-  evidence.recovery.duplicateThreadRepairRequired = true;
+  evidence.threadReference = await runFeedbackReferenceAcceptance({
+    scope: { ...scope, resource: { kind: "record", key: `reference-${runId}` } },
+    title: `[feedback-backlog-stage-b:${runId}] HTTP reference acceptance`,
+    runtimeProfile: { id: "backlog-live-reference", connectorKey: "backlog", application, environment },
+    codec, envelopeKid: "backlog-live-ephemeral", envelopeSecret: signingSecret,
+    providerCredential: JSON.stringify({ kind: "backlog-api-key", apiKey }),
+    createRepository: referenceRepository,
+    async createDuplicate(query) {
+      await referenceRepository(participantId).createThread(query, { onThreadResolved(ref) { referenceDuplicate = ref; } });
+      assert(referenceDuplicate, "参照分離検証用の重複issueを作成できません");
+    },
+    async verifyDuplicate(referenceThreadId) {
+      const candidates = await referenceRepository(participantId).findThreadCandidatesById({
+        ...scope, resource: { kind: "record", key: `reference-${runId}` }, threadId: referenceThreadId
+      }, { threadRef: referenceDuplicate });
+      const record = await referenceRepository(participantId).readCandidate(candidates[0]);
+      assert(record.thread.messages.length === 1 && record.thread.messages[0].body === "別issue。固定参照の操作対象ではない",
+        "固定参照の操作が別issueへ混入しました");
+    }
+  });
 } finally {
   const discovered = await findRunOwnedIssues().catch(() => []);
   for (const issue of discovered) if (Number.isSafeInteger(issue.id)) issueIds.add(issue.id);
@@ -297,6 +344,18 @@ try {
   evidence.cleanup = failures.length === 0 && remaining.length === 0
     ? "deleted-all-run-owned-issues"
     : "failed-to-delete-all-run-owned-issues";
+  // 本試験の例外時もcleanup結果が失われないよう、成功証跡とは分離してstderrへ出す。
+  process.stderr.write(`${JSON.stringify({
+    kind: "backlog-stage-b-live-diagnostic",
+    executedAt: evidence.executedAt,
+    threadCandidateCounts,
+    replyResultState,
+    duplicateRecoveryState,
+    cleanup: evidence.cleanup,
+    cleanupTargetCount: issueIds.size,
+    cleanupFailureCount: failures.length,
+    remainingIssueCount: remaining.length
+  })}\n`);
 }
 
 assert(evidence.cleanup === "deleted-all-run-owned-issues", `Backlog Stage B cleanupに失敗しました: ${evidence.cleanup}`);
@@ -333,9 +392,9 @@ async function reconstructInFreshProcess() {
   assert(record.thread.threadId === input.threadId && reply?.revisions.at(-1)?.revisionId === input.revisionId,
     "別processのBacklog thread再構築が不正です");
   const recoveries = await Promise.all([
-    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.create, operation: "feedback:create" }),
-    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.reply, operation: "feedback:reply" }),
-    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.revision, operation: "feedback:revise" })
+    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.create, operation: "feedback:create" }, { threadRef: candidates[0].providerRef }),
+    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.reply, operation: "feedback:reply" }, { threadRef: candidates[0].providerRef }),
+    child.recoverIntent({ ...input.scope, threadId: input.threadId, ...input.revision, operation: "feedback:revise" }, { threadRef: candidates[0].providerRef })
   ]);
   process.stdout.write(JSON.stringify({
     pid: process.pid,
@@ -425,11 +484,11 @@ function faultInjectingTransport(transport) {
   };
 }
 
-async function waitForCompleted(initial, intent) {
+async function waitForCompleted(initial, intent, options) {
   if (initial?.state === "completed") return initial;
   const deadline = Date.now() + 60_000;
   do {
-    const result = await connector.recoverIntent({ ...scope, ...intent });
+    const result = await connector.recoverIntent({ ...scope, ...intent }, options);
     if (result.state === "completed") return result;
     if (result.state === "repair_required") throw new Error(`${intent.operation}がrepair_requiredになりました`);
     await delay(1_000);
@@ -555,17 +614,7 @@ function commandHash(operation, value) {
 }
 
 function implementationDigest() {
-  const files = [
-    "packages/feedback-connector-backlog/src/connector.ts",
-    "packages/feedback-connector-backlog/src/http-transport.ts",
-    "packages/feedback-connector-backlog/src/provisioning.ts",
-    "packages/feedback-connector-backlog/src/rest-v2-client.ts",
-    "packages/feedback-connector-backlog/src/types.ts",
-    "scripts/run-feedback-backlog-live-conformance.mjs"
-  ];
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file).update("\0").update(readFileSync(file)).update("\0");
-  return `sha256:${digest.digest("hex")}`;
+  return feedbackLiveDigest("backlog");
 }
 
 function backlogOrigin(value) {

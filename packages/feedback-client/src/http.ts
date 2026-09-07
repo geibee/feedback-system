@@ -210,6 +210,7 @@ export function createFeedbackHttpClient(options: FeedbackHttpClientOptions): Fe
         Accept: "application/json, application/problem+json",
         ...(body === undefined ? {} : { "Content-Type": "application/json; charset=utf-8" }),
         ...(method === "POST" ? { "X-Feedback-CSRF": "1" } : {}),
+        ...referenceHeaders(requestOptions),
         ...additionalHeaders,
         ...credentialHeaders
       },
@@ -335,6 +336,7 @@ export function createFeedbackHttpClient(options: FeedbackHttpClientOptions): Fe
           Accept: "application/json, application/problem+json",
           "Content-Type": `multipart/form-data; boundary=${multipartBoundary}`,
           "X-Feedback-CSRF": "1",
+          ...referenceHeaders(requestOptions),
           ...credentialHeaders
         },
         body,
@@ -350,7 +352,7 @@ export function createFeedbackHttpClient(options: FeedbackHttpClientOptions): Fe
       const response = await options.transport.request({
         method: "GET",
         path: `${basePath}/profiles/${segment(query.profileId)}/workspaces/${segment(query.workspaceId)}/threads/${segment(query.threadId)}/attachments/${segment(query.attachmentId)}/content${scopeQuery(undefined, query.resource)}`,
-        headers: { Accept: "application/octet-stream", ...credentialHeaders },
+        headers: { Accept: "application/octet-stream", ...referenceHeaders(requestOptions), ...credentialHeaders },
         signal: requestOptions?.signal
       });
       if (response.status < 200 || response.status >= 300) await throwProblem(response);
@@ -573,4 +575,14 @@ function contentDispositionFilename(value: string | null): string | null {
   try { filename = encoded ? decodeURIComponent(encoded) : quoted ?? ""; } catch { return null; }
   const leaf = filename.replace(/\\/gu, "/").split("/").pop()?.trim() ?? "";
   return leaf.length >= 1 && leaf.length <= 255 && !/[\u0000-\u001f\u007f]/u.test(leaf) ? leaf : null;
+}
+
+/** 参照はcommandと分離し、更新時にもintent hashを変えない。 */
+function referenceHeaders(options?: FeedbackRequestOptions): Record<string, string> {
+  const token = options?.threadReference;
+  if (token !== undefined && (typeof token !== "string" || token.length > 8192 ||
+      !/^ftr1\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(token))) {
+    throw new Error("thread参照が不正です");
+  }
+  return { "X-Feedback-Accept-Thread-Reference": "1", ...(token === undefined ? {} : { "X-Feedback-Thread-Reference": token }) };
 }

@@ -10,6 +10,10 @@ freeze識別子: `feedback-v2-contract-2.0.0-alpha.1`
 
 2026-09-01の実装監査でalpha.1の公開participant発行経路とattachmentのmessage署名bindingに欠落が判明したため、現行識別子を`feedback-v2-contract-2.0.0-alpha.2`とする。alpha.1はPhase 2時点の履歴として残す。alpha.2ではintent回収hashを既存OpenAPIの必須headerへ実装統一し、public-profile participant発行endpoint、signed grant／participant credential security scheme、unsafe operationの必須CSRF headerを追加し、署名attachment markerへ必須`messageId`を追加した。全consumer影響、生成型、codec、両Connector、互換性文書、保存形式migration、CHANGELOGを同時更新する。
 
+## 2026-09-07の利用者承認による参照拡張
+
+現行識別子を `feedback-v2-contract-2.0.0-alpha.3` とする。[共通参照規約](../../contracts/feedback/thread-reference.md)がalpha.2を拡張する。DBレス・重複排除best-effort、opt-in応答、独立暗号鍵、全consumerの参照伝播を採用し、Redmine v1と認可境界は維持する。alpha.1／alpha.2のGate結果は履歴であり、本拡張のlive成功を意味しない。
+
 ## DBレス回復境界
 
 - Feedback ServiceはDB、queue、persistent／shared application data cache、upload directory、private object storage、host DB直接参照を持たない。

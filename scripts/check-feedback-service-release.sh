@@ -27,7 +27,7 @@ const { join } = require("node:path");
 const directory = process.env.RELEASE_DIRECTORY;
 const manifest = JSON.parse(readFileSync(join(directory, "feedback-service-release-manifest.json"), "utf8"));
 if (manifest.schemaVersion !== "1" || manifest.product !== "feedback-service" ||
-    manifest.version !== process.env.EXPECTED_VERSION || manifest.contractVersion !== "2.0.0-alpha.2" ||
+    manifest.version !== process.env.EXPECTED_VERSION || manifest.contractVersion !== "2.0.0-alpha.3" ||
     !["clean", "dirty"].includes(manifest.sourceTreeState) ||
     manifest.runtime?.package !== "@geibee/feedback-service-runtime" ||
     manifest.runtime?.providers?.join(",") !== "jira-cloud,redmine,backlog" ||

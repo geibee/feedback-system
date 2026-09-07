@@ -1,3 +1,4 @@
+import { createThreadReferencePort } from "./thread-reference.js";
 import type { FeedbackCapabilitiesV2 } from "@geibee/feedback-contracts/v2";
 import type { FeedbackProviderProfileV2, FeedbackServiceSettingsV2 } from "@geibee/feedback-contracts/v2/server";
 import { createFakeFeedbackRepository } from "@geibee/feedback-connector-sdk/testing";
@@ -39,7 +40,7 @@ const capabilities: FeedbackCapabilitiesV2 = {
 };
 const key = Buffer.alloc(32, 7).toString("base64url");
 const ring = JSON.stringify({ activeKid: "current", keys: [{ kid: "current", key }] });
-const secretResolver = { async resolve(id: string) { return id === "PARTICIPANT_RING" ? ring : key; } };
+const secretResolver = { async resolve(id: string) { return ["PARTICIPANT_RING", "REFERENCE_RING"].includes(id) ? ring : key; } };
 
 function fixture(
   repository = createFakeFeedbackRepository({ async getCapabilities() { return capabilities; } }),
@@ -58,6 +59,7 @@ function fixture(
     profileLoader,
     authorizationPorts: authorization.ports,
     connectors: new Map([["fake", repository]]),
+    threadReferences: createThreadReferencePort({ secretResolver, audience: origin }),
     projectionVerifier: { async verify(_candidate, record) {
       return acceptProjection ? { valid: true as const, record: record as never }
         : { valid: false as const, reason: "signature" as const };
@@ -72,6 +74,44 @@ function fixture(
 }
 
 describe("Feedback Service v2 HTTP adapter", () => {
+  it("opt-inで参照を発行し、別scope・改変・認可取消しをprovider呼出し前に拒否する", async () => {
+    const activeProfile: FeedbackProviderProfileV2 = { ...profile, policy: { ...profile.policy, operations: [...profile.policy.operations] },
+      secretRefs: { ...profile.secretRefs, threadReferenceKeyRing: { kind: "server-secret", id: "REFERENCE_RING" } } };
+    const threadId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5001";
+    const thread = { threadId, resource, title: "title", status: "open" as const, createdAt: "2026-09-07T00:00:00Z",
+      updatedAt: "2026-09-07T00:00:00Z", messageCount: 1, messages: [] };
+    const candidate = { providerRef: { providerKey: "fake", objectId: "private-1" }, projection: {} as never };
+    let searchUnavailable = false;
+    const repository = createFakeFeedbackRepository({
+      supportsThreadReferences: true,
+      async getCapabilities() { return capabilities; },
+      async findThreadCandidatesById(_query, options) {
+        if (searchUnavailable) expect(options?.threadRef).toEqual(candidate.providerRef);
+        return [candidate];
+      },
+      async readCandidate() { return { ...candidate, envelope: null, legacyMetadata: null, thread }; },
+      async createThread(query, options) {
+        options?.onThreadResolved?.(candidate.providerRef);
+        return { disposition: "created", intentId: query.command.intentId, thread };
+      }
+    });
+    const { handler } = fixture(repository, 1000, undefined, activeProfile, undefined, true);
+    const path = origin + "/internal/feedback/v2/profiles/public/workspaces/OPS/threads/" + threadId + "?resourceKind=record&resourceKey=order-001";
+    expect((await (await handler(new Request(path))).json()).thread.threadReference).toBeUndefined();
+    const headers = { "X-Feedback-Accept-Thread-Reference": "1" };
+    const token = (await (await handler(new Request(path, { headers }))).json()).thread.threadReference;
+    expect(token).toMatch(/^ftr1\./u);
+    searchUnavailable = true;
+    const requestHeaders = { ...headers, "X-Feedback-Thread-Reference": token };
+    expect((await handler(new Request(path, { headers: requestHeaders }))).status).toBe(200);
+    const before = repository.count("findThreadCandidatesById");
+    expect((await handler(new Request(path.replace("order-001", "other"), { headers: requestHeaders }))).status).toBe(409);
+    expect((await handler(new Request(path, { headers: { ...requestHeaders, "X-Feedback-Thread-Reference": token + "A" } }))).status).toBe(409);
+    activeProfile.policy.operations = [];
+    expect((await handler(new Request(path, { headers: requestHeaders }))).status).toBe(403);
+    expect(repository.count("findThreadCandidatesById")).toBe(before);
+  });
+
   it("remote profileの許可集合を照会し、自己編集のread／reviseを別々に認可する", async () => {
     const operations = ["feedback:read", "feedback:create", "feedback:revise"] as const;
     const activeProfile: FeedbackProviderProfileV2 = { ...profile,

@@ -24,9 +24,7 @@ temp_dir=$(mktemp -d /tmp/feedback-backlog-live.XXXXXX)
 chmod 700 "$temp_dir"
 trap 'rm -f "$temp_dir/evidence.json"; rmdir "$temp_dir" 2>/dev/null || true' EXIT
 
-npm --workspace @geibee/feedback-envelope run build >&2
-npm --workspace @geibee/feedback-connector-sdk run build >&2
-npm --workspace @geibee/feedback-connector-backlog run build >&2
+bash scripts/build-feedback-live-dependencies.sh
 FEEDBACK_BACKLOG_ACCEPTANCE_API_KEY=$api_key \
   node scripts/run-feedback-backlog-live-conformance.mjs >"$temp_dir/evidence.json"
 unset api_key
@@ -34,7 +32,7 @@ unset api_key
 jq -e '
   .schemaVersion == "1" and
   .kind == "backlog-stage-b-live-conformance" and
-  .contractVersion == "2.0.0-alpha.2" and
+  .contractVersion == "2.0.0-alpha.3" and
   (.implementationDigest | test("^sha256:[a-f0-9]{64}$")) and
   .api == "Backlog API v2" and
   .siteType == "Backlog SaaS free trial" and
@@ -48,7 +46,21 @@ jq -e '
   .recovery.replyRecoveredFromProvider == true and
   .recovery.revisionResponseLostAfterCommit == true and
   .recovery.revisionRecoveredFromProvider == true and
-  .recovery.duplicateThreadRepairRequired == true and
+  .recovery.observedDuplicateDecisionVerified == true and
+  .threadReference.publicCredential == true and
+  .threadReference.create == true and
+  .threadReference.read == true and
+  .threadReference.reply == true and
+  .threadReference.revision == true and
+  .threadReference.recovery == true and
+  .threadReference.serviceReconstruction == true and
+  .threadReference.noSearchFallback == true and
+  .threadReference.tamperRejected == true and
+  .threadReference.scopeRejected == true and
+  .threadReference.currentAuthorization == true and
+  .threadReference.duplicateTargetIsolated == true and
+  .threadReference.attachment == "unsupported" and
+  .duplicateObservation.globalUniquenessProven == false and
   .recovery.automaticWriteRetry == false and
   (.roundtrip | [.[]] | all) and
   .restartReconstruction.separateProcess == true and
@@ -60,23 +72,7 @@ jq -e '
   (.executedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"))
 ' "$temp_dir/evidence.json" >/dev/null || fail "Backlog live Conformance evidenceが不正です"
 
-# JavaScript template literalはshellで展開しない。
-# shellcheck disable=SC2016
-current_digest=$(node -e '
-  const { createHash } = require("node:crypto");
-  const { readFileSync } = require("node:fs");
-  const files = [
-    "packages/feedback-connector-backlog/src/connector.ts",
-    "packages/feedback-connector-backlog/src/http-transport.ts",
-    "packages/feedback-connector-backlog/src/provisioning.ts",
-    "packages/feedback-connector-backlog/src/rest-v2-client.ts",
-    "packages/feedback-connector-backlog/src/types.ts",
-    "scripts/run-feedback-backlog-live-conformance.mjs"
-  ];
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write(`sha256:${digest.digest("hex")}`);
-')
+current_digest=$(node scripts/lib/feedback-live-digest.mjs backlog)
 [[ "$(jq -r .implementationDigest "$temp_dir/evidence.json")" == "$current_digest" ]] \
   || fail "Backlog live evidenceが現source revisionへbindingされていません"
 

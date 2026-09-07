@@ -79,7 +79,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -100,7 +105,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -117,7 +127,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -134,7 +149,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages/{messageId}/revisions": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -151,7 +171,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -171,7 +196,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments/{attachmentId}/content": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -188,7 +218,12 @@ export interface paths {
     "/profiles/{profileId}/workspaces/{workspaceId}/intents/{intentId}": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -206,6 +241,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description 暗号化・改ざん検出付きの不透明参照。権限を付与せず、URL・ログ・command本文へ含めない。 */
+        ThreadReference: string;
         StableKey: string;
         /** Format: uuid */
         StableId: string;
@@ -338,6 +375,7 @@ export interface components {
             attachments: components["schemas"]["Attachment"][];
         };
         ThreadSummary: {
+            threadReference?: components["schemas"]["ThreadReference"];
             threadId: components["schemas"]["StableId"];
             resource: components["schemas"]["ResourceRef"];
             title: string;
@@ -349,7 +387,18 @@ export interface components {
             updatedAt: string;
             messageCount: number;
         };
-        Thread: components["schemas"]["ThreadSummary"] & {
+        Thread: {
+            threadReference?: components["schemas"]["ThreadReference"];
+            threadId: components["schemas"]["StableId"];
+            resource: components["schemas"]["ResourceRef"];
+            title: string;
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            messageCount: number;
             messages: components["schemas"]["Message"][];
         };
         ThreadPage: {
@@ -395,28 +444,33 @@ export interface components {
         /** @enum {string} */
         CommandDisposition: "created" | "recovered" | "already_applied";
         ThreadCommandResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             disposition: components["schemas"]["CommandDisposition"];
             intentId: components["schemas"]["StableId"];
             thread: components["schemas"]["Thread"];
         };
         MessageCommandResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             disposition: components["schemas"]["CommandDisposition"];
             intentId: components["schemas"]["StableId"];
             message: components["schemas"]["Message"];
         };
         AttachmentCommandResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             disposition: components["schemas"]["CommandDisposition"];
             intentId: components["schemas"]["StableId"];
             attachment: components["schemas"]["Attachment"];
         };
         IntentRecoveryResult: components["schemas"]["IntentNotFoundResult"] | components["schemas"]["IntentPendingResult"] | components["schemas"]["IntentCompletedResult"] | components["schemas"]["IntentRepairRequiredResult"];
         IntentNotFoundResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             intentId: components["schemas"]["StableId"];
             /** @constant */
             state: "not_found";
             operation: components["schemas"]["Operation"];
         };
         IntentPendingResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             intentId: components["schemas"]["StableId"];
             /** @constant */
             state: "pending";
@@ -426,6 +480,7 @@ export interface components {
             automaticWriteAllowed: false;
         };
         IntentCompletedResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             intentId: components["schemas"]["StableId"];
             /** @constant */
             state: "completed";
@@ -433,6 +488,7 @@ export interface components {
             stableResultId: components["schemas"]["StableId"];
         };
         IntentRepairRequiredResult: {
+            threadReference?: components["schemas"]["ThreadReference"];
             intentId: components["schemas"]["StableId"];
             /** @constant */
             state: "repair_required";
@@ -472,6 +528,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+        AcceptThreadReference: "1";
+        /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+        ThreadReference: components["schemas"]["ThreadReference"];
         ProfileId: components["schemas"]["StableKey"];
         WorkspaceId: components["schemas"]["StableKey"];
         WorkspaceIdQuery: components["schemas"]["StableKey"];
@@ -631,7 +691,12 @@ export interface operations {
                 order?: "updated_desc" | "updated_asc";
                 cursor?: components["parameters"]["Cursor"];
             };
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path: {
                 profileId: components["parameters"]["ProfileId"];
                 workspaceId: components["parameters"]["WorkspaceId"];
@@ -664,6 +729,10 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
                 /** @description same-originのunsafe requestへ固定値を付け、browserの単純cross-origin送信を拒否する。 */
                 "X-Feedback-CSRF": components["parameters"]["Csrf"];
             };
@@ -723,7 +792,12 @@ export interface operations {
                 resourceKind: components["parameters"]["ResourceKind"];
                 resourceKey: components["parameters"]["ResourceKey"];
             };
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path: {
                 profileId: components["parameters"]["ProfileId"];
                 workspaceId: components["parameters"]["WorkspaceId"];
@@ -760,6 +834,10 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
                 /** @description same-originのunsafe requestへ固定値を付け、browserの単純cross-origin送信を拒否する。 */
                 "X-Feedback-CSRF": components["parameters"]["Csrf"];
             };
@@ -821,6 +899,10 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
                 /** @description same-originのunsafe requestへ固定値を付け、browserの単純cross-origin送信を拒否する。 */
                 "X-Feedback-CSRF": components["parameters"]["Csrf"];
             };
@@ -883,6 +965,10 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
                 /** @description same-originのunsafe requestへ固定値を付け、browserの単純cross-origin送信を拒否する。 */
                 "X-Feedback-CSRF": components["parameters"]["Csrf"];
             };
@@ -949,7 +1035,12 @@ export interface operations {
                 resourceKind: components["parameters"]["ResourceKind"];
                 resourceKey: components["parameters"]["ResourceKey"];
             };
-            header?: never;
+            header?: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
+            };
             path: {
                 profileId: components["parameters"]["ProfileId"];
                 workspaceId: components["parameters"]["WorkspaceId"];
@@ -989,6 +1080,10 @@ export interface operations {
                 resourceKey: components["parameters"]["ResourceKey"];
             };
             header: {
+                /** @description 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。 */
+                "X-Feedback-Accept-Thread-Reference"?: components["parameters"]["AcceptThreadReference"];
+                /** @description 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。 */
+                "X-Feedback-Thread-Reference"?: components["parameters"]["ThreadReference"];
                 "X-Feedback-Request-Hash": components["parameters"]["RequestHash"];
             };
             path: {

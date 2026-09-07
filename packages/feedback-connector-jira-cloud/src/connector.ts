@@ -156,9 +156,17 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
     };
   }
 
+  readonly supportsThreadReferences = true as const;
+
   async findThreadCandidatesById(query: FeedbackRepositoryScope & { threadId: string }, options?: FeedbackRepositoryOptions): Promise<FeedbackProjectionCandidate[]> {
     this.assertScope(query);
     assertUuid(query.threadId, "threadId");
+    if (options?.threadRef) {
+      this.assertProviderRef({ providerRef: options.threadRef } as FeedbackProjectionCandidate);
+      const property = await this.client.getIssueProperty(options.threadRef.objectId, jiraCloudRecoveryPropertyKey, options.signal);
+      await this.assertBoundProperty(property, query, options.threadRef.objectId);
+      return [{ providerRef: options.threadRef, projection: projectionFromProperty(property, this.config) }];
+    }
     const issues = await this.searchAll({
       jql: `project = ${query.workspaceId} AND issue.property['${jiraCloudRecoveryPropertyKey}'].threadId = "${query.threadId}"`,
       signal: options?.signal
@@ -246,6 +254,7 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
       const reread = await this.client.getIssueProperty(created.id, jiraCloudRecoveryPropertyKey, options?.signal);
       await this.assertBoundProperty(reread, query, created.id);
       const record = await this.readCandidate({ providerRef: { providerKey: "jira-cloud", objectId: created.id }, projection: projectionFromProperty(reread, this.config) }, options);
+      options?.onThreadResolved?.(record.providerRef);
       return { disposition: "created", intentId: query.command.intentId, thread: record.thread } satisfies FeedbackThreadCommandResult;
     } catch (error) {
       if (!recoverableMetadataFailure(error)) throw error;
@@ -496,6 +505,7 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
     const existingEnvelope = envelopeFromRecovery(property);
     if (existingEnvelope !== null) {
       await this.assertBoundProperty(property, query, issueId);
+      options?.onThreadResolved?.({ providerKey: "jira-cloud", objectId: issueId });
       return completed(query.intentId, query.operation, query.threadId);
     }
     const envelope = await this.codec.signEnvelope({
@@ -512,6 +522,7 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
     await this.client.setIssueProperty(issueId, jiraCloudRecoveryPropertyKey, { ...seed, state: "bound", envelope }, options?.signal);
     const reread = await this.client.getIssueProperty(issueId, jiraCloudRecoveryPropertyKey, options?.signal);
     await this.assertBoundProperty(reread, query, issueId);
+    options?.onThreadResolved?.({ providerKey: "jira-cloud", objectId: issueId });
     return completed(query.intentId, query.operation, query.threadId);
   }
 
@@ -527,7 +538,9 @@ class FeedbackJiraCloudConnector implements FeedbackRepositoryPort {
     const issueId = candidates[0]!.providerRef.objectId;
     const property = await this.client.getIssueProperty(issueId, jiraCloudRecoveryPropertyKey, options?.signal);
     await this.assertBoundProperty(property, query, issueId);
-    return { issue: await this.client.getIssue(issueId, options?.signal), property };
+    const issue = await this.client.getIssue(issueId, options?.signal);
+    options?.onThreadResolved?.(providerRef(issue));
+    return { issue, property };
   }
 
   private async assertBoundProperty(property: unknown, scope: FeedbackRepositoryScope & { threadId?: string }, issueId: string): Promise<void> {

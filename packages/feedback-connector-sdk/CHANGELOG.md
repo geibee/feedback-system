@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- 直接参照の対応宣言、request-scoped provider参照と解決通知を実装portへ追加した。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - `FeedbackConnectorProblem`へ、OpenAPIの404 problem codeと一致する`feedback.not_found`を追加した。

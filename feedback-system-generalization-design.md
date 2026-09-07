@@ -650,3 +650,7 @@ React、Web Component、Redmine、Jira、GitHub等はすべて周辺実装とす
 - 運用チームが新システムを覚えなくてよい
 - バックアップ・監査・権限管理を既存toolへ委譲できる
 - ベンダーロックインをconnector単位に閉じ込められる
+
+## 2026-09-07の契約更新
+
+DBレス継続・重複排除best-effortの利用者判断に基づき、[Thread Reference v1](contracts/feedback/thread-reference.md)と[ADR 0005](docs/adr/0005-protected-thread-reference.md)を採用する。provider検索だけによる全体的一意性を初期v2の保証としない。参照取得後はscopeに束縛した暗号化参照で同じticketへ固定する。生のprovider参照公開を禁止する境界、毎回の認可・Envelope・projection検証、v1互換、専用永続storage禁止は維持する。

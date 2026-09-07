@@ -202,19 +202,21 @@ function validateProfile(value: unknown): FeedbackProviderProfileV2 {
     }
   }
   assertIntegerRange(capabilities.maximumMetadataBytes, "maximumMetadataBytes", 1024, Number.MAX_SAFE_INTEGER);
-  if (capabilities.projectionValidation !== "envelope-required" || capabilities.uniqueThreadLookup !== true) {
+  if (capabilities.projectionValidation !== "envelope-required" || typeof capabilities.uniqueThreadLookup !== "boolean") {
     throw new Error("projection validationまたはunique thread lookupが不正です");
   }
   const secretRefs = exactObject(object.secretRefs, [
     "providerCredential", "envelopeKeyRing", "participantCredentialKeyRing",
-    "participantIdDerivationKey", "authorizationCredential"
+    "participantIdDerivationKey", "authorizationCredential", "threadReferenceKeyRing"
   ], "secretRefs", true);
   for (const required of ["providerCredential", "envelopeKeyRing", "participantCredentialKeyRing", "participantIdDerivationKey"] as const) {
     validateSecretReference(secretRefs[required]);
   }
   if (secretRefs.authorizationCredential !== undefined) validateSecretReference(secretRefs.authorizationCredential);
+  if (secretRefs.threadReferenceKeyRing !== undefined) validateSecretReference(secretRefs.threadReferenceKeyRing);
   const separatedKeyIds = ["envelopeKeyRing", "participantCredentialKeyRing", "participantIdDerivationKey"]
     .map((name) => (secretRefs[name] as { id: string }).id);
+  if (secretRefs.threadReferenceKeyRing !== undefined) separatedKeyIds.push((secretRefs.threadReferenceKeyRing as { id: string }).id);
   if (new Set(separatedKeyIds).size !== separatedKeyIds.length) {
     throw new Error("Envelope、participant credential、participant ID導出鍵は別secretにしてください");
   }

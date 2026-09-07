@@ -25,11 +25,13 @@ export type FeedbackPendingIntentSnapshot = {
   intentId: string;
   operation: Extract<FeedbackOperationV2, "feedback:create" | "feedback:reply" | "feedback:revise" | "feedback:attachment:upload">;
   requestHash: string;
+  threadReference?: import("@geibee/feedback-contracts/v2").FeedbackThreadReferenceV2;
   recovery: FeedbackIntentRecoveryResultV2;
   retryPolicy: "recover-only" | "manual-confirmation";
 };
 
 export type FeedbackControllerLocalState = {
+  threadReferences?: readonly { scope: FeedbackScopedQuery; threadId: string; threadReference: import("@geibee/feedback-contracts/v2").FeedbackThreadReferenceV2 }[];
   draft: string;
   followedThreadIds: readonly string[];
   lastViewedByThread: Readonly<Record<string, FeedbackOrderingKeyV2>>;

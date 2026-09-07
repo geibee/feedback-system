@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1",
   "kind": "backlog-stage-a-live-acceptance",
-  "contractVersion": "2.0.0-alpha.2",
-  "implementationDigest": "sha256:21e867f4d449651803585c38eaac907a59f694bc50536970b4f6e3f5fde65488",
-  "executedAt": "2026-09-02T09:06:27.772Z",
+  "contractVersion": "2.0.0-alpha.3",
+  "implementationDigest": "sha256:a29bffdd61145988cff670abafe44f270db6aa2517eb874a9dd067a62304983b",
+  "executedAt": "2026-09-07T04:52:31.408Z",
   "api": "Backlog API v2",
   "siteType": "Backlog SaaS free trial",
   "tenantIdentifiersRemoved": true,
@@ -23,7 +23,7 @@
     "oneExactHitRecoveredAfterResponseLoss": true,
     "multipleExactHitsDecision": "repair_required",
     "exactPostFilterApplied": true,
-    "visibilityMilliseconds": 24751
+    "visibilityMilliseconds": 8610
   },
   "comments": {
     "zeroMarkerHitsDecision": "pending",

@@ -2,15 +2,17 @@
 
 確認日: 2026-09-01
 
-契約freeze: `feedback-v2-contract-2.0.0-alpha.2`
+契約freeze: `feedback-v2-contract-2.0.0-alpha.3`
+
+> 2026-09-07追記: 暗号化threadReferenceを含むalpha.3のJira／Backlog live Gateと正規verifyを再実行し、現sourceへ束縛した。詳細は[リリース準備記録](../release-preparation-2026-09-07.md)を参照する。
 
 ## 判定
 
-**PASS**。release前監査の8指摘をalpha.2契約と実装へ反映し、production composition、actual client／Service／Connector acceptance、browser write、10行compatibility matrix、fault injection、運用文書、Forge deploy／installation、現sourceへ束縛したJira Cloud live acceptance、正規`bash scripts/verify-feedback.sh`がすべて成功した。Feedback Serviceへの専用DB等の追加はない。
+**PASS**。release前監査の修正とalpha.3の暗号化threadReferenceを実装し、production composition、actual client／Service／Connector acceptance、browser write、10行compatibility matrix、fault injection、運用文書、Forge deploy／installation、現sourceへ束縛したJira Cloud／Backlog live acceptance、正規`bash scripts/verify-feedback.sh`がすべて成功した。Feedback Serviceへの専用DB等の追加はない。
 
 ## 判定対象
 
-Phase 5のproduction composition、provider共通acceptance、compatibility matrix、fault injection、運用文書、管理Jira Cloud開発siteの実証をGate対象とする。Phase 2／4のalpha.1 checksumは履歴証跡として保持し、release訂正後のOpenAPI、schema、server／browser port、TCK fixtureは`docs/phase5/contract-freeze.sha256`のalpha.2 checksumで固定する。
+Phase 5のproduction composition、provider共通acceptance、compatibility matrix、fault injection、運用文書、管理Jira Cloud開発siteとBacklog test projectの実証をGate対象とする。Phase 2／4のalpha.1 checksumは履歴証跡として保持し、release訂正後のOpenAPI、thread reference正本、schema、server／browser port、TCK fixtureは`docs/phase5/contract-freeze.sha256`のalpha.3 checksumで固定する。
 
 ## production topology
 
@@ -49,5 +51,13 @@ deployment、保存形式migration、key rotation、incident、rollbackは`docs/
 - `bash scripts/verify-feedback.sh`: skip環境変数を指定せず直列実行してPASS。clean `npm ci`、Phase 0〜5、React 18／19 clean consumer、実Chrome smoke、Redmine 5.1.12／6.0.10／6.1.3／7.0.0 container conformance、security、release／publish／container platform検査が成功した。
 - `apps/feedback-redmine-demo`は既存の`--passWithNoTests`によりtest fileなしで終了する。これをtest成功件数には含めず、buildと実Chrome smokeで検証した。
 - Jira Cloud live acceptanceは`tests/fixtures/jira-cloud-phase5/live-acceptance.json`の通りPASS。作成したrun-owned issueは削除済みで、自動write retryは0回である。
+
+2026-09-07にalpha.3候補で次を再実行した。
+
+- Jira Cloud live: PASS。公開credentialからService／client／Connectorを通る直接参照、Service再構成、reply／revision／intent回収、添付、改ざん・scope不一致・認可取消しを確認した。最終runは作成二件・削除二件・失敗0。先行runの未追跡二件も一件ずつ厳密照合して削除した。
+- Backlog Stage A／B live: PASS。重複検索一件を全体一意性とは扱わず、固定参照で別issueへの操作混入を防いだ。最終Stage Bはcleanup対象四件・失敗0・残存0。
+- provider acceptance: 21件PASS。
+- `bash scripts/check-feedback-phase5.sh`: PASS。
+- `bash scripts/verify-feedback.sh`: skipなし、終了コード0、`[feedback-verify] PASS`。
 
 Phase 5 Gate通過後は後続Phaseへ進まず停止する。

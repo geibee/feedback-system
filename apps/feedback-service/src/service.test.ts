@@ -69,16 +69,19 @@ function profile(connectorKey: string): FeedbackProviderProfileV2 {
 
 function fixture(input: {
   connectorKey?: string;
+  referenceKeyRing?: string;
   secrets?: Readonly<Record<string, string>>;
   providerCredentialValidator?: FeedbackProviderCredentialValidatorPort;
 } = {}) {
   const connectorKey = input.connectorKey ?? "jira-cloud";
   const currentProfile = profile(connectorKey);
+  if (input.referenceKeyRing !== undefined) currentProfile.secretRefs.threadReferenceKeyRing = { kind: "server-secret", id: "REFERENCE_RING" };
   const secrets = input.secrets ?? {
     PROVIDER: connectorKey === "redmine" ? redmineCredential : jiraCredential,
     ENVELOPE_RING: validRing,
     PARTICIPANT_RING: validRing,
-    DERIVATION_KEY: derivationKey
+    DERIVATION_KEY: derivationKey,
+    ...(input.referenceKeyRing === undefined ? {} : { REFERENCE_RING: input.referenceKeyRing })
   };
   const configuration: FeedbackReadOnlyConfiguration = {
     settings,
@@ -106,6 +109,13 @@ function fixture(input: {
 }
 
 describe("Feedback Service readiness", () => {
+  it("任意の参照鍵を設定した場合もring形式・鍵長をreadinessで検査する", async () => {
+    await expect(fixture({ referenceKeyRing: validRing }).readiness()).resolves.toMatchObject({ ready: true });
+    for (const source of ["{}", "bad", JSON.stringify({ activeKid: "current", keys: [{ kid: "current", key: "short" }] })]) {
+      await expect(fixture({ referenceKeyRing: source }).readiness()).resolves.toMatchObject({ ready: false });
+    }
+  });
+
   it("Jira Cloud credential、active一鍵、verify-only鍵、分離導出鍵を検証してreadyにする", async () => {
     await expect(fixture().readiness()).resolves.toEqual({ ready: true, profileCount: 1 });
   });

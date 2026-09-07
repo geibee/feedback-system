@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-alpha.3 thread参照拡張 - 2026-09-07
+
+- ThreadのallOfとadditionalProperties=falseの矛盾を解消し、messagesを含む既存応答のschema検証を固定した。
+- opt-inのthreadReferenceと共通要求headerを追加した。旧v2の応答fieldとRedmine v1を維持する。
+- DBレス・重複排除best-effort、参照の認可非代替性、scope／audience binding、失効時のfallback禁止を固定した。
+- provider profileへ任意の独立threadReferenceKeyRingを追加し、uniqueThreadLookup=false（best-effort検索）を許可した。visible duplicate拒否は維持する。
+- HTTP client、controllerのscope別端末state／pending intent、3 Connectorの直接取得portを導入した。React／Web Componentは共通controller経由で利用する。
+
 ## 未リリース - 2026-09-06 セキュリティ修正
 
 - server-only Envelopeへ任意の`initialBodyHash`を追加し、生成型を同期した。新規作成の既知本文だけを署名し、hashのない旧Envelope／first-write結果不明からの補修ではprovider本文を本人の検証済み本文へ昇格しない。

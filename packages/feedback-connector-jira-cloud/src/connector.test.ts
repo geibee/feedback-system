@@ -142,6 +142,19 @@ async function readOnlyCandidate(repository: ReturnType<typeof connector>) {
 }
 
 describe("Jira Cloud Connector managed acceptance fake", () => {
+  it("検証済み参照では検索を使わず、別threadへ転送しない", async () => {
+    const transport = candidateReadTransport({ property: await boundProperty() });
+    const repository = connector(transport);
+    const options = { threadRef: { providerKey: "jira-cloud", objectId: "10001" } };
+    expect(repository.supportsThreadReferences).toBe(true);
+    const candidates = await repository.findThreadCandidatesById({ ...scope, threadId }, options);
+    expect((await repository.readCandidate(candidates[0]!)).thread.threadId).toBe(threadId);
+    await expect(repository.recoverIntent({ ...scope, threadId, intentId: createIntentId, requestHash, operation: "feedback:create" }, options))
+      .resolves.toMatchObject({ state: "completed" });
+    await expect(repository.findThreadCandidatesById({ ...scope, threadId: messageId }, options)).rejects.toMatchObject({ code: "feedback.integrity_error" });
+    expect(transport.requests.some((request) => request.path.includes("/search/"))).toBe(false);
+  });
+
   it("初期本文の改変を拒否し、旧Envelopeの本文を本人へ帰属させない", async () => {
     const old = await boundProperty();
     const oldRead = await readOnlyCandidate(connector(candidateReadTransport({ property: old })));

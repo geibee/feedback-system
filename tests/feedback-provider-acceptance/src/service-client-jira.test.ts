@@ -217,6 +217,7 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
       PROVIDER: JSON.stringify({ kind: "jira-cloud-basic", email: "feedback@example.com", apiToken: "test-token" }),
       ENVELOPE_RING: signingRing("envelope-current", envelopeKey),
       PARTICIPANT_RING: signingRing("participant-current", participantKey),
+      REFERENCE_RING: signingRing("reference-current", new Uint8Array(32).fill(42)),
       DERIVATION_KEY: base64url(derivationKey)
     };
     const projectionVerifier = createProductionFeedbackProjectionVerifier({
@@ -226,7 +227,8 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
     const service = createFeedbackService({
       configuration: {
         settings,
-        profileLoader: { async loadProfiles() { return [profile]; } },
+        profileLoader: { async loadProfiles() { return [{ ...profile, secretRefs: { ...profile.secretRefs,
+          threadReferenceKeyRing: { kind: "server-secret" as const, id: "REFERENCE_RING" } } }]; } },
         secretResolver: {
           async resolve(id) {
             const secret = secrets[id];
@@ -302,7 +304,10 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
     expect(controller.getSnapshot().pendingIntents).toEqual([]);
     expect(jira.createCalls).toBe(1);
 
-    const thread = await client.getThread({ profileId, workspaceId, resource, threadId });
+    const searchCallsBeforeDirectRead = jira.searchCalls;
+    const threadReference = controller.getSnapshot().localState.threadReferences?.find((entry) => entry.threadId === threadId)?.threadReference;
+    expect(threadReference).toMatch(/^ftr1\./u);
+    const thread = await client.getThread({ profileId, workspaceId, resource, threadId }, { threadReference });
     expect(thread).toMatchObject({
       threadId,
       resource,
@@ -333,7 +338,7 @@ describe("Feedback client/service/Jira actual integration acceptance", () => {
     });
     expect(http.requests.find((request) => request.path.endsWith("/threads"))?.headers)
       .toMatchObject({ "X-Feedback-Participant-Credential": participant.credential });
-    expect(jira.searchCalls).toBe(loseResponse ? 4 : 1);
+    expect(jira.searchCalls).toBe(searchCallsBeforeDirectRead);
   });
 });
 

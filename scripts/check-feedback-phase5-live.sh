@@ -28,10 +28,7 @@ temp_dir=$(mktemp -d /tmp/feedback-phase5-live.XXXXXX)
 chmod 700 "$temp_dir"
 trap 'rm -f "$temp_dir/evidence.json"; rmdir "$temp_dir" 2>/dev/null || true' EXIT
 
-npm --workspace @geibee/feedback-contracts run build
-npm --workspace @geibee/feedback-envelope run build
-npm --workspace @geibee/feedback-connector-sdk run build
-npm --workspace @geibee/feedback-connector-jira-cloud run build
+bash scripts/build-feedback-live-dependencies.sh
 
 FEEDBACK_JIRA_ACCEPTANCE_EMAIL=$email \
 FEEDBACK_JIRA_ACCEPTANCE_API_TOKEN=$api_token \
@@ -41,7 +38,7 @@ unset email api_token
 jq -e '
   .schemaVersion == "1" and
   .kind == "jira-cloud-phase5-live-acceptance" and
-  .contractVersion == "2.0.0-alpha.2" and
+  .contractVersion == "2.0.0-alpha.3" and
   (.implementationDigest | test("^sha256:[a-f0-9]{64}$")) and
   .api == "Jira Cloud REST API v3" and
   .siteType == "Forge development demo" and
@@ -53,26 +50,24 @@ jq -e '
   .bodyIntegrityVerified == true and
   .attachmentRoundtrip == true and
   .attachmentMessageBindingVerified == true and
+  .threadReference.publicCredential == true and
+  .threadReference.create == true and
+  .threadReference.read == true and
+  .threadReference.reply == true and
+  .threadReference.revision == true and
+  .threadReference.recovery == true and
+  .threadReference.serviceReconstruction == true and
+  .threadReference.noSearchFallback == true and
+  .threadReference.tamperRejected == true and
+  .threadReference.scopeRejected == true and
+  .threadReference.currentAuthorization == true and
+  .threadReference.attachment == "verified" and
   .automaticWriteRetry == false and
   .cleanup == "deleted-run-owned-issue" and
   (.executedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"))
 ' "$temp_dir/evidence.json" >/dev/null || fail "live acceptance evidenceが不正です"
 
-current_digest=$(node -e '
-  const { createHash } = require("node:crypto");
-  const { readFileSync } = require("node:fs");
-  const files = [
-    "contracts/feedback/feedback-gateway.openapi.yaml",
-    "contracts/feedback/schemas/feedback-attachment-marker.schema.json",
-    "packages/feedback-connector-jira-cloud/src/connector.ts",
-    "packages/feedback-connector-jira-cloud/src/rest-v3-client.ts",
-    "packages/feedback-connector-jira-cloud/src/types.ts",
-    "scripts/run-feedback-jira-live-acceptance.mjs"
-  ];
-  const hash = createHash("sha256");
-  for (const file of files) hash.update(file).update("\0").update(readFileSync(file)).update("\0");
-  process.stdout.write(`sha256:${hash.digest("hex")}`);
-')
+current_digest=$(node scripts/lib/feedback-live-digest.mjs jira-cloud)
 [[ "$(jq -r .implementationDigest "$temp_dir/evidence.json")" == "$current_digest" ]] \
   || fail "live evidenceが現source revisionへbindingされていません"
 

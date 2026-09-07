@@ -38,6 +38,10 @@ export type FeedbackRepositoryScope = {
 
 export type FeedbackRepositoryOptions = {
   signal?: FeedbackAbortSignal;
+  /** Serviceが復号・scope検証した参照。存在する場合は検索へfallbackしない。 */
+  threadRef?: ProviderRef;
+  /** 現在のEnvelope binding検証後だけ通知するserver内部port。 */
+  onThreadResolved?: (reference: ProviderRef) => void;
 };
 
 export type FeedbackProjectionCandidate = {
@@ -103,6 +107,7 @@ export interface FeedbackDownloadStream {
 }
 
 export interface FeedbackRepositoryPort {
+  readonly supportsThreadReferences?: true;
   getCapabilities(options?: FeedbackRepositoryOptions): Promise<FeedbackCapabilitiesV2>;
   listWorkspaces(profileId: string, cursor?: string, options?: FeedbackRepositoryOptions): Promise<FeedbackWorkspacePageV2>;
   listResources(query: { profileId: string; workspaceId: string; query?: string; cursor?: string }, options?: FeedbackRepositoryOptions): Promise<FeedbackResourcePageV2>;

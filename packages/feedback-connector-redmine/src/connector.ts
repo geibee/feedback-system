@@ -48,6 +48,7 @@ export function createFeedbackRedmineConnector(input: {
   const now = input.now ?? (() => new Date().toISOString());
 
   const repository: FeedbackRepositoryPort = {
+    supportsThreadReferences: true,
     async getCapabilities() {
       return capabilities(profile);
     },
@@ -133,6 +134,7 @@ export function createFeedbackRedmineConnector(input: {
         const created = await transport.createIssue(issue, options?.signal);
         await provisionCreatedIssue(created.issueId, query, query.command, options, query.command.body);
         const mapped = await mapRedmineIssue(await transport.getIssue(created.issueId, options?.signal), profile, query, codec);
+        if (mapped.envelope) options?.onThreadResolved?.(mapped.providerRef);
         return { disposition: "created", intentId: query.command.intentId, thread: mapped.thread };
       } catch (error) {
         if (!couldBeUnknownProviderResult(error)) throw normalizeProviderError(error);
@@ -396,6 +398,7 @@ export function createFeedbackRedmineConnector(input: {
     const mapped = await mapRedmineIssue(await transport.getIssue(issue.id, options?.signal), profile, scope, codec);
     if (mapped.thread.threadId !== scope.threadId || mapped.envelope?.intentId !== intentId ||
       mapped.envelope.requestHash !== requestHash) throw integrity("回収したRedmine Envelopeがcreate commandと一致しません");
+    if (mapped.envelope) options?.onThreadResolved?.(mapped.providerRef);
     return { intentId, state: "completed", operation: "feedback:create", stableResultId: scope.threadId };
   }
 
@@ -403,6 +406,15 @@ export function createFeedbackRedmineConnector(input: {
     scope: FeedbackRepositoryScope & { threadId: string },
     options?: FeedbackRepositoryOptions
   ): Promise<RedmineIssueSummaryRaw[]> {
+    if (options?.threadRef) {
+      const ref = options.threadRef;
+      if (ref.providerKey !== "redmine" || !/^[1-9][0-9]*$/u.test(ref.objectId)) throw integrity("参照先のprovider bindingが不正です");
+      const issue = await transport.getIssue(Number(ref.objectId), options.signal);
+      if (String(issue.id) !== ref.objectId) throw integrity("参照先が別ticketへ変わりました");
+      const mapped = await mapRedmineIssue(issue, profile, scope, codec);
+      if (!mapped.envelope || mapped.thread.threadId !== scope.threadId) throw integrity("参照先のthread bindingが不正です");
+      return [issue];
+    }
     const result = await transport.searchIssues({
       projectId: profile.projectId,
       customFieldFilters: { ...scopeFilters(profile, scope), [profile.customFieldIds.threadId]: scope.threadId },
@@ -423,6 +435,7 @@ export function createFeedbackRedmineConnector(input: {
     const issue = await transport.getIssue(issues[0]!.id, options?.signal);
     const mapped = await mapRedmineIssue(issue, profile, scope, codec);
     if (mapped.thread.threadId !== scope.threadId) throw integrity("Redmine custom fieldとEnvelopeのthread IDが一致しません");
+    if (mapped.envelope) options?.onThreadResolved?.(mapped.providerRef);
     return { issueId: issue.id, issue };
   }
 

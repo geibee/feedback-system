@@ -40,3 +40,5 @@ provider acceptance全suiteは14件中12件PASS、2件FAIL。FAILはBacklog Stag
 - 上記の実測証跡を正規手順で更新後、`bash scripts/verify-feedback.sh`を再実行する。
 
 この修正作業では外部providerへのwrite、deployment、pushは実行していない。再実測には対象siteでの操作承認と、新しいFIFOによるcredential引渡しが必要。
+
+2026-09-07の承認後の実測結果は[live再検証記録](live-revalidation-2026-09-07.md)へ分離して記録する。上記の検証結果は2026-09-06時点の記録である。

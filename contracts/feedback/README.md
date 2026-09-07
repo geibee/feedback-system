@@ -23,3 +23,5 @@ REST検査、15件の手動確認、承認digest、生成profileを含むread-on
 汎用v2のAuthorization Modeはserver profileへ固定し、browser OpenAPIでmodeを選択しません。signed grantとremote authorizationのserver-side DTOはJSON Schemaを正本にし、attachment uploadは独立した`feedback:attachment:upload`を要求します。OpenAPIのsecurity schemeはsigned grant Bearerとpublic participant credential headerを記述する一方、server profileに合わないcredentialへfallbackしません。release blocker修正後の契約識別子は`feedback-v2-contract-2.0.0-alpha.2`で、public participant発行、unsafe operationのCSRF header、header束縛したintent回収、messageへ束縛したattachment markerを含みます。
 `npm run generate`はv1／v2 OpenAPIとv2 JSON SchemaのTypeScript型を生成し、すべてdrift検査の対象にします。
 registry が決まるまでは `private: true` のため、配布検証には repository 内の `npm pack` を使用します。
+
+現行契約は `feedback-v2-contract-2.0.0-alpha.3`。[Thread Reference v1](./thread-reference.md)に従い、独立暗号鍵とopt-inを用いた参照固定を追加した。旧v2 JSONとRedmine v1は維持し、重複排除はbest-effortとする。

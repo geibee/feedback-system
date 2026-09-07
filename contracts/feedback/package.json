@@ -10,6 +10,7 @@
     "redmine-gateway.openapi.yaml",
     "fixtures",
     "schemas",
+    "thread-reference.md",
     "README.md",
     "CHANGELOG.md"
   ],

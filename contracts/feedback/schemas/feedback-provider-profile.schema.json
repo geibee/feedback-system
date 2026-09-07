@@ -164,7 +164,7 @@
         },
         "maximumMetadataBytes": { "type": "integer", "minimum": 1024 },
         "projectionValidation": { "const": "envelope-required" },
-        "uniqueThreadLookup": { "const": true }
+        "uniqueThreadLookup": { "type": "boolean", "description": "trueはprovider検索の一意解決能力の申告。falseは重複排除best-effort。いずれもexactly-onceを保証せず、可視の複数候補を拒否する。" }
       }
     },
     "CreationField": {
@@ -200,6 +200,7 @@
         "envelopeKeyRing": { "$ref": "#/$defs/SecretReference" },
         "participantCredentialKeyRing": { "$ref": "#/$defs/SecretReference" },
         "participantIdDerivationKey": { "$ref": "#/$defs/SecretReference" },
+        "threadReferenceKeyRing": { "$ref": "#/$defs/SecretReference" },
         "authorizationCredential": { "$ref": "#/$defs/SecretReference" }
       }
     }

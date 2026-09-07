@@ -119,3 +119,13 @@ version 1のJSON Schemaはunknown propertyを拒否します。後方互換の�
 - Jira／Redmineのfirst-write recovery seedは未信頼候補であり、provider object IDへ束縛した署名Envelopeへ補修するまで正本metadataとして返さない。
 
 保存済みデータや公開APIに影響するか判断できない場合は、互換扱いにせず新しいversionとして設計してください。
+
+## 2026-09-07: Thread Reference v1（v2 alpha.3）
+
+[共通参照規約](../contracts/feedback/thread-reference.md)を正本とする。OpenAPIはalpha.3へ更新したが、API base pathはv2のまま。新任意fieldは `X-Feedback-Accept-Thread-Reference: 1` がある要求だけに返すので、旧clientのadditionalProperties=falseを破らない。参照付き要求を旧Serviceへ送る組合せはサポートしない。Service更新後にclientを更新する。
+
+HTTP clientは受信opt-inと `FeedbackRequestOptions.threadReference` を提供する。controller、React、Web Componentは共通実装を利用する。browserは復号せず、tokenをhashやURLへ含めない。既存v2 storage keyに任意threadReferencesとpending参照を追加し、旧stateを読める。旧bundleへのdowngradeではこの追加stateが失われるため固定参照の継続を保証しない。v1 export、DTO、Redmine v1 storage keyは不変。
+
+Connectorの新optionはserver-only。未対応の外部Connectorは任意capabilityを宣言しないことで旧動作を維持する。参照対応を宣言したConnectorは全個別操作で検索へfallbackしないことを検証する。profileのuniqueThreadLookup=falseはbest-effort検索を明示するもので、current auth／Envelope／projection検証を省略する意味ではない。
+
+Thread response schemaの旧allOf／additionalProperties=falseの矛盾も訂正した。既存JSON形状を変えず、messagesを含む正規Threadがschema検証を通るようにした。

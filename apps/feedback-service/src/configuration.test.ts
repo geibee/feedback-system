@@ -40,6 +40,20 @@ const profile = {
 };
 
 describe("read-only Feedback Service configuration", () => {
+  it("best-effort検索と独立参照鍵の設定を許可し、既存署名鍵の参照流用を拒否する", async () => {
+    const load = (id: string) => loadFeedbackReadOnlyConfiguration({
+      settingsFile: "/settings.json", environment: {},
+      async readTextFile(path) {
+        return JSON.stringify(path === "/settings.json" ? settings : { ...profile,
+          capabilities: { ...profile.capabilities, uniqueThreadLookup: false },
+          secretRefs: { ...profile.secretRefs, threadReferenceKeyRing: { kind: "server-secret", id } } });
+      }
+    });
+    expect((await (await load("REFERENCE_RING")).profileLoader.loadProfiles())[0]?.capabilities.uniqueThreadLookup).toBe(false);
+    await expect(load("ENVELOPE_RING")).rejects.toThrow("別secret");
+    await expect(load("PARTICIPANT_DERIVATION")).rejects.toThrow("別secret");
+  });
+
   it("settingsとprofileを一度だけ読んだimmutable snapshotにする", async () => {
     const reads: string[] = [];
     const configuration = await loadFeedbackReadOnlyConfiguration({

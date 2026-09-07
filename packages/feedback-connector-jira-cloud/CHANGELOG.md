@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- 署名Envelopeに束縛した直接issue参照へ対応し、参照付き操作ではJQL検索へfallbackしない。
+
 ## 未リリース - 2026-09-06
 
 - 既知の初期本文を署名hashへ束縛し、旧Envelopeの未検証本文を本人へ帰属させない。ADFの空行とinline textを保持し、旧初期messageの署名済みrevisionを安全に再構築する。

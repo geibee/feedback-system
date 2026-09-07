@@ -73,7 +73,10 @@ export interface BackendCapabilities {
   creationFields: CreationField[];
   maximumMetadataBytes: number;
   projectionValidation: "envelope-required";
-  uniqueThreadLookup: true;
+  /**
+   * trueはprovider検索の一意解決能力の申告。falseは重複排除best-effort。いずれもexactly-onceを保証せず、可視の複数候補を拒否する。
+   */
+  uniqueThreadLookup: boolean;
 }
 export interface CreationField {
   key: StableKey;
@@ -93,6 +96,7 @@ export interface SecretReferences {
   envelopeKeyRing: SecretReference;
   participantCredentialKeyRing: SecretReference;
   participantIdDerivationKey: SecretReference;
+  threadReferenceKeyRing?: SecretReference;
   authorizationCredential?: SecretReference;
 }
 export interface SecretReference {

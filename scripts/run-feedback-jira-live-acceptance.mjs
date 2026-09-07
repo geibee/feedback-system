@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Jira Cloud開発siteへrun-owned issueだけを作成し、Connectorのlive acceptance後に削除する。
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import {
   createFeedbackJiraCloudConnector,
   createJiraCloudFetchTransport
 } from "@geibee/feedback-connector-jira-cloud";
 import { calculateFeedbackCommandHash, createFeedbackEnvelopeCodec } from "@geibee/feedback-envelope";
+import { feedbackLiveDigest } from "./lib/feedback-live-digest.mjs";
+import { trackJiraLiveRepository } from "./lib/feedback-jira-live-ownership.mjs";
+import { runFeedbackReferenceAcceptance } from "./lib/feedback-reference-acceptance.mjs";
 
 const siteUrl = origin(required("FEEDBACK_JIRA_ACCEPTANCE_SITE_URL"));
 const projectKey = stableKey(required("FEEDBACK_JIRA_ACCEPTANCE_PROJECT_KEY"));
@@ -27,9 +29,10 @@ const scope = {
   workspaceId: projectKey,
   resource
 };
+const envelopeSecret = crypto.getRandomValues(new Uint8Array(32));
 const codec = createFeedbackEnvelopeCodec([{
   kid: "phase5-ephemeral",
-  secret: crypto.getRandomValues(new Uint8Array(32)),
+  secret: envelopeSecret,
   state: "active"
 }]);
 const connector = createFeedbackJiraCloudConnector({
@@ -55,10 +58,11 @@ const connector = createFeedbackJiraCloudConnector({
 });
 
 let issueId = null;
+const issueIds = new Set();
 const evidence = {
   schemaVersion: "1",
   kind: "jira-cloud-phase5-live-acceptance",
-  contractVersion: "2.0.0-alpha.2",
+  contractVersion: "2.0.0-alpha.3",
   implementationDigest: implementationDigest(),
   executedAt: new Date().toISOString(),
   api: "Jira Cloud REST API v3",
@@ -88,6 +92,7 @@ try {
   if (!("thread" in created) || created.thread.threadId !== threadId) throw new Error("Jira create resultが不正です");
   evidence.runOwnedIssueCreated = true;
   issueId = await waitForUniqueCandidate();
+  issueIds.add(issueId);
   const recoveredCreate = await connector.recoverIntent({
     ...scope,
     threadId,
@@ -172,16 +177,37 @@ try {
     throw new Error("Jira attachmentのmessage関連付けが不正です");
   }
   evidence.attachmentMessageBindingVerified = true;
+  evidence.threadReference = await runFeedbackReferenceAcceptance({
+    scope: { ...scope, resource: { kind: "record", key: `reference-${runId}` } },
+    title: `[feedback-phase5:${runId}] HTTP reference acceptance`,
+    runtimeProfile: { id: "jira-live-reference", connectorKey: "jira-cloud", application: "feedback-system", environment: "phase5-acceptance" },
+    codec, envelopeKid: "phase5-ephemeral", envelopeSecret,
+    providerCredential: JSON.stringify({ kind: "jira-cloud-basic", email, apiToken }),
+    createRepository(participantId) {
+      const repository = createFeedbackJiraCloudConnector({
+        configuration: { profileId: scope.profileId, installationId: scope.installationId,
+          application: "feedback-system", environment: "phase5-acceptance", participantId, issueTypeId,
+          maximumAttachmentBytes: 1048576, attachmentContentTypes: ["text/plain"], pageSize: 50, recoveryRetryAfterSeconds: 2 },
+        transport: createJiraCloudFetchTransport({ baseUrl: siteUrl, authorization, fetch: jiraFetch, timeoutMilliseconds: 30000 }),
+        envelopeCodec: codec
+      });
+      return trackJiraLiveRepository(repository, issueIds);
+    }
+  });
 } finally {
-  if (issueId) {
-    const response = await fetch(`${siteUrl}/rest/api/3/issue/${encodeURIComponent(issueId)}?deleteSubtasks=true`, {
-      method: "DELETE",
-      headers: { Accept: "application/json", Authorization: authorization }
-    });
-    evidence.cleanup = response.status === 204 ? "deleted-run-owned-issue" : `failed-status-${response.status}`;
-  } else {
-    evidence.cleanup = "no-resolved-run-owned-issue";
+  if (issueId) issueIds.add(issueId);
+  let failures = 0;
+  for (const ownedId of issueIds) {
+    try {
+      const response = await fetch(`${siteUrl}/rest/api/3/issue/${encodeURIComponent(ownedId)}?deleteSubtasks=true`, {
+        method: "DELETE",
+        headers: { Accept: "application/json", Authorization: authorization }
+      });
+      if (response.status !== 204 && response.status !== 404) failures++;
+    } catch { failures++; }
   }
+  evidence.cleanup = issueIds.size > 0 && failures === 0 ? "deleted-run-owned-issue" : "failed-to-delete-run-owned-issues";
+  process.stderr.write(`${JSON.stringify({ kind: "jira-live-cleanup", targetCount: issueIds.size, failureCount: failures, cleanup: evidence.cleanup })}\n`);
 }
 
 if (evidence.cleanup !== "deleted-run-owned-issue") throw new Error(`Jira acceptance cleanupに失敗しました: ${evidence.cleanup}`);
@@ -219,16 +245,27 @@ async function waitForUniqueCandidate() {
 
 async function jiraFetch(input, init) {
   const response = await fetch(input, { ...init, body: init.body, signal: init.signal, duplex: init.duplex });
+  const trackCreatedIssue = (value) => {
+    if (init.method === "POST" && new URL(input).pathname === "/rest/api/3/issue" &&
+        value && typeof value.id === "string") {
+      issueId = value.id;
+      issueIds.add(value.id);
+    }
+    return value;
+  };
   return {
     status: response.status,
     headers: response.headers,
     async json() {
-      const value = await response.json();
-      if (init.method === "POST" && new URL(input).pathname === "/rest/api/3/issue" &&
-          value && typeof value.id === "string") issueId = value.id;
-      return value;
+      return trackCreatedIssue(await response.json());
     },
-    text: () => response.text(),
+    async text() {
+      const source = await response.text();
+      if (init.method === "POST" && new URL(input).pathname === "/rest/api/3/issue") {
+        try { trackCreatedIssue(JSON.parse(source)); } catch { /* Connector側でprovider payload errorとして処理する。 */ }
+      }
+      return source;
+    },
     body: response.body
   };
 }
@@ -257,20 +294,5 @@ function stableKey(value) {
 }
 
 function implementationDigest() {
-  const files = [
-    "contracts/feedback/feedback-gateway.openapi.yaml",
-    "contracts/feedback/schemas/feedback-attachment-marker.schema.json",
-    "packages/feedback-connector-jira-cloud/src/connector.ts",
-    "packages/feedback-connector-jira-cloud/src/rest-v3-client.ts",
-    "packages/feedback-connector-jira-cloud/src/types.ts",
-    "scripts/run-feedback-jira-live-acceptance.mjs"
-  ];
-  const hash = createHash("sha256");
-  for (const file of files) {
-    hash.update(file);
-    hash.update("\0");
-    hash.update(readFileSync(file));
-    hash.update("\0");
-  }
-  return `sha256:${hash.digest("hex")}`;
+  return feedbackLiveDigest("jira-cloud");
 }

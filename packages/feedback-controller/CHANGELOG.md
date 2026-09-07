@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- scope別の固定参照を保存・復元し、pending intent／follow／rendererへ伝播する。並行refreshによる参照の巻戻しを防ぐ。
+
 ## 未リリース - 2026-09-06
 
 - 最初のwrite前にpending intentを保存し、切断後も回収用ID／hashを保持する。保存例外時は送信しない。

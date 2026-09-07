@@ -166,9 +166,9 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
   ): Promise<FeedbackControllerLocalState> => {
     const followed = state.followedThreadIds.slice(0, 100);
     const details = await Promise.all(followed.map(async (threadId) => {
-      try { return await dependencies.client.getThread({ ...scope, threadId }, options); } catch { return null; }
+      try { return await dependencies.client.getThread({ ...scope, threadId }, referenceOptions(state, scope, threadId, options)); } catch { return null; }
     }));
-    let next = cloneLocalState(state);
+    let next = rememberReferences(cloneLocalState(state), scope, details.filter((detail) => detail !== null), true);
     for (const detail of details) {
       if (!detail) continue;
       const latest = latestOrdering(detail);
@@ -217,7 +217,7 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
           : Promise.resolve({ items: [], nextCursor: null }),
         dependencies.client.listThreads(scope, operation.options)
       ]);
-      const localState = await refreshFollowed(scope, stored ?? emptyLocalState(), operation.options);
+      const localState = await refreshFollowed(scope, rememberReferences(stored ?? emptyLocalState(), scope, page.items), operation.options);
       if (!isCurrentSession(generation) || operation.signal.aborted) return;
       replace({
         ...snapshot,
@@ -264,7 +264,11 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
         ...scope,
         ...(append ? { cursor: snapshot.threads.nextCursor ?? undefined } : {})
       }, operation.options);
-      const localState = await refreshFollowed(scope, snapshot.localState, operation.options);
+      const referencesBeforeRefresh = snapshot.localState.threadReferences;
+      const refreshedLocalState = await refreshFollowed(scope, rememberReferences(snapshot.localState, scope, page.items), operation.options);
+      // 遅いpollが、その間に選択／writeで固定・更新した参照を巻き戻さない。
+      const localState = snapshot.localState.threadReferences === referencesBeforeRefresh ? refreshedLocalState :
+        { ...refreshedLocalState, threadReferences: mergeCurrentReferences(refreshedLocalState, snapshot.localState) };
       if (!isCurrentSession(session) || generation !== threadsGeneration || operation.signal.aborted) return;
       const items = append ? mergeThreadSummaries(snapshot.threads.items, page.items) : page.items;
       update({
@@ -285,8 +289,9 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
     const operation = createSignal();
     update({ threads: { ...snapshot.threads, state: "loading", error: null } });
     try {
-      const thread = await dependencies.client.getThread({ ...scope, threadId }, operation.options);
+      const thread = await dependencies.client.getThread({ ...scope, threadId }, referenceOptions(snapshot.localState, scope, threadId, operation.options));
       if (!isCurrentSession(session) || generation !== selectionGeneration || operation.signal.aborted) return;
+      update({ localState: rememberReferences(snapshot.localState, scope, [thread], true) });
       const latest = latestOrdering(thread);
       const localState = latest ? {
         ...snapshot.localState,
@@ -316,6 +321,7 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
       intentId,
       operation,
       requestHash,
+      ...(referenceOptions(snapshot.localState, scope, threadId).threadReference ? { threadReference: referenceOptions(snapshot.localState, scope, threadId).threadReference } : {}),
       recovery,
       retryPolicy: recovery.state === "repair_required" && recovery.retryDirective === "manual-confirmation"
         ? "manual-confirmation"
@@ -355,8 +361,12 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
         input.requestHash, { intentId: input.intentId, state: "pending", operation: input.operation,
           retryAfterSeconds: 5, automaticWriteAllowed: false });
       if (!isCurrentSession(session) || operation.signal.aborted) return;
-      const result = await input.run(operation.options);
+      const result = await input.run(input.operation === "feedback:create" ? operation.options : referenceOptions(snapshot.localState, input.scope, input.threadId, operation.options));
       if (!isCurrentSession(session) || operation.signal.aborted) return;
+      if (typeof result === "object" && result !== null && "threadReference" in result && typeof result.threadReference === "string") {
+        update({ localState: rememberReferences(snapshot.localState, input.scope, [{ threadId: input.threadId, threadReference: result.threadReference }], true) });
+        await saveLocal();
+      }
       if (isRecovery(result)) {
         if (result.intentId !== input.intentId || result.operation !== input.operation) {
           setProblem(localProblem("feedback.integrity_error", "intent回収結果のbindingが一致しません", false));
@@ -643,11 +653,14 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
             intentId: pending.intentId,
             requestHash: pending.requestHash,
             operation: pending.operation
-          }, operation.options);
+          }, { ...referenceOptions(snapshot.localState, pending.scope, pending.threadId, operation.options),
+            ...(pending.threadReference ? { threadReference: pending.threadReference } : {}) });
           if (!isCurrentSession(session) || operation.signal.aborted) return;
           if (recovery.intentId !== pending.intentId || recovery.operation !== pending.operation) {
             setProblem(localProblem("feedback.integrity_error", "intent回収結果のbindingが一致しません", false));
           } else if (recovery.state === "completed") {
+            update({ localState: rememberReferences(snapshot.localState, pending.scope, [{ threadId: pending.threadId, threadReference: recovery.threadReference }], true) });
+            await saveLocal();
             update({ pendingIntents: snapshot.pendingIntents.filter((item) => item.intentId !== pending.intentId) });
             await savePending();
             await refresh(false);
@@ -712,7 +725,22 @@ export function createFeedbackController(dependencies: FeedbackControllerRuntime
   };
 
   return {
-    client: dependencies.client,
+    client: {
+      issueParticipant: (query, options) => dependencies.client.issueParticipant(query, options),
+      getProfile: (query, options) => dependencies.client.getProfile(query, options),
+      listWorkspaces: (query, options) => dependencies.client.listWorkspaces(query, options),
+      listResources: (query, options) => dependencies.client.listResources(query, options),
+      listThreads: (query, options) => dependencies.client.listThreads(query, options),
+      getThread: (query, options) => dependencies.client.getThread(query, referenceOptions(snapshot.localState, query, query.threadId, options)),
+      createThread: (query, options) => dependencies.client.createThread(query, options),
+      reply: (query, options) => dependencies.client.reply(query, referenceOptions(snapshot.localState, query, query.threadId, options)),
+      appendRevision: (query, options) => dependencies.client.appendRevision(query, referenceOptions(snapshot.localState, query, query.threadId, options)),
+      recoverIntent: (query, options) => dependencies.client.recoverIntent(query, referenceOptions(snapshot.localState, query, query.threadId, options)),
+      uploadAttachment: (query, options) => dependencies.client.uploadAttachment(query, referenceOptions(snapshot.localState, query, query.threadId, options)),
+      getAttachment(query, options) {
+        return dependencies.client.getAttachment(query, referenceOptions(snapshot.localState, query, query.threadId, options));
+      }
+    },
     getSnapshot: () => snapshot,
     subscribe(listener) {
       if (destroyed) return () => undefined;
@@ -882,6 +910,7 @@ function toSummary(thread: FeedbackThreadV2): FeedbackThreadSummaryV2 {
 function cloneLocalState(state: FeedbackControllerLocalState): FeedbackControllerLocalState {
   return {
     draft: state.draft,
+    ...(state.threadReferences ? { threadReferences: state.threadReferences.map((entry) => ({ ...entry, scope: { ...entry.scope, resource: { ...entry.scope.resource } } })) } : {}),
     followedThreadIds: [...state.followedThreadIds],
     lastViewedByThread: Object.fromEntries(Object.entries(state.lastViewedByThread).map(([id, key]) => [id, { ...key }])),
     unreadCountByThread: { ...state.unreadCountByThread }
@@ -896,4 +925,40 @@ function localProblem(code: FeedbackProblemV2["code"], title: string, retryable:
     code,
     retryable
   };
+}
+
+function referenceOptions(state: FeedbackControllerLocalState, scope: FeedbackScopedQuery, threadId: string, options: FeedbackRequestOptions = {}): FeedbackRequestOptions {
+  const reference = state.threadReferences?.find((entry) => entry.threadId === threadId && sameReferenceScope(entry.scope, scope));
+  return reference ? { ...options, threadReference: reference.threadReference } : options;
+}
+
+function sameReferenceScope(left: FeedbackScopedQuery, right: FeedbackScopedQuery): boolean {
+  return left.profileId === right.profileId && left.workspaceId === right.workspaceId &&
+    left.resource.kind === right.resource.kind && left.resource.key === right.resource.key;
+}
+
+/** 一覧refreshでは既に固定した参照を上書きしない。検証済み直接応答だけ更新する。 */
+function rememberReferences(state: FeedbackControllerLocalState, scope: FeedbackScopedQuery,
+  threads: readonly { threadId: string; threadReference?: string }[], renew = false): FeedbackControllerLocalState {
+  const entries = [...(state.threadReferences ?? [])];
+  for (const thread of threads) {
+    if (!thread.threadReference) continue;
+    const index = entries.findIndex((entry) => entry.threadId === thread.threadId && sameReferenceScope(entry.scope, scope));
+    const entry = { scope: { ...scope, resource: { ...scope.resource } }, threadId: thread.threadId, threadReference: thread.threadReference };
+    if (index >= 0) { if (renew) entries[index] = entry; }
+    else {
+      if (entries.length >= 1000) throw new Error("thread参照の端末保存上限です");
+      entries.push(entry);
+    }
+  }
+  return entries.length ? { ...state, threadReferences: entries } : state;
+}
+
+function mergeCurrentReferences(previous: FeedbackControllerLocalState, current: FeedbackControllerLocalState): NonNullable<FeedbackControllerLocalState["threadReferences"]> {
+  const entries = [...(current.threadReferences ?? [])];
+  for (const entry of previous.threadReferences ?? []) {
+    if (!entries.some((item) => item.threadId === entry.threadId && sameReferenceScope(item.scope, entry.scope))) entries.push(entry);
+  }
+  if (entries.length > 1000) throw new Error("thread参照の端末保存上限です");
+  return entries;
 }

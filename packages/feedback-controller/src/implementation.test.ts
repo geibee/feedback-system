@@ -128,6 +128,66 @@ function dependencies(options: {
 }
 
 describe("ClientStateV2", () => {
+  it("遅いfollow pollが新しい直接参照へ巻き戻しを起こさない", async () => {
+    const deferred = createDeferredFeedbackClientResult<FeedbackThreadV2>();
+    let reads = 0;
+    const fake = client({
+      async listThreads() { return { items: [{ ...summary, threadReference: "ftr1.k.a.b.c" }], nextCursor: null }; },
+      async getThread() {
+        reads += 1;
+        if (reads === 1) return deferred.promise;
+        return { ...thread, threadReference: "ftr1.k.d.e.f" };
+      }
+    });
+    const controller = createFeedbackController(dependencies({ client: fake }));
+    await controller.dispatch({ type: "connect", scope });
+    await controller.dispatch({ type: "follow", threadId });
+    const refreshing = controller.dispatch({ type: "refresh" });
+    await vi.waitFor(() => expect(reads).toBe(1));
+    await controller.dispatch({ type: "select-thread", threadId });
+    deferred.resolve({ ...thread, threadReference: "ftr1.k.a.b.c" });
+    await refreshing;
+    expect(controller.getSnapshot().localState.threadReferences?.[0]?.threadReference).toBe("ftr1.k.d.e.f");
+    await controller.dispatch({ type: "destroy" });
+  });
+
+  it("参照をscope別に保存し、一覧refreshによる別候補への切替を禁止し、remount後も回収に使う", async () => {
+    const storage = new MemoryStorage();
+    const state = () => createBrowserFeedbackControllerState({ origin: "https://app.example", clientScopeId: "browser", localStorage: storage });
+    let listed = "ftr1.k.a.b.c";
+    const observed: (string | undefined)[] = [];
+    const fake = client({
+      async getProfile() { return { ...profile, effectivePermissions: [...profile.effectivePermissions, "feedback:reply"] }; },
+      async listThreads() { return { items: [{ ...summary, threadReference: listed }], nextCursor: null }; },
+      async getThread(_query, options) { observed.push(options?.threadReference); return { ...thread, threadReference: options?.threadReference }; },
+      async reply(query, options) {
+        observed.push(options?.threadReference);
+        return { intentId: query.command.intentId, operation: "feedback:reply", state: "pending", retryAfterSeconds: 5, automaticWriteAllowed: false };
+      },
+      async recoverIntent(query, options) {
+        observed.push(options?.threadReference);
+        return { intentId: query.intentId, operation: query.operation, state: "completed", stableResultId: threadId };
+      }
+    });
+    const first = createFeedbackController(dependencies({ state: state(), client: fake }));
+    await first.dispatch({ type: "connect", scope });
+    await first.dispatch({ type: "select-thread", threadId });
+    await first.dispatch({ type: "follow", threadId });
+    listed = "ftr1.k.d.e.f";
+    await first.dispatch({ type: "refresh" });
+    await first.dispatch({ type: "reply", scope, threadId, command: {
+      intentId: replyEventId, messageId: ownEventId, requestHash: "sha256:" + "1".repeat(64), body: "返信"
+    } });
+    expect(first.getSnapshot().pendingIntents[0]?.threadReference).toBe("ftr1.k.a.b.c");
+    await first.dispatch({ type: "destroy" });
+    const second = createFeedbackController(dependencies({ state: state(), client: fake }));
+    await second.dispatch({ type: "connect", scope });
+    await second.dispatch({ type: "recover-intent", intentId: replyEventId });
+    expect(observed.length).toBeGreaterThan(3);
+    expect(observed.every((token) => token === "ftr1.k.a.b.c")).toBe(true);
+    await second.dispatch({ type: "destroy" });
+  });
+
   it("v1の安全に変換できるfollow／draftだけを利用者scope付きv2 keyへ移行する", async () => {
     const local = new MemoryStorage();
     const session = new MemoryStorage();

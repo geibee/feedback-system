@@ -1,13 +1,15 @@
 openapi: 3.1.0
 info:
   title: Feedback Gateway API
-  version: 2.0.0-alpha.2
+  version: 2.0.0-alpha.3
   description: |
     契約済みticket管理systemを正本とする、provider非依存のFeedback API契約draft。
     server profileごとに固定したAuthorization Modeを使用し、requestによるmode選択やfallbackを許可しない。
     provider内部ID、URL、projection、credential、署名情報はbrowserへ公開しない。
     profileのeffectivePermissionsはread要求単独ではなく、現在の認可・policy・backend能力の許可集合を返す。
     自己編集はreadによる所有者確認とreviseをそれぞれ認可する。署名済み初期本文hashのない旧Envelopeは本人本文の証明に使用しない。
+    X-Feedback-Accept-Thread-Reference: 1を送った要求だけthreadReferenceを受信する。
+    参照は認可ではなく、command hashから除外する。不正・失効時の検索fallbackは禁止する。
 servers:
   - url: /internal/feedback/v2
     description: 業務applicationと同一originの相対path
@@ -127,6 +129,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     get:
       operationId: listFeedbackThreads
       x-feedback-operation: feedback.thread.list.v2
@@ -202,6 +207,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     get:
       operationId: getFeedbackThread
       x-feedback-operation: feedback.thread.get.v2
@@ -230,6 +238,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     post:
       operationId: replyFeedbackThread
       x-feedback-operation: feedback.message.reply.v2
@@ -274,6 +285,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages/{messageId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     post:
       operationId: appendFeedbackRevision
       x-feedback-operation: feedback.message.revise.v2
@@ -319,6 +333,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     post:
       operationId: uploadFeedbackAttachment
       x-feedback-operation: feedback.attachment.upload.v2
@@ -375,6 +392,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments/{attachmentId}/content:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     get:
       operationId: getFeedbackAttachment
       x-feedback-operation: feedback.attachment.get.v2
@@ -406,6 +426,9 @@ paths:
         '503': { $ref: '#/components/responses/Problem' }
         '504': { $ref: '#/components/responses/Problem' }
   /profiles/{profileId}/workspaces/{workspaceId}/intents/{intentId}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
     get:
       operationId: recoverFeedbackIntent
       x-feedback-operation: feedback.intent.recover.v2
@@ -454,6 +477,18 @@ components:
       name: X-Feedback-Participant-Credential
       description: public-profileの投稿所有確認用。実在人物の認証またはmembership証明ではない。
   parameters:
+    AcceptThreadReference:
+      name: X-Feedback-Accept-Thread-Reference
+      in: header
+      required: false
+      schema: { type: string, const: '1' }
+      description: 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。
+    ThreadReference:
+      name: X-Feedback-Thread-Reference
+      in: header
+      required: false
+      schema: { $ref: '#/components/schemas/ThreadReference' }
+      description: 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。
     ProfileId:
       name: profileId
       in: path
@@ -526,6 +561,12 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
   schemas:
+    ThreadReference:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: '^ftr1\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+      description: 暗号化・改ざん検出付きの不透明参照。権限を付与せず、URL・ログ・command本文へ含めない。
     StableKey:
       type: string
       minLength: 1
@@ -765,6 +806,7 @@ components:
       additionalProperties: false
       required: [threadId, resource, title, status, createdAt, updatedAt, messageCount]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         threadId: { $ref: '#/components/schemas/StableId' }
         resource: { $ref: '#/components/schemas/ResourceRef' }
         title: { type: string, minLength: 1, maxLength: 300 }
@@ -773,16 +815,22 @@ components:
         updatedAt: { type: string, format: date-time }
         messageCount: { type: integer, minimum: 1 }
     Thread:
-      allOf:
-        - $ref: '#/components/schemas/ThreadSummary'
-        - type: object
-          unevaluatedProperties: false
-          required: [messages]
-          properties:
-            messages:
-              type: array
-              minItems: 1
-              items: { $ref: '#/components/schemas/Message' }
+      type: object
+      additionalProperties: false
+      required: [threadId, resource, title, status, createdAt, updatedAt, messageCount, messages]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        threadId: { $ref: '#/components/schemas/StableId' }
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        status: { type: string, enum: [open, closed] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        messageCount: { type: integer, minimum: 1 }
+        messages:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Message' }
     ThreadPage:
       type: object
       additionalProperties: false
@@ -853,6 +901,7 @@ components:
       additionalProperties: false
       required: [disposition, intentId, thread]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         disposition: { $ref: '#/components/schemas/CommandDisposition' }
         intentId: { $ref: '#/components/schemas/StableId' }
         thread: { $ref: '#/components/schemas/Thread' }
@@ -861,6 +910,7 @@ components:
       additionalProperties: false
       required: [disposition, intentId, message]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         disposition: { $ref: '#/components/schemas/CommandDisposition' }
         intentId: { $ref: '#/components/schemas/StableId' }
         message: { $ref: '#/components/schemas/Message' }
@@ -869,6 +919,7 @@ components:
       additionalProperties: false
       required: [disposition, intentId, attachment]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         disposition: { $ref: '#/components/schemas/CommandDisposition' }
         intentId: { $ref: '#/components/schemas/StableId' }
         attachment: { $ref: '#/components/schemas/Attachment' }
@@ -883,6 +934,7 @@ components:
       additionalProperties: false
       required: [intentId, state, operation]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         intentId: { $ref: '#/components/schemas/StableId' }
         state: { type: string, const: not_found }
         operation: { $ref: '#/components/schemas/Operation' }
@@ -891,6 +943,7 @@ components:
       additionalProperties: false
       required: [intentId, state, operation, retryAfterSeconds, automaticWriteAllowed]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         intentId: { $ref: '#/components/schemas/StableId' }
         state: { type: string, const: pending }
         operation: { $ref: '#/components/schemas/Operation' }
@@ -901,6 +954,7 @@ components:
       additionalProperties: false
       required: [intentId, state, operation, stableResultId]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         intentId: { $ref: '#/components/schemas/StableId' }
         state: { type: string, const: completed }
         operation: { $ref: '#/components/schemas/Operation' }
@@ -910,6 +964,7 @@ components:
       additionalProperties: false
       required: [intentId, state, operation, detail, automaticWriteAllowed, retryDirective]
       properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
         intentId: { $ref: '#/components/schemas/StableId' }
         state: { type: string, const: repair_required }
         operation: { $ref: '#/components/schemas/Operation' }

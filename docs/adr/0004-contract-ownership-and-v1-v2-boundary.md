@@ -74,7 +74,7 @@ integration ownerだけが次を最終編集する。
 ## 却下した選択肢
 
 - v1 OpenAPIをその場で汎用化する: 既存consumerとsecurity boundaryを破壊するため採用しない。
-- provider内部参照をopaque stringとしてbrowserへ返す: opaqueでもIDORとprovider binding漏洩を防げないため採用しない。
+- provider内部参照をopaque stringとしてbrowserへ返す: opaqueでもIDORとprovider binding漏洩を防げないため採用しない。2026-09-07のADR 0005で、独立鍵による認証付き暗号化・scope binding・毎回の再認可を備えた参照だけを例外として採用した。
 - 各packageに似たport型を手書きする: 並列laneで意味論が分岐するため採用しない。
 - v1 facadeだけ認可を省略する: v2認可の迂回路になるため採用しない。
 

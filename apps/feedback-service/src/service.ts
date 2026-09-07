@@ -1,3 +1,4 @@
+import { createThreadReferencePort, parseThreadReferenceKeyRing } from "./thread-reference.js";
 import type { FeedbackRepositoryPort } from "@geibee/feedback-connector-sdk";
 import type { FeedbackProviderProfileV2 } from "@geibee/feedback-contracts/v2/server";
 import {
@@ -66,6 +67,7 @@ export function createFeedbackService(input: {
         participantPrincipal: participantByAccess.get(resolution.access) ?? null
       })
     } : {}),
+    threadReferences: createThreadReferencePort({ secretResolver: input.configuration.secretResolver, audience: JSON.stringify([input.configuration.settings.serviceId, input.expectedOrigin, input.basePath ?? "/internal/feedback/v2"]) }),
     projectionVerifier: input.projectionVerifier
   });
   const handle = createFeedbackHttpHandler({
@@ -103,6 +105,7 @@ export function createFeedbackService(input: {
             secret: providerCredential,
             customValidator: input.providerCredentialValidator
           });
+          if (profile.secretRefs.threadReferenceKeyRing) parseThreadReferenceKeyRing(await input.configuration.secretResolver.resolve(profile.secretRefs.threadReferenceKeyRing.id));
           validateSigningKeyRing(
             await input.configuration.secretResolver.resolve(profile.secretRefs.envelopeKeyRing.id),
             "Envelope key ring"

@@ -65,6 +65,27 @@ const revisionIntentId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5005";
 const revisionId = "018f0f58-c3d1-7a2b-8a4f-4c09571e5006";
 
 describe("Redmine production Connector", () => {
+  it("作成時の検証済み参照を返し、検索障害中でも直接read／reply／revision／回収する", async () => {
+    const provider = new MemoryRedmine();
+    const connector = repository(provider);
+    expect(connector.supportsThreadReferences).toBe(true);
+    let threadRef: { providerKey: string; objectId: string } | undefined;
+    await connector.createThread({ ...scope, command: createCommand() }, { onThreadResolved: (ref) => { threadRef = ref; } });
+    expect(threadRef).toEqual({ providerKey: "redmine", objectId: String(provider.onlyIssue().id) });
+    provider.searchIssues = async () => { throw new Error("検索は禁止"); };
+    const options = { threadRef: threadRef! };
+    expect(await connector.findThreadCandidatesById({ ...scope, threadId }, options)).toHaveLength(1);
+    await expect(connector.reply({ ...scope, threadId, command: {
+      intentId: replyIntentId, requestHash: requestHash(replyIntentId), messageId, body: "返信"
+    } }, options)).resolves.toMatchObject({ disposition: "created" });
+    await expect(connector.appendRevision({ ...scope, threadId, messageId, command: {
+      intentId: revisionIntentId, requestHash: requestHash(revisionIntentId), revisionId, expectedRevisionId: messageId, body: "改訂"
+    } }, options)).resolves.toMatchObject({ message: { body: "改訂" } });
+    await expect(connector.recoverIntent({ ...scope, threadId, intentId: createIntentId, requestHash: createCommand().requestHash,
+      operation: "feedback:create" }, options)).resolves.toMatchObject({ state: "completed" });
+    await expect(connector.findThreadCandidatesById({ ...scope, threadId: messageId }, options)).rejects.toMatchObject({ code: "feedback.integrity_error" });
+  });
+
   it("未検証v1編集でv2の本文と所有者を上書きしない", async () => {
     const provider = new MemoryRedmine();
     const connector = repository(provider);

@@ -79,6 +79,10 @@ for (const provider of ["jira-cloud", "redmine"] as const) {
         clickNamed(renderer, "証跡を撮影");
         await waitFor(() => expect(harness.calls.filter((call) => call.method === "uploadAttachment")).toHaveLength(1));
         expect(harness.uploadedSource).toBe(harness.fileSource);
+        for (const call of harness.calls.filter((item) => ["getThread", "reply", "appendRevision", "uploadAttachment"].includes(item.method))) {
+          expect(call.threadReference).toBe("ftr1.k.a.b.c");
+        }
+        expect(document.body.textContent).not.toContain("ftr1.k.a.b.c");
         expect(harness.uploadedBytes).toEqual(new Uint8Array([99, 97, 112, 116, 117, 114, 101]));
       });
     }
@@ -210,7 +214,7 @@ function snapshot(provider: Provider): FeedbackControllerSnapshot {
 }
 
 type ClientPort = FeedbackControllerRuntimeDependencies["client"];
-type ClientCall = { method: keyof ClientPort; query: unknown };
+type ClientCall = { method: keyof ClientPort; query: unknown; threadReference?: string };
 
 function createProviderHarness(provider: Provider) {
   const scope = {
@@ -229,8 +233,8 @@ function createProviderHarness(provider: Provider) {
   let uploadedSource: unknown;
   let uploadedBytes = new Uint8Array();
   let pendingCreate: { intentId: string; requestHash: string; threadId: string } | null = null;
-  let currentThread = acceptanceThread(provider, ownMessageId);
-  const record = (method: keyof ClientPort, query: unknown) => { calls.push({ method, query }); };
+  let currentThread = { ...acceptanceThread(provider, ownMessageId), threadReference: "ftr1.k.a.b.c" };
+  const record = (method: keyof ClientPort, query: unknown, options?: { threadReference?: string }) => { calls.push({ method, query, ...(options?.threadReference ? { threadReference: options.threadReference } : {}) }); };
   const client: ClientPort = {
     async issueParticipant(query) {
       record("issueParticipant", query);
@@ -253,8 +257,8 @@ function createProviderHarness(provider: Provider) {
       const { messages: _messages, ...summary } = currentThread;
       return { items: [summary], nextCursor: null };
     },
-    async getThread(query) {
-      record("getThread", query);
+    async getThread(query, options) {
+      record("getThread", query, options);
       return currentThread;
     },
     async createThread(query) {
@@ -291,8 +295,8 @@ function createProviderHarness(provider: Provider) {
         stableResultId: pendingCreate.threadId
       };
     },
-    async reply(query) {
-      record("reply", query);
+    async reply(query, options) {
+      record("reply", query, options);
       const message = {
         messageId: query.command.messageId,
         body: query.command.body,
@@ -315,8 +319,8 @@ function createProviderHarness(provider: Provider) {
       currentThread = { ...currentThread, messages: [...currentThread.messages, message], messageCount: currentThread.messageCount + 1 };
       return { disposition: "created", intentId: query.command.intentId, message };
     },
-    async appendRevision(query) {
-      record("appendRevision", query);
+    async appendRevision(query, options) {
+      record("appendRevision", query, options);
       const existing = currentThread.messages.find((message) => message.messageId === query.messageId)!;
       const revision = {
         revisionId: query.command.revisionId,
@@ -331,8 +335,8 @@ function createProviderHarness(provider: Provider) {
       };
       return { disposition: "created", intentId: query.command.intentId, message };
     },
-    async uploadAttachment(query) {
-      record("uploadAttachment", query);
+    async uploadAttachment(query, options) {
+      record("uploadAttachment", query, options);
       uploadedSource = query.source;
       const chunks: Uint8Array[] = [];
       for await (const chunk of query.source.stream()) chunks.push(chunk);
@@ -349,8 +353,8 @@ function createProviderHarness(provider: Provider) {
         }
       };
     },
-    async getAttachment(query) {
-      record("getAttachment", query);
+    async getAttachment(query, options) {
+      record("getAttachment", query, options);
       return { filename: "unused", contentType: "text/plain", sizeBytes: 0, body: emptyBody() };
     }
   };

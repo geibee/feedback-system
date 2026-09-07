@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- 有効なv2 Envelopeに束縛した直接参照へ対応した。Redmine v1と参照なし経路の互換性は維持する。
+
 ## 未リリース - 2026-09-06
 
 - 未検証v1 journalからv2 messageへの上書きを禁止し、reply／revisionの正規化と署名hashを統一した。既知の初期本文をhashで束縛し、hashのないprovider本文を本人へ昇格しない。現行Redmine v1単独版は変更しない。

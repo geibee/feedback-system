@@ -51,7 +51,7 @@ const createRequestHash = calculateFeedbackCommandHash({
 const evidence = {
   schemaVersion: "1",
   kind: "backlog-stage-a-live-acceptance",
-  contractVersion: "2.0.0-alpha.2",
+  contractVersion: "2.0.0-alpha.3",
   implementationDigest: implementationDigest(),
   executedAt: new Date().toISOString(),
   api: "Backlog API v2",

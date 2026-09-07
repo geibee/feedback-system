@@ -158,6 +158,17 @@ async function dispatch(
     authenticatedSubjectId: context.authenticatedSubjectId,
     signal
   });
+  const reference = request.headers.get("x-feedback-thread-reference");
+  const accept = request.headers.get("x-feedback-accept-thread-reference");
+  if (accept !== null && accept !== "1") throw invalid("参照拡張headerが不正です");
+  if (reference !== null) {
+    if (!["thread", "reply", "revision", "upload", "download", "intent"].includes(route.kind) ||
+        reference.length > 8192 || !/^ftr1\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(reference)) {
+      throw invalid("thread参照headerが不正です");
+    }
+    access.threadReference = reference;
+  }
+  access.acceptThreadReferences = accept === "1";
   const participant = await resolveAndBindParticipant(
     request,
     route,
@@ -242,6 +253,8 @@ async function dispatch(
       bearerToken: bearerToken(request.headers.get("authorization")),
       authenticatedSubjectId: context.authenticatedSubjectId, signal
     });
+    readAccess.threadReference = access.threadReference;
+    readAccess.acceptThreadReferences = access.acceptThreadReferences;
     dependencies.bindParticipant?.({ access: readAccess, principal: participant });
     const thread = await dependencies.gateway.getThread({
       profileId: route.profileId,

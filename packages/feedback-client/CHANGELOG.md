@@ -1,5 +1,9 @@
 # Changelog
 
+## 未リリース - 2026-09-07
+
+- 暗号化threadReferenceのopt-inと個別操作header伝播を追加し、command hash・URLへ含めない。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - frozen v2 OpenAPIを`FeedbackClientPort`へ写像するgeneric HTTP／fetch transportを実装した。

@@ -117,12 +117,23 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
     };
   }
 
+  readonly supportsThreadReferences = true as const;
+
   async findThreadCandidatesById(
     query: FeedbackRepositoryScope & { threadId: string },
     options?: FeedbackRepositoryOptions
   ): Promise<FeedbackProjectionCandidate[]> {
     this.assertScope(query);
     assertUuid(query.threadId, "threadId");
+    if (options?.threadRef) {
+      this.assertProviderRef({ providerRef: options.threadRef } as FeedbackProjectionCandidate);
+      const issue = await this.client.getIssue(options.threadRef.objectId, options.signal);
+      if (String(issue.id) !== options.threadRef.objectId) throw integrity("参照先が別ticketへ変わりました");
+      await this.assertBoundEnvelope(parseBlock(issue.description, backlogMarkerNames.envelope), query, issue.id);
+      const projection = projectionFromIssue(issue, this.config);
+      if (!projectionMatches(projection, query) || projection.threadId !== query.threadId) throw integrity("参照先のprojection bindingが不正です");
+      return [{ providerRef: providerRef(issue), projection }];
+    }
     const issues = await this.searchAll({
       customFieldId: this.config.customFieldIds.threadId,
       value: query.threadId,
@@ -195,6 +206,7 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
       const reread = await this.client.getIssue(created.id, options?.signal);
       const projection = projectionFromIssue(reread, this.config);
       const record = await this.readCandidate({ providerRef: providerRef(reread), projection }, options);
+      options?.onThreadResolved?.(record.providerRef);
       return { disposition: "created", intentId: query.command.intentId, thread: record.thread };
     } catch (error) {
       if (!recoverableMetadataFailure(error)) throw error;
@@ -313,11 +325,13 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
     const envelope = parseBlock(issue.description, backlogMarkerNames.envelope);
     if (envelope) {
       await this.assertBoundEnvelope(envelope, query, issue.id);
+      options?.onThreadResolved?.(providerRef(issue));
       return completed(query.intentId, query.operation, query.threadId);
     }
     await this.bindEnvelope(issue, query, seed, options);
     const reread = await this.client.getIssue(issue.id, options?.signal);
     await this.assertBoundEnvelope(parseBlock(reread.description, backlogMarkerNames.envelope), query, issue.id);
+    options?.onThreadResolved?.(providerRef(issue));
     return completed(query.intentId, query.operation, query.threadId);
   }
 
@@ -363,6 +377,7 @@ class FeedbackBacklogConnector implements FeedbackRepositoryPort {
     const issue = await this.client.getIssue(candidates[0]!.providerRef.objectId, options?.signal);
     const envelope = parseBlock(issue.description, backlogMarkerNames.envelope);
     await this.assertBoundEnvelope(envelope, query, issue.id);
+    options?.onThreadResolved?.(providerRef(issue));
     return { issue, envelope };
   }
 

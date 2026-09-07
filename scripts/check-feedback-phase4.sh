@@ -69,6 +69,10 @@ test_packages=(
   @geibee/feedback-web-component
   @geibee/feedback-redmine-react
 )
+# v1互換rendererは共通capture／UIの公開dist型を参照する。clean checkoutでは
+# consumerのtypecheck前に、Phase 1で固定した依存DAG順で生成する。
+npm --workspace @geibee/feedback-dom-capture run build
+npm --workspace @geibee/feedback-react-ui run build
 for package_name in "${test_packages[@]}"; do
   echo "[feedback-phase4-package] $package_name"
   npm --workspace "$package_name" run typecheck

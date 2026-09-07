@@ -1,0 +1,58 @@
+name: Feedback System verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: feedback-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify 結果集約
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Sourceを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Node.jsを準備
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Trivyを準備
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.70.0
+          cache: true
+
+      - name: 検証toolを準備
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ripgrep skopeo
+
+      - name: 正規品質ゲート
+        run: bash scripts/verify-feedback.sh
+
+  nightly:
+    name: nightly 結果集約
+    needs: verify
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: 正規品質ゲート結果を集約
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: test "$VERIFY_RESULT" = success

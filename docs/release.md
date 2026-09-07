@@ -15,6 +15,7 @@ npm version "${FEEDBACK_RELEASE_VERSION}" \
 ```
 
 変更した契約とpackageの`CHANGELOG.md`を更新し、version変更をPRでmainへmergeします。
+PRでは`.github/workflows/verify-feedback.yml`がskip指定なしの正規品質ゲートを実行し、branch rulesの`verify 結果集約`と`nightly 結果集約`を更新します。後者は独立した検証の代替ではなく、同じ正規品質ゲートの完了状態を集約する必須contextです。いずれかが未起動、skip、失敗のPRはmergeしません。定時実行でも同じ正規品質ゲートを再実行します。
 
 ## 2. 品質ゲートを通す
 

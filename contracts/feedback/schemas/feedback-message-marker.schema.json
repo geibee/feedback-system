@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-message-marker.v2.json",
+  "title": "FeedbackMessageMarkerV2",
+  "description": "親threadのprovider bindingへ束縛する署名付きmessage marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "threadId", "eventId", "eventKind", "messageId", "intentId", "requestHash", "participantId", "bodyHash", "providerBinding", "createdAt", "signature"],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "threadId": { "type": "string", "format": "uuid" },
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventKind": { "enum": ["reply", "revision"] },
+    "messageId": { "type": "string", "format": "uuid" },
+    "expectedRevisionId": { "type": "string", "format": "uuid" },
+    "intentId": { "type": "string", "format": "uuid" },
+    "requestHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "participantId": { "type": "string", "format": "uuid" },
+    "bodyHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "providerBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "installationId", "objectId"],
+      "properties": {
+        "profileId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "installationId": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "objectId": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "kid", "value"],
+      "properties": {
+        "alg": { "const": "HS256" },
+        "kid": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+        "value": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "eventKind": { "const": "revision" } }, "required": ["eventKind"] },
+      "then": { "required": ["expectedRevisionId"] },
+      "else": { "not": { "required": ["expectedRevisionId"] } }
+    }
+  ]
+}

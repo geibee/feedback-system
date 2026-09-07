@@ -2,6 +2,8 @@
 
 ## 1.0.0-alpha.7 - 2026-08-30
 
+- v2 dual-write ticketのUUIDv7／UUIDv8識別子をgateway transportで受理するようにしました。
+- plugin／controllerの破棄後に遅延gateway、storage fallback、dynamic import、state purgeからhost callbackや副作用が発生しないようにした。
 - runtime JSONまたは直接integration optionから管理者案内を表示できるようにし、runtime loaderではJSONを唯一の設定源にしました。
 - Gatewayの任意issue項目・priority選択肢を取得して投稿payloadへ渡すtransportを追加しました。
 

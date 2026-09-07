@@ -1,0 +1,35 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-thread-search-miss",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/search/jql",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "context": {
+    "writeResponseLost": true,
+    "providerIssueIdKnown": false,
+    "searchTiming": "immediately-after-write"
+  },
+  "request": {
+    "jql": "project = \"FB\" AND issue.property['com.geibee.feedback.recovery.v2'].threadId = \"0191f34b-3a4e-7f61-8ba4-1f4f96774919\"",
+    "maxResults": 2,
+    "properties": [
+      "com.geibee.feedback.recovery.v2"
+    ]
+  },
+  "providerResult": {
+    "issues": [],
+    "isLast": true
+  },
+  "expectedConnectorDecision": {
+    "state": "pending",
+    "automaticRecreate": false,
+    "reason": "JQLはread-after-write整合を既定で保証せず、issue ID不明のためreconcileIssuesを使用できない"
+  },
+  "requiresLiveConfirmation": [
+    "property indexの反映遅延分布",
+    "issue ID不明時の運用上の回収上限"
+  ]
+}

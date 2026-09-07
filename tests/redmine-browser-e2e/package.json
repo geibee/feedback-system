@@ -1,14 +1,15 @@
 {
   "name": "@geibee/redmine-browser-e2e",
-  "version": "1.0.0-alpha.7",
-  "description": "SPA同梱Feedback Redmine pluginのbrowser lifecycle smoke",
+  "version": "1.0.0-rc.1",
+  "description": "Feedback rendererとRedmine pluginのbrowser lifecycle smoke",
   "private": true,
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test src/plugin-smoke.test.mjs",
     "build": "tsc -p tsconfig.json --noEmit",
-    "test:plugin:chrome": "node src/plugin-browser-smoke.mjs"
+    "test:plugin:chrome": "node src/plugin-browser-smoke.mjs",
+    "test:renderer:chrome": "node src/renderer-browser-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

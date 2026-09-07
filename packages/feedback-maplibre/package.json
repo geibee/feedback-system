@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-maplibre",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-rc.1",
   "description": "MapLibre向けフィードバックtarget変換とpin lifecycle adapter",
   "private": true,
   "type": "module",
@@ -27,8 +27,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-alpha.7",
-    "@geibee/feedback-core": "1.0.0-alpha.7"
+    "@geibee/feedback-contracts": "1.0.0-rc.1",
+    "@geibee/feedback-core": "1.0.0-rc.1"
   },
   "peerDependencies": {
     "maplibre-gl": ">=5.0.0 <6"

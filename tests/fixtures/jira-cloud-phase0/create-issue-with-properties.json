@@ -1,0 +1,39 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-create-request-candidate",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/issue",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "request": {
+    "fields": {
+      "project": {
+        "key": "FB"
+      },
+      "issuetype": {
+        "id": "10001"
+      },
+      "summary": "合成Feedback"
+    },
+    "properties": [
+      {
+        "key": "com.geibee.feedback.recovery.v2",
+        "value": {
+          "threadId": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+          "intentId": "74cb2662-2467-43f4-a506-bebc65e45e8c",
+          "requestHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    ]
+  },
+  "expectedConnectorDecision": {
+    "singleProviderRequestContainsRecoveryMetadata": true,
+    "capability": "requires-live-confirmation"
+  },
+  "requiresLiveConfirmation": [
+    "Create issues権限だけで作成時property同梱が成功すること",
+    "issueとpropertyの障害時commit境界"
+  ]
+}

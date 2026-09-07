@@ -163,11 +163,13 @@ export function createRedmineFeedbackPluginControllerInternal(
       };
     },
     async purgeLocalState() {
+      if (permanentlyDestroyed) return;
       try {
         const storage = await importStorage();
+        if (permanentlyDestroyed) return;
         storage.purgeBrowserClientState({ profileId: options.profileId });
       } catch (error) {
-        notifyUnavailable(error);
+        if (!permanentlyDestroyed) notifyUnavailable(error);
       }
     },
     destroy() {

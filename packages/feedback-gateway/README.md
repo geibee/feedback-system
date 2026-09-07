@@ -1,0 +1,7 @@
+# @geibee/feedback-gateway
+
+Feedback Service process内で使用するapplication／authorization／profile／projection検証portです。Phase 3では3 modeの固定selector、権限積集合、workspace／resource discovery、command／intent回収、projection候補の直接再読込までをapplication serviceとして実装しました。
+
+Authorization Adapterはprofileに固定した一つのmodeだけを実行します。決定、immutable profile policy、backend capabilityの積集合を超える許可や、失敗時の別mode fallbackを許しません。
+
+projectionは候補抽出専用です。候補ごとにproviderを直接再読込し、注入されたverifierでEnvelope署名、provider binding、scopeを検証してから返します。候補0件はnot found、複数件はintegrity errorでfail-closedにします。

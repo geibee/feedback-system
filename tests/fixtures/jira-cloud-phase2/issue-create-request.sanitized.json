@@ -1,0 +1,32 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-v3-create-issue-first-write",
+  "request": {
+    "fields": {
+      "project": { "key": "TEST" },
+      "issuetype": { "id": "10000" },
+      "summary": "[feedback-phase2] synthetic recovery",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "synthetic contract spike" }] }]
+      }
+    },
+    "properties": [{
+      "key": "com.geibee.feedback.recovery.v2",
+      "value": {
+        "schemaVersion": "2",
+        "threadId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5001",
+        "intentId": "018f0f58-c3d1-7a2b-8a4f-4c09571e5002",
+        "requestHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "scope": { "workspaceId": "TEST", "resource": { "kind": "record", "key": "synthetic-001" } },
+        "state": "recovery-seed"
+      }
+    }]
+  },
+  "expected": {
+    "singleProviderWrite": true,
+    "storedTogether": ["threadId", "intentId", "requestHash"],
+    "seedTrust": "untrusted-candidate-until-bound-envelope-verification"
+  }
+}

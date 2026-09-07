@@ -1,4 +1,4 @@
-name: Feedback Redmine release
+name: Feedback System release
 
 on:
   push:
@@ -82,6 +82,8 @@ jobs:
         run: |
           mkdir release
           mkdir release-npmjs
+          mkdir release-service
+          bash scripts/build-feedback-service-release.sh --output release-service --version "$RELEASE_VERSION"
           bash scripts/build-feedback-redmine-release.sh --output release --version "$RELEASE_VERSION"
           bash scripts/build-feedback-redmine-release.sh --output release-npmjs --version "$RELEASE_VERSION" --npm-only
 
@@ -98,7 +100,7 @@ jobs:
               echo "同じtagの公開済みReleaseが既に存在します: $RELEASE_TAG" >&2
               exit 1
             }
-            gh release upload "$RELEASE_TAG" release/* --clobber
+            gh release upload "$RELEASE_TAG" release/* release-service/* --clobber
           else
             if ! grep -q 'HTTP 404' "$release_error"; then
               cat "$release_error" >&2
@@ -107,7 +109,7 @@ jobs:
             fi
             release_flags=(--draft --verify-tag --generate-notes)
             if [[ "$RELEASE_VERSION" == *-* ]]; then release_flags+=(--prerelease); fi
-            gh release create "$RELEASE_TAG" release/* "${release_flags[@]}"
+            gh release create "$RELEASE_TAG" release/* release-service/* "${release_flags[@]}"
           fi
 
       - name: 公開automationを取得
@@ -151,6 +153,17 @@ jobs:
           --input release
           --version "$RELEASE_VERSION"
           --tag "$RELEASE_DIST_TAG"
+
+      - name: Feedback Service runtimeをGHCRへ公開
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: >-
+          bash scripts/publish-feedback-service-release.sh
+          --input release-service
+          --version "$RELEASE_VERSION"
 
       - name: GitHub Releaseを公開
         env:

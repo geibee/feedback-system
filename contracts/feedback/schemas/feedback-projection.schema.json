@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-projection.v2.json",
+  "title": "FeedbackProjectionV2",
+  "description": "候補抽出専用の未信頼projection。単独では返却・認可・回復完了の根拠にしない",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "threadId", "intentId", "requestHash", "profileId", "workspaceId", "resource"],
+  "properties": {
+    "schemaVersion": { "const": "2" },
+    "threadId": { "type": "string", "format": "uuid" },
+    "intentId": { "type": "string", "format": "uuid" },
+    "requestHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "profileId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "key": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  }
+}

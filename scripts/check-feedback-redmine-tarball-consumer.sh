@@ -19,6 +19,9 @@ vite_version=8.2.1
 mkdir -p "$tarball_dir" "$feedback_npm_cache"
 packages=(
   @geibee/feedback-contracts
+  @geibee/feedback-client
+  @geibee/feedback-controller
+  @geibee/feedback-react
   @geibee/feedback-core
   @geibee/feedback-dom-capture
   @geibee/feedback-react-ui

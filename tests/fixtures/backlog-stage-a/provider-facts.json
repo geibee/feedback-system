@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "backlog-stage-a-provider-facts.v1",
+  "connectorKey": "backlog",
+  "checkedAt": "2026-09-02",
+  "api": "Backlog API v2",
+  "observation": {
+    "officialDocumentationReviewed": true,
+    "liveSpaceObserved": false,
+    "credentialAvailable": false,
+    "syntheticValuesOnly": true
+  },
+  "hardGate": {
+    "status": "pending",
+    "passed": false,
+    "blockingChecks": [
+      "create requestのdescriptionと3 custom fieldが同時に保存されること",
+      "Text custom field検索の一致規則、pagination、read-after-write可視性",
+      "response喪失後にthreadIdだけから一意候補を再解決できること",
+      "comment本文markerの完全なround-tripとresponse喪失後のpagination回収",
+      "一時attachment uploadとcommentへのattachの障害境界",
+      "別processからprovider以外の操作状態なしで再解決できること"
+    ]
+  },
+  "authorization": {
+    "selectedModeForSpike": "signed-grant",
+    "modeFallback": false,
+    "providerCredentialSource": "server-secret",
+    "credentialWireCandidate": {
+      "kind": "api-key-header",
+      "header": "Backlog-API-Key",
+      "queryParameterAllowedByProviderButForbiddenByConnector": "apiKey"
+    },
+    "feedbackServiceState": []
+  },
+  "canonicalDataLocations": {
+    "threadAndFirstMessage": "issue.descriptionの署名済みFeedback Envelope",
+    "threadRecoveryProjection": "issue作成と同じrequestの3 Text custom field",
+    "replies": "comment.contentの署名済みFeedback Envelope",
+    "revisions": "append-only comment.contentの署名済みrevision Envelope",
+    "evidenceBinary": "Backlog issue attachment",
+    "attachmentMetadata": "attachmentを関連付けるcomment.contentの署名済みmapping",
+    "operationRecoveryMetadata": "issue custom fieldまたはcomment.contentの署名済みmarker"
+  },
+  "firstThreadWrite": {
+    "method": "POST",
+    "path": "/api/v2/issues",
+    "contentType": "application/x-www-form-urlencoded",
+    "bodyField": "description",
+    "recoveryFields": [
+      {
+        "logicalName": "threadId",
+        "formName": "customField_900001",
+        "customFieldType": "Text"
+      },
+      {
+        "logicalName": "intentId",
+        "formName": "customField_900002",
+        "customFieldType": "Text"
+      },
+      {
+        "logicalName": "requestHash",
+        "formName": "customField_900003",
+        "customFieldType": "Text"
+      }
+    ],
+    "requestCandidate": {
+      "projectId": 5,
+      "summary": "合成Feedback",
+      "description": "合成Feedback本文\n\n[feedback-envelope:v2]\n<署名済みEnvelope>\n[/feedback-envelope]",
+      "issueTypeId": 2,
+      "priorityId": 3,
+      "customField_900001": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+      "customField_900002": "74cb2662-2467-43f4-a506-bebc65e45e8c",
+      "customField_900003": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "singleProviderRequestSupportedByPublishedParameters": true,
+    "transactionalCommitDocumented": false,
+    "requiresLiveConfirmation": true
+  },
+  "threadLookup": {
+    "method": "GET",
+    "path": "/api/v2/issues",
+    "queryCandidate": {
+      "projectId[]": [5],
+      "customField_900001": "0191f34b-3a4e-7f61-8ba4-1f4f96774919",
+      "count": 100,
+      "offset": 0
+    },
+    "publishedCustomFieldFilterDescription": "Keyword",
+    "connectorPostFilter": "responseのText custom field値をthreadIdと完全一致比較し、署名済みEnvelopeとscopeを検証する",
+    "zeroHitDecision": "pending",
+    "oneHitDecision": "verify-envelope-before-completed",
+    "multipleHitDecision": "repair_required",
+    "providerUniquenessConstraint": false,
+    "readAfterWriteGuaranteeDocumented": false,
+    "requiresLiveConfirmation": true
+  },
+  "operations": {
+    "create": {
+      "staticGuarantee": "best-effort",
+      "bodyAndIntentMarkerSingleWrite": true,
+      "providerBackedLookup": "eventual",
+      "automaticWriteRetry": false
+    },
+    "reply": {
+      "method": "POST",
+      "path": "/api/v2/issues/{issueIdOrKey}/comments",
+      "bodyAndIntentMarkerField": "content",
+      "staticGuarantee": "best-effort",
+      "bodyAndIntentMarkerSingleWrite": true,
+      "providerBackedLookup": "eventual",
+      "recoveryRead": "既知issueのcommentをminId/maxId、count、orderでpaginationしmarkerを検証する",
+      "automaticWriteRetry": false
+    },
+    "revision": {
+      "method": "POST",
+      "path": "/api/v2/issues/{issueIdOrKey}/comments",
+      "mapping": "既存commentを上書きせずappend-only revision commentを追加する",
+      "bodyAndIntentMarkerField": "content",
+      "staticGuarantee": "best-effort",
+      "bodyAndIntentMarkerSingleWrite": true,
+      "providerBackedLookup": "eventual",
+      "automaticWriteRetry": false
+    },
+    "attachmentUpload": {
+      "staticGuarantee": "best-effort",
+      "steps": [
+        "POST /api/v2/space/attachmentで一時attachment IDを得る",
+        "POST /api/v2/issues/{issueIdOrKey}/commentsのcontentへ署名済みmapping、attachmentId[]へ一時IDを同梱する"
+      ],
+      "bodyAndIntentMarkerSingleWrite": false,
+      "providerBackedLookup": "none",
+      "automaticBinaryRetry": false,
+      "signedProviderMapping": false,
+      "signedProviderMappingCandidate": "temporary attachment IDを署名し、最終issue attachment IDとの同一性をlive確認する",
+      "temporaryFileExpiryWhenNotAttached": "one-hour",
+      "minimumDocumentedPlanLimitBytes": 5000000,
+      "unknownInitialUploadDecision": "repair_required"
+    }
+  },
+  "provisioning": {
+    "requiredCustomFields": [
+      "feedback.threadId: Text",
+      "feedback.intentId: Text",
+      "feedback.requestHash: Text"
+    ],
+    "readinessChecks": [
+      "3 field IDが同じprojectに存在する",
+      "3 fieldがtypeId=1のTextである",
+      "設定issue typeへ3 fieldが適用される",
+      "credential主体がprojectを参照しissueとcommentを追加できる",
+      "configured attachment上限がspace plan上限以下である"
+    ],
+    "missingCustomFieldDecision": "configuration_error",
+    "fallbackToDescriptionScan": false
+  },
+  "forbiddenSupplementalState": {
+    "database": false,
+    "queue": false,
+    "persistentCache": false,
+    "objectStorage": false,
+    "uploadDirectory": false,
+    "hostDatabaseRead": false
+  },
+  "officialSources": [
+    "https://developer.nulab.com/docs/backlog/api/2/add-issue/",
+    "https://developer.nulab.com/docs/backlog/api/2/get-issue-list/",
+    "https://developer.nulab.com/docs/backlog/api/2/get-custom-field-list/",
+    "https://developer.nulab.com/docs/backlog/api/2/add-custom-field/",
+    "https://developer.nulab.com/docs/backlog/api/2/add-comment/",
+    "https://developer.nulab.com/docs/backlog/api/2/get-comment-list/",
+    "https://developer.nulab.com/docs/backlog/api/2/post-attachment-file/",
+    "https://developer.nulab.com/docs/backlog/auth/",
+    "https://developer.nulab.com/docs/backlog/rate-limit/",
+    "https://support.nulab.com/hc/en-us/articles/8683971547801-How-to-attach-files-to-issues-in-Backlog"
+  ]
+}

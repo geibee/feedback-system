@@ -1,0 +1,37 @@
+{
+  "name": "@geibee/feedback-web-component",
+  "version": "1.0.0-rc.1",
+  "description": "Headless Feedback Controller向け標準Web Componentとframework非依存plugin",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@geibee/feedback-controller": "1.0.0-rc.1"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1",
+    "typescript": "^5.6.3",
+    "vitest": "4.1.9"
+  }
+}

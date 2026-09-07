@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1",
+  "kind": "backlog-stage-b-live-conformance",
+  "contractVersion": "2.0.0-alpha.3",
+  "implementationDigest": "sha256:03f41b8111711c30cdd0e8e9fd6c8767fa55e5d20c0635c8f2d6e648502da486",
+  "executedAt": "2026-09-07T05:15:03.535Z",
+  "api": "Backlog API v2",
+  "siteType": "Backlog SaaS free trial",
+  "tenantIdentifiersRemoved": true,
+  "provisioning": {
+    "fourTextCustomFieldsReady": true,
+    "projectIssueTypePriorityReady": true
+  },
+  "capabilities": {
+    "createReplyRevisionRecoverable": true,
+    "attachmentReadUploadUnsupported": true,
+    "resourceDiscoveryUnsupported": true
+  },
+  "recovery": {
+    "zeroCreateHitPending": true,
+    "createResponseLostAfterCommit": true,
+    "createRecoveredFromProvider": true,
+    "replyResponseLostAfterCommit": true,
+    "replyRecoveredFromProvider": true,
+    "revisionResponseLostAfterCommit": true,
+    "revisionRecoveredFromProvider": true,
+    "observedDuplicateDecisionVerified": true,
+    "automaticWriteRetry": false
+  },
+  "roundtrip": {
+    "workspace": true,
+    "resourceProjection": true,
+    "body": true,
+    "reply": true,
+    "appendOnlyRevision": true,
+    "signedMetadata": true
+  },
+  "restartReconstruction": {
+    "separateProcess": true,
+    "providerObjectIdentifiersPassed": false,
+    "threadRecovered": true,
+    "intentsRecovered": true,
+    "resourceProjectionRecovered": true
+  },
+  "cleanup": "deleted-all-run-owned-issues",
+  "duplicateObservation": {
+    "observedCandidateCount": 1,
+    "recoveryState": "completed",
+    "globalUniquenessProven": false
+  },
+  "threadReference": {
+    "publicCredential": true,
+    "create": true,
+    "read": true,
+    "reply": true,
+    "revision": true,
+    "recovery": true,
+    "serviceReconstruction": true,
+    "noSearchFallback": true,
+    "tamperRejected": true,
+    "scopeRejected": true,
+    "currentAuthorization": true,
+    "duplicateTargetIsolated": true,
+    "attachment": "unsupported"
+  }
+}

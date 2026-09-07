@@ -152,6 +152,8 @@ async function createFixture() {
   await updateIssue(created.issueId, { status_id: seed.closedStatusId });
   await updateIssue(created.issueId, { notes: "notes and priority", priority_id: seed.highPriorityId });
 
+  const phase2Recovery = await createPhase2RecoveryIssue();
+
   writeFileSync(statePath, JSON.stringify({
     threadId,
     issueId: created.issueId,
@@ -160,7 +162,8 @@ async function createFixture() {
     resourceRef,
     pageKey: input.location.pageKey,
     evidenceSha256: evidence.sha256,
-    screenshotByteSize: screenshot.byteLength
+    screenshotByteSize: screenshot.byteLength,
+    phase2Recovery
   }));
   process.stdout.write(`created Redmine ${seed.version} issue ${created.issueId}\n`);
 }
@@ -229,7 +232,90 @@ async function verifyFixture() {
     `${profilePath()}/threads/${state.threadId}?resourceKind=record&resourceKey=known-thread-from-other-resource`
   ));
   assert.equal(deniedResponse.status, 404);
+  await verifyPhase2RecoveryIssue(state.phase2Recovery);
   process.stdout.write(`verified Redmine ${seed.version} reconstruction issue ${state.issueId}\n`);
+}
+
+async function createPhase2RecoveryIssue() {
+  const threadId = crypto.randomUUID();
+  const intentId = crypto.randomUUID();
+  const requestHash = `sha256:${await sha256Hex(Uint8Array.from(Buffer.from(
+    `feedback-redmine-phase2\n${threadId}\n${intentId}`,
+    "utf8"
+  )))}`;
+  const description = [
+    "Feedback recovery marker v2",
+    `threadId=${threadId}`,
+    `intentId=${intentId}`,
+    `requestHash=${requestHash}`
+  ].join("\n");
+  const ids = profile.customFieldIds;
+  const issue = {
+    project_id: profile.projectId,
+    tracker_id: profile.trackerId,
+    subject: `[Phase 2] recovery ${threadId}`,
+    description,
+    is_private: profile.isPrivate,
+    priority_id: profile.defaultPriorityId,
+    custom_fields: [
+      { id: ids.threadId, value: threadId },
+      { id: ids.requestHash, value: requestHash.slice("sha256:".length) },
+      { id: ids.applicationKey, value: profile.clientProfile.applicationKey },
+      { id: ids.environmentKey, value: profile.clientProfile.environmentKey },
+      { id: ids.externalWorkspaceKey, value: profile.clientProfile.externalWorkspaceKey },
+      { id: ids.pageKey, value: "phase2.recovery" },
+      { id: ids.hostResourceKey, value: `phase2-${threadId}` },
+      { id: ids.perspectiveCode, value: "ux" },
+      { id: ids.locator, value: "" },
+      { id: ids.submittedById, value: "00000000-0000-4000-8000-000000000007" },
+      { id: ids.submittedByName, value: "Phase 2 conformance" }
+    ]
+  };
+  const response = await fetch(`${endpoint}/issues.json`, {
+    method: "POST",
+    redirect: "error",
+    headers: { "Content-Type": "application/json", "X-Redmine-API-Key": seed.apiKey },
+    body: JSON.stringify({ issue })
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  const issueId = (await response.json()).issue.id;
+  assert(Number.isInteger(issueId));
+  return { issueId, threadId, intentId, requestHash };
+}
+
+/**
+ * @param {{ issueId: number; threadId: string; intentId: string; requestHash: string }} recovery
+ */
+async function verifyPhase2RecoveryIssue(recovery) {
+  assert(recovery && typeof recovery === "object");
+  const query = new URLSearchParams({
+    project_id: String(profile.projectId),
+    status_id: "*",
+    [`cf_${profile.customFieldIds.threadId}`]: recovery.threadId,
+    limit: "100"
+  });
+  const searchResponse = await fetch(`${endpoint}/issues.json?${query}`, {
+    headers: { "X-Redmine-API-Key": seed.apiKey }
+  });
+  assert.equal(searchResponse.status, 200, await searchResponse.clone().text());
+  const search = await searchResponse.json();
+  assert.equal(search.issues.length, 1);
+  assert.equal(search.issues[0].id, recovery.issueId);
+
+  const detailResponse = await fetch(`${endpoint}/issues/${recovery.issueId}.json`, {
+    headers: { "X-Redmine-API-Key": seed.apiKey }
+  });
+  assert.equal(detailResponse.status, 200, await detailResponse.clone().text());
+  const issue = (await detailResponse.json()).issue;
+  assert(issue.description.includes(`threadId=${recovery.threadId}`));
+  assert(issue.description.includes(`intentId=${recovery.intentId}`));
+  assert(issue.description.includes(`requestHash=${recovery.requestHash}`));
+  const fields = new Map(issue.custom_fields.map(/** @param {{ id: number; value: unknown }} field */ (field) => [
+    field.id,
+    String(field.value)
+  ]));
+  assert.equal(fields.get(profile.customFieldIds.threadId), recovery.threadId);
+  assert.equal(fields.get(profile.customFieldIds.requestHash), recovery.requestHash.slice("sha256:".length));
 }
 
 function profilePath() {

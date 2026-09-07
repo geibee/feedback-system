@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback.example/schemas/feedback-authorization.v2.json",
+  "title": "FeedbackAuthorizationContractV2",
+  "description": "signed grant claimsとremote authorization request/decisionのserver-side契約",
+  "oneOf": [
+    { "$ref": "#/$defs/SignedGrantClaimsV2" },
+    { "$ref": "#/$defs/RemoteAuthorizationRequestV2" },
+    { "$ref": "#/$defs/RemoteAuthorizationDecisionV2" }
+  ],
+  "$defs": {
+    "Operation": {
+      "type": "string",
+      "enum": [
+        "feedback:read",
+        "feedback:create",
+        "feedback:reply",
+        "feedback:revise",
+        "feedback:attachment:read",
+        "feedback:attachment:upload"
+      ]
+    },
+    "Resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "enum": ["workspace", "record", "page"] },
+        "key": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "AuthorizationTarget": {
+      "oneOf": [
+        { "$ref": "#/$defs/ProfileTarget" },
+        { "$ref": "#/$defs/WorkspaceTarget" },
+        { "$ref": "#/$defs/ResourceTarget" }
+      ]
+    },
+    "ProfileTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "profileId"],
+      "properties": {
+        "level": { "const": "profile" },
+        "profileId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "WorkspaceTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "profileId", "workspaceId"],
+      "properties": {
+        "level": { "const": "workspace" },
+        "profileId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "ResourceTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "profileId", "workspaceId", "resource"],
+      "properties": {
+        "level": { "const": "resource" },
+        "profileId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "resource": { "$ref": "#/$defs/Resource" }
+      }
+    },
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sub"],
+      "properties": { "sub": { "type": "string", "minLength": 1, "maxLength": 200 } }
+    },
+    "SignedGrantClaimsV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iss", "sub", "aud", "iat", "exp", "scope", "feedback_grant_kind", "feedback_profile_id", "feedback_workspace_id", "feedback_resource"],
+      "properties": {
+        "iss": { "type": "string", "format": "uri", "maxLength": 200 },
+        "sub": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": ".*\\S.*" },
+        "aud": { "type": "string", "pattern": "^urn:geibee:feedback-service:[a-z0-9][a-z0-9._-]{0,99}$" },
+        "iat": { "type": "integer" },
+        "exp": { "type": "integer" },
+        "nbf": { "type": "integer" },
+        "jti": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "feedback_grant_kind": { "enum": ["oidc", "token-exchange"] },
+        "feedback_profile_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "feedback_workspace_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "feedback_resource": { "$ref": "#/$defs/Resource" },
+        "azp": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "client_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "act": { "$ref": "#/$defs/Actor" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "feedback_grant_kind": { "const": "oidc" } }, "required": ["feedback_grant_kind"] },
+          "then": { "required": ["azp"] }
+        },
+        {
+          "if": { "properties": { "feedback_grant_kind": { "const": "token-exchange" } }, "required": ["feedback_grant_kind"] },
+          "then": { "required": ["client_id", "act"] }
+        }
+      ]
+    },
+    "RemoteSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "source": { "const": "authenticated-adapter" }
+      }
+    },
+    "RemoteAuthorizationRequestV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "target", "requestedOperations", "subject"],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "target": { "$ref": "#/$defs/AuthorizationTarget" },
+        "requestedOperations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Operation" }
+        },
+        "subject": { "$ref": "#/$defs/RemoteSubject" }
+      }
+    },
+    "RemoteAuthorizationDecisionV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "target", "subject", "allowedOperations"],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "target": { "$ref": "#/$defs/AuthorizationTarget" },
+        "subject": { "$ref": "#/$defs/RemoteSubject" },
+        "allowedOperations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Operation" }
+        }
+      }
+    }
+  }
+}

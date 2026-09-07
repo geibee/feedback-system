@@ -1,0 +1,28 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-thread-search-unindexed-property",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/search/jql",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "tenantProvisioning": {
+    "issuePropertyExists": true,
+    "forgeEntityPropertyModuleInstalled": false,
+    "indexedPaths": []
+  },
+  "providerResult": {
+    "category": "jql-field-not-searchable",
+    "httpStatusCandidate": 400,
+    "providerMessageCaptured": false
+  },
+  "expectedConnectorDecision": {
+    "state": "configuration_error",
+    "profileReady": false,
+    "fallbackToFullIssueScan": false
+  },
+  "requiresLiveConfirmation": [
+    "tenantが返すstatusとerror payloadの匿名化記録"
+  ]
+}

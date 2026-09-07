@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "phase1-attachment-permission-negative-v1",
+  "requiredOperation": "feedback:attachment:upload",
+  "cases": [
+    {
+      "name": "create-does-not-imply-upload",
+      "authorizationOperations": ["feedback:create"],
+      "profilePolicyOperations": ["feedback:attachment:upload"],
+      "backendOperations": ["feedback:attachment:upload"],
+      "expected": { "outcome": "deny", "status": 403, "streamReads": 0, "repositoryCalls": 0 }
+    },
+    {
+      "name": "profile-policy-cannot-be-expanded",
+      "authorizationOperations": ["feedback:attachment:upload"],
+      "profilePolicyOperations": ["feedback:create"],
+      "backendOperations": ["feedback:attachment:upload"],
+      "expected": { "outcome": "deny", "status": 403, "streamReads": 0, "repositoryCalls": 0 }
+    },
+    {
+      "name": "backend-capability-cannot-be-expanded",
+      "authorizationOperations": ["feedback:attachment:upload"],
+      "profilePolicyOperations": ["feedback:attachment:upload"],
+      "backendOperations": ["feedback:create"],
+      "expected": { "outcome": "deny", "status": 403, "streamReads": 0, "repositoryCalls": 0 }
+    },
+    {
+      "name": "three-way-intersection-allows-upload",
+      "authorizationOperations": ["feedback:attachment:upload"],
+      "profilePolicyOperations": ["feedback:attachment:upload"],
+      "backendOperations": ["feedback:attachment:upload"],
+      "expected": { "outcome": "allow", "status": 201, "maximumUploadAttempts": 1 }
+    }
+  ]
+}

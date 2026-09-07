@@ -1,0 +1,1008 @@
+openapi: 3.1.0
+info:
+  title: Feedback Gateway API
+  version: 2.0.0-alpha.3
+  description: |
+    契約済みticket管理systemを正本とする、provider非依存のFeedback API契約draft。
+    server profileごとに固定したAuthorization Modeを使用し、requestによるmode選択やfallbackを許可しない。
+    provider内部ID、URL、projection、credential、署名情報はbrowserへ公開しない。
+    profileのeffectivePermissionsはread要求単独ではなく、現在の認可・policy・backend能力の許可集合を返す。
+    自己編集はreadによる所有者確認とreviseをそれぞれ認可する。署名済み初期本文hashのない旧Envelopeは本人本文の証明に使用しない。
+    X-Feedback-Accept-Thread-Reference: 1を送った要求だけthreadReferenceを受信する。
+    参照は認可ではなく、command hashから除外する。不正・失効時の検索fallbackは禁止する。
+servers:
+  - url: /internal/feedback/v2
+    description: 業務applicationと同一originの相対path
+security:
+  - SignedGrant: []
+  - ParticipantCredential: []
+  - {}
+tags:
+  - name: Profile
+  - name: Discovery
+  - name: Thread
+  - name: Intent
+  - name: Attachment
+paths:
+  /profiles/{profileId}/participants:
+    post:
+      operationId: createFeedbackParticipant
+      x-feedback-operation: feedback.participant.create.v2
+      x-feedback-authorization-mode: public-profile
+      security: []
+      tags: [Profile]
+      summary: public-profile用participant credentialを発行する
+      description: |
+        server profileのAuthorization Modeがpublic-profileの場合だけ利用できる。
+        browser profile UUIDと配備originへcredentialを束縛し、他modeへfallbackしない。
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateParticipantRequest' }
+      responses:
+        '201':
+          description: 発行したparticipant credential
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParticipantCredentialResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}:
+    get:
+      operationId: getFeedbackProfile
+      x-feedback-operation: feedback.profile.get.v2
+      x-feedback-permission: feedback:read
+      tags: [Profile]
+      summary: 公開profileと利用可能operationを取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceIdQuery'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: 公開profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces:
+    get:
+      operationId: listFeedbackWorkspaces
+      x-feedback-operation: feedback.workspace.list.v2
+      x-feedback-permission: feedback:read
+      tags: [Discovery]
+      summary: 認可済みworkspaceを列挙する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: workspace page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspacePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/resources:
+    get:
+      operationId: listFeedbackResources
+      x-feedback-operation: feedback.resource.list.v2
+      x-feedback-permission: feedback:read
+      tags: [Discovery]
+      summary: 認可済みresource候補を列挙する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: query
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: resource page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResourcePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    get:
+      operationId: listFeedbackThreads
+      x-feedback-operation: feedback.thread.list.v2
+      x-feedback-permission: feedback:read
+      tags: [Thread]
+      summary: scope内のthreadを安定順序で取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [updated_desc, updated_asc]
+            default: updated_desc
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: thread page。cursorはquery scopeへ束縛されたopaque token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createFeedbackThread
+      x-feedback-operation: feedback.thread.create.v2
+      x-feedback-permission: feedback:create
+      tags: [Thread]
+      summary: threadと最初のmessageを作成する
+      description: 最初のprovider writeへthreadId、intentId、requestHashを同時保存する。
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateThreadCommand' }
+      responses:
+        '200':
+          description: 既存結果を回収または既適用として解決した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadCommandResult' }
+        '201':
+          description: 新規threadを作成した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadCommandResult' }
+        '202':
+          description: 結果は未確定でありintent回収が必要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntentRecoveryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    get:
+      operationId: getFeedbackThread
+      x-feedback-operation: feedback.thread.get.v2
+      x-feedback-permission: feedback:read
+      tags: [Thread]
+      summary: thread詳細を取得する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: thread詳細
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThreadResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    post:
+      operationId: replyFeedbackThread
+      x-feedback-operation: feedback.message.reply.v2
+      x-feedback-permission: feedback:reply
+      tags: [Thread]
+      summary: threadへreplyを追加する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReplyCommand' }
+      responses:
+        '200':
+          description: reply操作結果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageCommandResult' }
+        '201':
+          description: replyを作成した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageCommandResult' }
+        '202':
+          description: 結果は未確定でありintent回収が必要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntentRecoveryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/messages/{messageId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    post:
+      operationId: appendFeedbackRevision
+      x-feedback-operation: feedback.message.revise.v2
+      x-feedback-permission: feedback:revise
+      tags: [Thread]
+      summary: 自分のmessageへrevisionを追加する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/MessageId'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppendRevisionCommand' }
+      responses:
+        '200':
+          description: revision操作結果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageCommandResult' }
+        '201':
+          description: revisionを作成した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageCommandResult' }
+        '202':
+          description: 結果は未確定でありintent回収が必要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntentRecoveryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    post:
+      operationId: uploadFeedbackAttachment
+      x-feedback-operation: feedback.attachment.upload.v2
+      x-feedback-permission: feedback:attachment:upload
+      tags: [Attachment]
+      summary: 独立権限でattachmentをstream uploadする
+      description: 結果不明時に同じbinaryを自動再送しない。
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/Csrf'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [command, file]
+              properties:
+                command: { $ref: '#/components/schemas/UploadAttachmentCommand' }
+                file: { type: string, format: binary }
+            encoding:
+              command:
+                contentType: application/json; charset=utf-8
+      responses:
+        '200':
+          description: attachmentを回収または既適用として解決した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentCommandResult' }
+        '201':
+          description: attachmentを作成した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentCommandResult' }
+        '202':
+          description: 結果不明。binaryを自動再送せずintent回収または利用者確認が必要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntentRecoveryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '415': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/threads/{threadId}/attachments/{attachmentId}/content:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    get:
+      operationId: getFeedbackAttachment
+      x-feedback-operation: feedback.attachment.get.v2
+      x-feedback-permission: feedback:attachment:read
+      tags: [Attachment]
+      summary: attachmentをstream downloadする
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: attachment content
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /profiles/{profileId}/workspaces/{workspaceId}/intents/{intentId}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptThreadReference'
+      - $ref: '#/components/parameters/ThreadReference'
+    get:
+      operationId: recoverFeedbackIntent
+      x-feedback-operation: feedback.intent.recover.v2
+      x-feedback-permission: original-operation
+      tags: [Intent]
+      summary: providerを正本として操作結果を回収する
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IntentIdPath'
+        - $ref: '#/components/parameters/ThreadIdQuery'
+        - $ref: '#/components/parameters/RequestHash'
+        - name: operation
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [feedback:create, feedback:reply, feedback:revise, feedback:attachment:upload]
+        - $ref: '#/components/parameters/ResourceKind'
+        - $ref: '#/components/parameters/ResourceKey'
+      responses:
+        '200':
+          description: intent回収状態
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntentRecoveryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    SignedGrant:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: signed-grant profileだけで使用する。失敗時に他modeへfallbackしない。
+    ParticipantCredential:
+      type: apiKey
+      in: header
+      name: X-Feedback-Participant-Credential
+      description: public-profileの投稿所有確認用。実在人物の認証またはmembership証明ではない。
+  parameters:
+    AcceptThreadReference:
+      name: X-Feedback-Accept-Thread-Reference
+      in: header
+      required: false
+      schema: { type: string, const: '1' }
+      description: 参照拡張を受信可能と明示する。未設定profileでは従来応答を維持する。
+    ThreadReference:
+      name: X-Feedback-Thread-Reference
+      in: header
+      required: false
+      schema: { $ref: '#/components/schemas/ThreadReference' }
+      description: 個別thread操作・intent回収専用。作成・一覧では拒否する。失敗時の検索fallbackは禁止する。
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableKey' }
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableKey' }
+    WorkspaceIdQuery:
+      name: workspaceId
+      in: query
+      required: true
+      schema: { $ref: '#/components/schemas/StableKey' }
+    ThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableId' }
+    ThreadIdQuery:
+      name: threadId
+      in: query
+      required: true
+      schema: { $ref: '#/components/schemas/StableId' }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableId' }
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableId' }
+    IntentIdPath:
+      name: intentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/StableId' }
+    RequestHash:
+      name: X-Feedback-Request-Hash
+      in: header
+      required: true
+      schema: { $ref: '#/components/schemas/RequestHash' }
+    Csrf:
+      name: X-Feedback-CSRF
+      in: header
+      required: true
+      description: same-originのunsafe requestへ固定値を付け、browserの単純cross-origin送信を拒否する。
+      schema: { type: string, const: '1' }
+    ResourceKind:
+      name: resourceKind
+      in: query
+      required: true
+      schema: { $ref: '#/components/schemas/StableKey' }
+    ResourceKey:
+      name: resourceKey
+      in: query
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 512 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { $ref: '#/components/schemas/Cursor' }
+  responses:
+    Problem:
+      description: RFC 9457準拠の正規化error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    ThreadReference:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: '^ftr1\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+      description: 暗号化・改ざん検出付きの不透明参照。権限を付与せず、URL・ログ・command本文へ含めない。
+    StableKey:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+    StableId:
+      type: string
+      format: uuid
+    RequestHash:
+      type: string
+      pattern: '^sha256:[a-f0-9]{64}$'
+    Cursor:
+      type: string
+      minLength: 16
+      maxLength: 2048
+      description: version、query fingerprint、stable ordering boundaryへ束縛したopaque token
+    Operation:
+      type: string
+      enum:
+        - feedback:read
+        - feedback:create
+        - feedback:reply
+        - feedback:revise
+        - feedback:attachment:read
+        - feedback:attachment:upload
+    OperationGuarantee:
+      type: string
+      enum: [recoverable, best-effort, unsupported]
+    ResourceRef:
+      type: object
+      additionalProperties: false
+      required: [kind, key]
+      properties:
+        kind: { $ref: '#/components/schemas/StableKey' }
+        key: { type: string, minLength: 1, maxLength: 512 }
+    OrderingKey:
+      type: object
+      additionalProperties: false
+      required: [occurredAt, eventId]
+      properties:
+        occurredAt: { type: string, format: date-time }
+        eventId: { $ref: '#/components/schemas/StableId' }
+    WorkspaceSummary:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, displayName]
+      properties:
+        workspaceId: { $ref: '#/components/schemas/StableKey' }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    ResourceSummary:
+      type: object
+      additionalProperties: false
+      required: [resource, displayName]
+      properties:
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        displayName: { type: string, minLength: 1, maxLength: 300 }
+    CreationFieldOption:
+      type: object
+      additionalProperties: false
+      required: [value, label]
+      properties:
+        value: { type: string, minLength: 1, maxLength: 500 }
+        label: { type: string, minLength: 1, maxLength: 200 }
+    CreationField:
+      type: object
+      additionalProperties: false
+      required: [key, label, type, required]
+      properties:
+        key: { $ref: '#/components/schemas/StableKey' }
+        label: { type: string, minLength: 1, maxLength: 200 }
+        type: { type: string, enum: [text, date, select, reference] }
+        required: { type: boolean }
+        options:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/CreationFieldOption' }
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [backendOperations, discovery, operationGuarantees, creationFields, maximumAttachmentBytes, attachmentContentTypes]
+      properties:
+        backendOperations:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Operation' }
+        discovery:
+          type: object
+          additionalProperties: false
+          required: [workspaces, resources]
+          properties:
+            workspaces: { type: string, enum: [supported, unsupported] }
+            resources: { type: string, enum: [supported, unsupported] }
+        operationGuarantees:
+          type: object
+          additionalProperties: false
+          required: [create, reply, revision, attachmentUpload]
+          properties:
+            create: { $ref: '#/components/schemas/OperationGuarantee' }
+            reply: { $ref: '#/components/schemas/OperationGuarantee' }
+            revision: { $ref: '#/components/schemas/OperationGuarantee' }
+            attachmentUpload: { $ref: '#/components/schemas/OperationGuarantee' }
+        creationFields:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/CreationField' }
+        maximumAttachmentBytes: { type: integer, minimum: 0 }
+        attachmentContentTypes:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 200 }
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, profileId, displayName, capabilities, effectivePermissions]
+      properties:
+        schemaVersion: { type: string, const: '2' }
+        profileId: { $ref: '#/components/schemas/StableKey' }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        capabilities: { $ref: '#/components/schemas/Capabilities' }
+        effectivePermissions:
+          type: array
+          uniqueItems: true
+          description: 現在requestの認可結果、profile policy、backend capabilityの積集合
+          items: { $ref: '#/components/schemas/Operation' }
+        externalNavigationPath:
+          type: string
+          pattern: '^/(?!/)(?!.*(?:\\|%2[eE]|%2[fF]|%5[cC]|[?#@]))[A-Za-z0-9._~!$&''()*+,;=:/%-]{1,1023}$'
+          description: 認可付きsame-origin相対path。provider URLではない
+    ProfileResult:
+      type: object
+      additionalProperties: false
+      required: [profile]
+      properties:
+        profile: { $ref: '#/components/schemas/Profile' }
+    CreateParticipantRequest:
+      type: object
+      additionalProperties: false
+      required: [browserProfileId]
+      properties:
+        browserProfileId: { $ref: '#/components/schemas/StableId' }
+    ParticipantCredentialResult:
+      type: object
+      additionalProperties: false
+      required: [participantId, credential]
+      properties:
+        participantId: { $ref: '#/components/schemas/StableId' }
+        credential: { type: string, minLength: 32, maxLength: 8192 }
+    WorkspacePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WorkspaceSummary' }
+        nextCursor:
+          oneOf:
+            - { $ref: '#/components/schemas/Cursor' }
+            - { type: 'null' }
+    ResourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ResourceSummary' }
+        nextCursor:
+          oneOf:
+            - { $ref: '#/components/schemas/Cursor' }
+            - { type: 'null' }
+    Author:
+      oneOf:
+        - $ref: '#/components/schemas/ParticipantAuthor'
+        - $ref: '#/components/schemas/ProviderAuthor'
+        - $ref: '#/components/schemas/UnknownAuthor'
+    ParticipantAuthor:
+      type: object
+      additionalProperties: false
+      required: [kind, participantId, displayName]
+      properties:
+        kind: { type: string, const: participant }
+        participantId: { $ref: '#/components/schemas/StableId' }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        isCurrentParticipant: { type: boolean, default: false }
+    ProviderAuthor:
+      type: object
+      additionalProperties: false
+      required: [kind, displayName]
+      properties:
+        kind: { type: string, const: provider-user }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    UnknownAuthor:
+      type: object
+      additionalProperties: false
+      required: [kind, displayName]
+      properties:
+        kind: { type: string, const: unknown }
+        displayName: { type: string, const: Unknown }
+    Attachment:
+      type: object
+      additionalProperties: false
+      required: [attachmentId, filename, contentType, sizeBytes, createdAt]
+      properties:
+        attachmentId: { $ref: '#/components/schemas/StableId' }
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        contentType: { type: string, minLength: 1, maxLength: 200 }
+        sizeBytes: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+    MessageRevision:
+      type: object
+      additionalProperties: false
+      required: [revisionId, body, revisedAt, orderingKey]
+      properties:
+        revisionId: { $ref: '#/components/schemas/StableId' }
+        body: { type: string, minLength: 1, maxLength: 100000 }
+        revisedAt: { type: string, format: date-time }
+        orderingKey: { $ref: '#/components/schemas/OrderingKey' }
+    Message:
+      type: object
+      additionalProperties: false
+      required: [messageId, body, author, createdAt, orderingKey, revisions, attachments]
+      properties:
+        messageId: { $ref: '#/components/schemas/StableId' }
+        body: { type: string, minLength: 1, maxLength: 100000 }
+        author: { $ref: '#/components/schemas/Author' }
+        createdAt: { type: string, format: date-time }
+        orderingKey: { $ref: '#/components/schemas/OrderingKey' }
+        revisions:
+          type: array
+          items: { $ref: '#/components/schemas/MessageRevision' }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/Attachment' }
+    ThreadSummary:
+      type: object
+      additionalProperties: false
+      required: [threadId, resource, title, status, createdAt, updatedAt, messageCount]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        threadId: { $ref: '#/components/schemas/StableId' }
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        status: { type: string, enum: [open, closed] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        messageCount: { type: integer, minimum: 1 }
+    Thread:
+      type: object
+      additionalProperties: false
+      required: [threadId, resource, title, status, createdAt, updatedAt, messageCount, messages]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        threadId: { $ref: '#/components/schemas/StableId' }
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        status: { type: string, enum: [open, closed] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        messageCount: { type: integer, minimum: 1 }
+        messages:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Message' }
+    ThreadPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ThreadSummary' }
+        nextCursor:
+          oneOf:
+            - { $ref: '#/components/schemas/Cursor' }
+            - { type: 'null' }
+    ThreadResult:
+      type: object
+      additionalProperties: false
+      required: [thread]
+      properties:
+        thread: { $ref: '#/components/schemas/Thread' }
+    CreateThreadCommand:
+      type: object
+      additionalProperties: false
+      required: [intentId, requestHash, threadId, resource, title, body]
+      properties:
+        intentId: { $ref: '#/components/schemas/StableId' }
+        requestHash: { $ref: '#/components/schemas/RequestHash' }
+        threadId: { $ref: '#/components/schemas/StableId' }
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        body: { type: string, minLength: 1, maxLength: 100000 }
+    ReplyCommand:
+      type: object
+      additionalProperties: false
+      required: [intentId, requestHash, messageId, body]
+      properties:
+        intentId: { $ref: '#/components/schemas/StableId' }
+        requestHash: { $ref: '#/components/schemas/RequestHash' }
+        messageId: { $ref: '#/components/schemas/StableId' }
+        body: { type: string, minLength: 1, maxLength: 100000 }
+    AppendRevisionCommand:
+      type: object
+      additionalProperties: false
+      required: [intentId, requestHash, revisionId, body, expectedRevisionId]
+      properties:
+        intentId: { $ref: '#/components/schemas/StableId' }
+        requestHash: { $ref: '#/components/schemas/RequestHash' }
+        revisionId: { $ref: '#/components/schemas/StableId' }
+        body: { type: string, minLength: 1, maxLength: 100000 }
+        expectedRevisionId: { $ref: '#/components/schemas/StableId' }
+    UploadAttachmentCommand:
+      type: object
+      additionalProperties: false
+      required: [intentId, requestHash, attachmentId, filename, contentType, sizeBytes, contentHash, purpose]
+      properties:
+        intentId: { $ref: '#/components/schemas/StableId' }
+        requestHash: { $ref: '#/components/schemas/RequestHash' }
+        attachmentId: { $ref: '#/components/schemas/StableId' }
+        messageId: { $ref: '#/components/schemas/StableId' }
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        contentType: { type: string, minLength: 1, maxLength: 200 }
+        sizeBytes: { type: integer, minimum: 1 }
+        contentHash: { $ref: '#/components/schemas/RequestHash' }
+        purpose: { type: string, enum: [evidence, conversation] }
+    CommandDisposition:
+      type: string
+      enum: [created, recovered, already_applied]
+    ThreadCommandResult:
+      type: object
+      additionalProperties: false
+      required: [disposition, intentId, thread]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        disposition: { $ref: '#/components/schemas/CommandDisposition' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        thread: { $ref: '#/components/schemas/Thread' }
+    MessageCommandResult:
+      type: object
+      additionalProperties: false
+      required: [disposition, intentId, message]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        disposition: { $ref: '#/components/schemas/CommandDisposition' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        message: { $ref: '#/components/schemas/Message' }
+    AttachmentCommandResult:
+      type: object
+      additionalProperties: false
+      required: [disposition, intentId, attachment]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        disposition: { $ref: '#/components/schemas/CommandDisposition' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        attachment: { $ref: '#/components/schemas/Attachment' }
+    IntentRecoveryResult:
+      oneOf:
+        - $ref: '#/components/schemas/IntentNotFoundResult'
+        - $ref: '#/components/schemas/IntentPendingResult'
+        - $ref: '#/components/schemas/IntentCompletedResult'
+        - $ref: '#/components/schemas/IntentRepairRequiredResult'
+    IntentNotFoundResult:
+      type: object
+      additionalProperties: false
+      required: [intentId, state, operation]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        state: { type: string, const: not_found }
+        operation: { $ref: '#/components/schemas/Operation' }
+    IntentPendingResult:
+      type: object
+      additionalProperties: false
+      required: [intentId, state, operation, retryAfterSeconds, automaticWriteAllowed]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        state: { type: string, const: pending }
+        operation: { $ref: '#/components/schemas/Operation' }
+        retryAfterSeconds: { type: integer, minimum: 1, maximum: 300 }
+        automaticWriteAllowed: { type: boolean, const: false }
+    IntentCompletedResult:
+      type: object
+      additionalProperties: false
+      required: [intentId, state, operation, stableResultId]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        state: { type: string, const: completed }
+        operation: { $ref: '#/components/schemas/Operation' }
+        stableResultId: { $ref: '#/components/schemas/StableId' }
+    IntentRepairRequiredResult:
+      type: object
+      additionalProperties: false
+      required: [intentId, state, operation, detail, automaticWriteAllowed, retryDirective]
+      properties:
+        threadReference: { $ref: '#/components/schemas/ThreadReference' }
+        intentId: { $ref: '#/components/schemas/StableId' }
+        state: { type: string, const: repair_required }
+        operation: { $ref: '#/components/schemas/Operation' }
+        detail: { type: string, minLength: 1, maxLength: 1000 }
+        automaticWriteAllowed: { type: boolean, const: false }
+        retryDirective: { type: string, enum: [recover-only, manual-confirmation, do-not-write] }
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, retryable]
+      properties:
+        type: { type: string, format: uri, maxLength: 512 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        code:
+          type: string
+          enum:
+            - feedback.invalid_request
+            - feedback.unauthorized
+            - feedback.forbidden
+            - feedback.not_found
+            - feedback.conflict
+            - feedback.cursor_invalid
+            - feedback.integrity_error
+            - feedback.provider_unavailable
+            - feedback.provider_timeout
+            - feedback.authorization_unavailable
+            - feedback.rate_limited
+            - feedback.payload_too_large
+            - feedback.unsupported_media_type
+            - feedback.unsupported
+        detail: { type: string, maxLength: 1000 }
+        traceId: { type: string, minLength: 1, maxLength: 128 }
+        retryable: { type: boolean }
+        retryAfterSeconds: { type: integer, minimum: 1, maximum: 86400 }
+        conflict:
+          type: object
+          additionalProperties: false
+          properties:
+            expected: { type: string, maxLength: 200 }
+            actual: { type: string, maxLength: 200 }

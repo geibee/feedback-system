@@ -14,6 +14,14 @@ if [[ "${FEEDBACK_VERIFY_SKIP_NPM_CI:-0}" != "1" ]]; then
   npm ci --ignore-scripts --no-audit --no-fund
 fi
 
+bash scripts/check-feedback-phase0.sh
+bash scripts/check-feedback-phase1.sh
+bash scripts/check-feedback-phase2.sh
+bash scripts/check-feedback-phase3.sh
+bash scripts/check-feedback-phase4.sh
 FEEDBACK_VERIFY_SKIP_NPM_CI=1 bash scripts/verify-feedback-redmine.sh
+bash scripts/check-feedback-phase5.sh
+bash scripts/check-feedback-service-publish.sh
+bash scripts/check-feedback-service-release.sh
 
 echo "[feedback-verify] PASS"

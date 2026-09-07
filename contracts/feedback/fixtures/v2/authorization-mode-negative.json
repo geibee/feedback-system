@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "phase1-authorization-mode-negative-v1",
+  "cases": [
+    {
+      "name": "signed-grant-token-missing",
+      "configuredMode": "signed-grant",
+      "failure": "credential_missing",
+      "expected": { "outcome": "deny", "status": 401, "modeUsed": "signed-grant", "fallbackMode": null, "repositoryCalls": 0 }
+    },
+    {
+      "name": "signed-grant-unknown-kid",
+      "configuredMode": "signed-grant",
+      "failure": "unknown_kid_after_one_refresh",
+      "expected": { "outcome": "deny", "status": 401, "modeUsed": "signed-grant", "fallbackMode": null, "repositoryCalls": 0 }
+    },
+    {
+      "name": "remote-authorization-timeout",
+      "configuredMode": "remote-authorization",
+      "failure": "timeout_after_2_seconds",
+      "expected": { "outcome": "deny", "status": 504, "modeUsed": "remote-authorization", "fallbackMode": null, "repositoryCalls": 0 }
+    },
+    {
+      "name": "public-profile-with-bearer-token",
+      "configuredMode": "public-profile",
+      "failure": "extraneous_bearer_token",
+      "expected": { "outcome": "public-profile-only", "status": 200, "modeUsed": "public-profile", "fallbackMode": null, "signedGrantValidatorCalls": 0 }
+    }
+  ]
+}

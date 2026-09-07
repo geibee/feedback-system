@@ -53,6 +53,11 @@ export function createRedmineFeedbackPlugin(
   let root: Root | null = null;
   let diagnostics: RedmineDiagnosticBuffer;
   let clientState: ReturnType<typeof createBrowserClientState>;
+  let destroyed = false;
+  const notifyUnavailable = (error: unknown) => {
+    if (destroyed) return;
+    try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
+  };
   const registeredMaps = new Map<FeedbackMapLibreEvidenceMap, number>();
   const captureDiagnosticListeners = new Set<() => void>();
   const captureDiagnostics = {
@@ -98,7 +103,7 @@ export function createRedmineFeedbackPlugin(
       diagnostics
     });
     clientState = createBrowserClientState({
-      onFallback: (error) => options.onUnavailable?.(error)
+      onFallback: notifyUnavailable
     });
     root = createRoot(container);
     root.render(<RedmineFeedbackProvider runtime={{
@@ -112,7 +117,7 @@ export function createRedmineFeedbackPlugin(
       captureDiagnostics,
       submissionNotice: options.submissionNotice
     }}>
-      <RedmineFeedbackOverlay ref={overlay} onUnavailable={options.onUnavailable} />
+      <RedmineFeedbackOverlay ref={overlay} onUnavailable={notifyUnavailable} />
     </RedmineFeedbackProvider>);
     mounted.set(options.mount, { root, container });
   } catch (error) {
@@ -122,8 +127,6 @@ export function createRedmineFeedbackPlugin(
     mounted.delete(options.mount);
     throw error;
   }
-  let destroyed = false;
-
   const active = () => {
     if (destroyed) throw new Error("Feedback pluginはdestroy済みです");
   };
@@ -170,13 +173,13 @@ export function createRedmineFeedbackPlugin(
       try {
         root.unmount();
       } catch (error) {
-        try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
+        notifyUnavailable(error);
       } finally {
         container.remove();
         try {
           removeStyles();
         } catch (error) {
-          try { options.onUnavailable?.(error); } catch { /* host callbackを伝播させない。 */ }
+          notifyUnavailable(error);
         }
         mounted.delete(options.mount);
         captureDiagnosticListeners.clear();

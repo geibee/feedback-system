@@ -1,0 +1,35 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-comment-intent-multiple-hits",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "GET /rest/api/3/issue/{issueIdOrKey}/comment",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "providerIssueId": "10041",
+  "query": {
+    "intentId": "fb2f5f1d-bc22-4f21-8123-66b3f778341a"
+  },
+  "candidateComments": [
+    {
+      "id": "20071",
+      "messageId": "0191f34c-2177-7704-a355-f9be46129a60",
+      "intentId": "fb2f5f1d-bc22-4f21-8123-66b3f778341a"
+    },
+    {
+      "id": "20072",
+      "messageId": "0191f34c-2177-7704-a355-f9be46129a60",
+      "intentId": "fb2f5f1d-bc22-4f21-8123-66b3f778341a"
+    }
+  ],
+  "expectedConnectorDecision": {
+    "state": "repair_required",
+    "selectedProviderCommentId": null,
+    "automaticReply": false
+  },
+  "requiresLiveConfirmation": [
+    "comment property取得のpagination／request数",
+    "同じproperty値を持つcommentの作成可否"
+  ]
+}

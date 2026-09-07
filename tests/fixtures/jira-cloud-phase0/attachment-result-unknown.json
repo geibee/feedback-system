@@ -1,0 +1,54 @@
+{
+  "fixtureVersion": 1,
+  "kind": "jira-cloud-attachment-result-unknown",
+  "provenance": {
+    "apiVersion": "3",
+    "endpoint": "POST /rest/api/3/issue/{issueIdOrKey}/attachments",
+    "checkedAt": "2026-08-31",
+    "observedOnLiveTenant": false
+  },
+  "command": {
+    "attachmentId": "0191f34e-32c0-7ea2-a3b9-003277df46f3",
+    "intentId": "5775a23d-5231-433f-95f8-e0ef0c45da3c",
+    "providerIssueId": "10041",
+    "filename": "capture.png",
+    "mediaType": "image/png",
+    "byteLength": 4096
+  },
+  "requestContract": {
+    "multipartField": "file",
+    "xAtlassianToken": "no-check",
+    "supportsFeedbackAttachmentId": false,
+    "supportsFeedbackIntentId": false,
+    "supportsIdempotencyKey": false
+  },
+  "failure": {
+    "requestBodyMayHaveReachedProvider": true,
+    "responseReceived": false,
+    "providerAttachmentIdKnown": false
+  },
+  "ambiguousProviderCandidates": [
+    {
+      "id": "30081",
+      "filename": "capture.png",
+      "mimeType": "image/png",
+      "size": 4096
+    },
+    {
+      "id": "30082",
+      "filename": "capture.png",
+      "mimeType": "image/png",
+      "size": 4096
+    }
+  ],
+  "expectedConnectorDecision": {
+    "state": "repair_required",
+    "capability": "best-effort",
+    "automaticReupload": false,
+    "selectedProviderAttachmentId": null
+  },
+  "requiresLiveConfirmation": [
+    "同名同size attachmentを複数作成できること",
+    "複数file uploadの部分成功挙動"
+  ]
+}

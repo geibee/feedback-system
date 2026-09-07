@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.0.0-alpha.3 thread参照拡張 - 2026-09-07
+
+- ThreadのallOfとadditionalProperties=falseの矛盾を解消し、messagesを含む既存応答のschema検証を固定した。
+- opt-inのthreadReferenceと共通要求headerを追加した。旧v2の応答fieldとRedmine v1を維持する。
+- DBレス・重複排除best-effort、参照の認可非代替性、scope／audience binding、失効時のfallback禁止を固定した。
+- provider profileへ任意の独立threadReferenceKeyRingを追加し、uniqueThreadLookup=false（best-effort検索）を許可した。visible duplicate拒否は維持する。
+- HTTP client、controllerのscope別端末state／pending intent、3 Connectorの直接取得portを導入した。React／Web Componentは共通controller経由で利用する。
+
+## 未リリース - 2026-09-06 セキュリティ修正
+
+- server-only Envelopeへ任意の`initialBodyHash`を追加し、生成型を同期した。新規作成の既知本文だけを署名し、hashのない旧Envelope／first-write結果不明からの補修ではprovider本文を本人の検証済み本文へ昇格しない。
+- profileの許可集合照会と自己編集時のread／revise認可を明記した。browser wire DTOとRedmine v1契約は変更しない。
+- 旧DB保存版の互換・移行機能は提供しない。Redmine v1 ticket形式の互換はDB版とは独立して保持する。
+
+## 1.0.0-rc.1 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-02
+
+- Backlog初回release candidateは既存の公開wire／domain契約を変更せず、provider能力差を既存capabilityとoperation保証で表現した。
+- attachment read／uploadを`unsupported`として縮退し、Backlog固有DTO、credential、provider内部IDを公開契約へ追加していない。
+
+## 1.0.0-alpha.7 Feedback v2 contract 2.0.0-alpha.2 - 2026-09-01
+
+- `public-profile` browserがparticipant credentialを取得できるsame-origin発行endpointを追加した。
+- すべてのunsafe operationへ実装と同じ必須`X-Feedback-CSRF: 1` headerを明記した。
+- signed grant Bearerとpublic participant credential headerをOpenAPI security schemeへ明記した。
+- intent回収の`requestHash`はURLへ含めず、既存OpenAPIどおり`X-Feedback-Request-Hash`必須headerへ統一した。
+- 署名attachment markerへ必須`messageId`を追加し、provider attachmentをthread内messageへ束縛した。
+- `resource.key`の実装上限をOpenAPIどおり512文字へ統一した。
+
+## 1.0.0-alpha.7 Phase 2 contract freeze - 2026-08-31
+
+- v2 OpenAPIを`2.0.0-alpha.1`へ進め、intent回収のthread／resource scope、strict command DTO、provider timeout 504／unavailable 502／media type 415を固定した。
+- authorization targetをprofile／workspace／resourceへ分離し、remote authorization request／decisionを同じtargetへ束縛した。
+- message markerへreply／revision event、participant、body hashを追加し、server-only attachment mapping schemaを追加した。
+- provider profileへcreation fieldとmetadata byte上限を追加し、operation保証をprovider fixtureで固定した。
+- Jira Cloud REST v3のissue／comment／property／attachment／timeout回収をsanitized fixture化した。
+
+## 1.0.0-alpha.7 Phase 1 draft - 2026-08-31
+
+- provider非依存のFeedback Gateway v2 OpenAPIと生成型を追加した。
+- domain、Envelope、message marker、projection、provider profile、service settings、authorization schemaと生成型を追加した。
+- browser向け`./v2`とserver-only `./v2/server`を分離し、`ProviderRef`とprovider内部IDをbrowser契約へ公開しない境界を固定した。
+- workspace／resource discovery、operation別回復保証、独立attachment upload権限、typed intent回収、projection再検証のfreeze候補とnegative fixtureを追加した。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - `FeedbackHostContextV1.locale`の任意性と`FeedbackTargetV1`の5種類のunionを維持し、alpha.3〜alpha.6との公開型互換を固定した。

@@ -1,5 +1,11 @@
 # @geibee/feedback-redmine-react
 
+v2では`RedmineFeedbackControllerOverlay`を`@geibee/feedback-react`の互換wrapperとして公開します。このentry pointは
+`FeedbackControllerPort`のsnapshot購読とcommand発行だけを行い、Redmine DTO、transport、storage、pollingをrendererへ持ち込みません。
+
+既存の`RedmineFeedbackOverlay`／`RedmineFeedbackProvider`はv1互換期間中のlegacy entry pointとして維持します。v1のpackage exportと
+挙動は変更せず、v2 integrationは`RedmineFeedbackControllerOverlay`を使用します。
+
 `RedmineFeedbackPort`と端末内`ClientStatePort`を中心に構成するReact UIです。2つの起動ボタン、
 対象選択bar、右クリックmenu、独立composer／Workspace一覧／詳細drawer、pin、responsive sheetを提供します。
 DOM/画面/MapLibre位置の投稿、自動スクリーンショット添付、返信、自己編集、編集履歴、未読、deep linkを提供します。

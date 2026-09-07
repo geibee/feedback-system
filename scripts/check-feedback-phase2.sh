@@ -100,6 +100,11 @@ for package_name in "${packages[@]}"; do
   npm --workspace "$package_name" run test
 done
 
+# Redmine conformanceは公開packageのdist型をNodeNextで解決するため、clean checkoutでも
+# 前段Phaseの未追跡build出力に依存しない順序で必要な型を生成する。
+npm --workspace @geibee/feedback-core run build
+npm --workspace @geibee/feedback-redmine-core run build
+npm --workspace @geibee/feedback-redmine-gateway run build
 npm --workspace @geibee/redmine-conformance run typecheck
 
 echo "[feedback-phase2] PASS"

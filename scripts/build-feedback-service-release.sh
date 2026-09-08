@@ -66,6 +66,7 @@ output=$(cd "$output" && pwd)
 
 release_root=$(mktemp -d -t feedback-service-release.XXXXXX)
 release_builder=feedback-service-release-$$
+buildkit_image=moby/buildkit@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
 cleanup() {
   docker buildx rm "$release_builder" >/dev/null 2>&1 || true
   if [[ -d "$release_root" && "$(basename "$release_root")" == feedback-service-release.?????? ]]; then
@@ -77,16 +78,19 @@ trap cleanup EXIT
 layout="$release_root/feedback-service-runtime"
 archive="feedback-service-runtime_${version}_linux_multiarch.oci.tar"
 mkdir -p "$layout"
-docker buildx create --driver docker-container --name "$release_builder" >/dev/null
+docker buildx create --driver docker-container --driver-opt "image=$buildkit_image" \
+  --name "$release_builder" >/dev/null
 revision=$(git rev-parse HEAD)
+source_date_epoch=$(git show -s --format=%ct "$revision")
 docker buildx build \
   --builder "$release_builder" \
   --platform linux/amd64,linux/arm64 \
   --build-arg "VERSION=$version" \
   --build-arg "REVISION=$revision" \
+  --build-arg "SOURCE_DATE_EPOCH=$source_date_epoch" \
   --file apps/feedback-service-runtime/Dockerfile \
   --provenance=false \
-  --output "type=oci,dest=$layout,tar=false" \
+  --output "type=oci,dest=$layout,tar=false,rewrite-timestamp=true,compatibility-version=30" \
   .
 
 reports='[]'

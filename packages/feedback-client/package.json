@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-client",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "provider非依存Feedback browser client port契約",
   "private": true,
   "type": "module",
@@ -31,7 +31,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-rc.2"
+    "@geibee/feedback-contracts": "1.0.0-rc.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

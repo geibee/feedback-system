@@ -5,6 +5,15 @@ set -euo pipefail
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/.." && pwd))
 cd "$ROOT"
 
+grep -Fq 'SOURCE_DATE_EPOCH=$source_date_epoch' scripts/build-feedback-redmine-release.sh || {
+  echo "[feedback-redmine-release-check] FAIL: OCI build時刻がcommitへ固定されていません" >&2
+  exit 1
+}
+grep -Fq 'rewrite-timestamp=true,compatibility-version=30' scripts/build-feedback-redmine-release.sh || {
+  echo "[feedback-redmine-release-check] FAIL: OCI exporterの再現可能性設定がありません" >&2
+  exit 1
+}
+
 release_tmp=$(mktemp -d -t feedback-redmine-release-check.XXXXXX)
 npm_release_tmp=$(mktemp -d -t feedback-redmine-npm-release-check.XXXXXX)
 stale_fixture=packages/feedback-core/dist/release-stale-sentinel.js

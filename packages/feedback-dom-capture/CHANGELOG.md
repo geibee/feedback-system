@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。公開APIと実行時挙動は変更しない。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - Redmine UIで利用するDOM capture providerを追加しました。

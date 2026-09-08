@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。公開APIと実行時挙動は変更しない。
+
 ## 1.0.0-rc.1 - 2026-09-02
 
 - submit／reply／reviseの最小UIとbrowser command compositionを追加した。

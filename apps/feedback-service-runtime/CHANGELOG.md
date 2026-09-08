@@ -1,5 +1,9 @@
 # 変更履歴
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。runtime構成とprovider capabilityは変更しない。
+
 ## 未リリース - 2026-09-07
 
 - 共通参照契約alpha.3へ対応したService・Connectorを同梱する。live証跡は公開clientからService・projection・Connectorまでのsourceへ束縛する。

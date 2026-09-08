@@ -15,8 +15,8 @@ release候補はrootと全workspaceを同じversionへ揃えたsourceからmulti
 
 ```sh
 bash scripts/build-feedback-service-release.sh \
-  --output /tmp/feedback-service-1.0.0-rc.1 \
-  --version 1.0.0-rc.1
+  --output /tmp/feedback-service-1.0.0-rc.2 \
+  --version 1.0.0-rc.2
 ```
 
 standalone listenerは`public-profile`と`signed-grant`を扱う。`remote-authorization`は認証済みsubjectを供給するhost adapterが必要なため、adapterなしでは起動をfail-closedにする。任意HTTP headerをsubjectとして信頼しない。

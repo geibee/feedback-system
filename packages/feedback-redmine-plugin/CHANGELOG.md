@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。pluginのmount lifecycleと公開APIは変更しない。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - v2 dual-write ticketのUUIDv7／UUIDv8識別子をgateway transportで受理するようにしました。

@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-contracts",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Feedback v2とRedmine v1 gatewayのOpenAPI、JSON Schema、TypeScript契約",
   "private": true,
   "type": "module",

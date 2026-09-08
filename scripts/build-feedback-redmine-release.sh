@@ -72,6 +72,28 @@ packages=(
   @geibee/feedback-redmine-ops
 )
 
+# TypeScriptは削除済みsourceに対応する旧出力をdistから除去しないため、release前に
+# 公開対象workspaceの生成物だけを明示的に破棄する。これにより開発中のstale出力が
+# npm tarballへ混入せず、clean checkoutと障害復旧時のartifactが一致する。
+release_workspace_directories=(
+  contracts/feedback
+  packages/feedback-client
+  packages/feedback-controller
+  packages/feedback-react
+  packages/feedback-core
+  packages/feedback-dom-capture
+  packages/feedback-react-ui
+  packages/feedback-maplibre
+  packages/feedback-redmine-core
+  packages/feedback-redmine-react
+  packages/feedback-redmine-plugin
+  packages/feedback-redmine-gateway
+  packages/feedback-redmine-ops
+)
+for workspace_directory in "${release_workspace_directories[@]}"; do
+  rm -rf -- "$workspace_directory/dist"
+done
+
 npm run build:redmine
 
 if [[ "$npm_only" != true ]]; then

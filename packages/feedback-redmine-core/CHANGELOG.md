@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。Redmine v1互換と公開APIは変更しない。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - v2 dual-write ticketのUUIDv7／UUIDv8識別子をv1 readerでも保持できるよう、UUID検証をRFC 9562のversion範囲へ広げました。

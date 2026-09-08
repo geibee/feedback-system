@@ -2,12 +2,14 @@
 
 この文書はrelease担当者向けです。通常のreleaseはGitHub Actionsから行い、ローカルのpublish scriptは障害復旧時だけ使用します。Redmine npm／OCIに加え、Feedback Service runtime OCIを同じmonorepo versionで扱います。
 
+`1.0.0-rc.1`は障害復旧時にローカルのstale `dist`が一部npmjs artifactへ混入したため使用しない。公開対象`dist`をclean buildする`1.0.0-rc.2`以降を使用する。
+
 ## 1. versionを更新する
 
 releaseするversionを決め、rootと全workspaceへ同じ値を設定します。
 
 ```bash
-export FEEDBACK_RELEASE_VERSION='1.0.0-rc.1'
+export FEEDBACK_RELEASE_VERSION='1.0.0-rc.2'
 npm version "${FEEDBACK_RELEASE_VERSION}" \
   --workspaces \
   --include-workspace-root \
@@ -67,6 +69,7 @@ jq '{version, contractVersion, providers: .runtime.providers, backlogCapabilitie
 
 出力先が既に存在して中身がある場合、builderは停止します。別の空directoryを使ってください。
 release manifestの`sourceTreeState`が`dirty`の候補は内容確認専用です。publisherはfail-closedで拒否するため、公開workflowではcleanなtag checkoutから再生成します。
+builderは公開対象workspaceの`dist`をbuild前に削除する。障害復旧時も既存のローカルbuild出力を再利用せず、必ず同じtagからbuilderを再実行してnpmjs用artifactを生成する。GitHub Releaseへ添付されたnpm tarballはGitHub Packages用であり、npmjsへの代用はしない。
 
 ## 3. tagをpushする
 

@@ -7,6 +7,7 @@ cd "$ROOT"
 
 release_tmp=$(mktemp -d -t feedback-redmine-release-check.XXXXXX)
 npm_release_tmp=$(mktemp -d -t feedback-redmine-npm-release-check.XXXXXX)
+stale_fixture=packages/feedback-core/dist/release-stale-sentinel.js
 cleanup() {
   if [[ -d "$release_tmp" && "$(basename "$release_tmp")" == feedback-redmine-release-check.?????? ]]; then
     rm -rf -- "$release_tmp"
@@ -14,8 +15,12 @@ cleanup() {
   if [[ -d "$npm_release_tmp" && "$(basename "$npm_release_tmp")" == feedback-redmine-npm-release-check.?????? ]]; then
     rm -rf -- "$npm_release_tmp"
   fi
+  rm -f -- "$stale_fixture"
 }
 trap cleanup EXIT
+
+mkdir -p "$(dirname "$stale_fixture")"
+printf '%s\n' 'export const staleReleaseSentinel = true;' >"$stale_fixture"
 
 bash scripts/build-feedback-redmine-release.sh --output "$release_tmp" --version 1.0.0-release-check.1
 bash scripts/build-feedback-redmine-release.sh --output "$npm_release_tmp" --version 1.0.0-release-check.1 --npm-only
@@ -78,6 +83,11 @@ while IFS= read -r filename; do
   ' >/dev/null
 done < <(jq -r '.packages[].filename' "$npm_release_tmp/release-manifest.json")
 ops_filename=$(jq -r '.packages[] | select(.name == "@geibee/feedback-redmine-ops") | .filename' "$npm_release_tmp/release-manifest.json")
+core_filename=$(jq -r '.packages[] | select(.name == "@geibee/feedback-core") | .filename' "$npm_release_tmp/release-manifest.json")
+if tar -tf "$npm_release_tmp/$core_filename" | grep -Fqx 'package/dist/release-stale-sentinel.js'; then
+  echo "[feedback-redmine-release-check] FAIL: 削除済みsource由来のstale distがreleaseへ混入しています" >&2
+  exit 1
+fi
 [[ "$(tar -tvf "$npm_release_tmp/$ops_filename" package/dist/cli.js | awk '{print $1}')" == "-rwxr-xr-x" ]] || {
   echo "[feedback-redmine-release-check] FAIL: feedback-redmine-ops CLIに実行権限がありません" >&2
   exit 1

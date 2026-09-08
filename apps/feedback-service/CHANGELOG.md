@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。DBレスtopology、公開契約、provider挙動は変更しない。
+
 ## 未リリース - 2026-09-07
 
 - 独立鍵ringによるAES-256-GCM threadReferenceの発行・検証、30日寿命、認可・scope束縛と検索fallback禁止を追加した。

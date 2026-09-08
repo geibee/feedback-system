@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。Redmine v1 gateway契約と実行時挙動は変更しない。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - v2 dual-write ticketのUUIDv7／UUIDv8識別子をv1 validation／participant境界で受理するようにしました。

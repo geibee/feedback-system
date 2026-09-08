@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。Redmine v1 UI挙動と公開APIは変更しない。
+
 ## 1.0.0-alpha.7 - 2026-09-01
 
 - `FeedbackControllerPort`へ接続する`RedmineFeedbackControllerOverlay`互換wrapperを追加しました。

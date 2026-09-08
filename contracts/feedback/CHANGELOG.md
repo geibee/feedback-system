@@ -1,5 +1,9 @@
 # Changelog
 
+## npm package 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合の一部にstale build出力が混入したため、公開対象`dist`を削除して再生成した。Feedback v2契約内容は変更しない。
+
 ## 2.0.0-alpha.3 thread参照拡張 - 2026-09-07
 
 - ThreadのallOfとadditionalProperties=falseの矛盾を解消し、messagesを含む既存応答のschema検証を固定した。

@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-redmine-core",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Redmineを正本とするFeedbackの共通model・operation・REST client",
   "private": true,
   "type": "module",
@@ -31,8 +31,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-contracts": "1.0.0-rc.1",
-    "@geibee/feedback-core": "1.0.0-rc.1"
+    "@geibee/feedback-contracts": "1.0.0-rc.2",
+    "@geibee/feedback-core": "1.0.0-rc.2"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

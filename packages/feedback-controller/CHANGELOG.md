@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。公開APIと実行時挙動は変更しない。
+
 ## 未リリース - 2026-09-07
 
 - scope別の固定参照を保存・復元し、pending intent／follow／rendererへ伝播する。並行refreshによる参照の巻戻しを防ぐ。

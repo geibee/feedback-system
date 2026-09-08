@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- RC.1 release集合のstale build混入を解消するclean rebuild。CLIの公開契約と実行時挙動は変更しない。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - installation manifestの任意レビュー観点をclient profile生成へ反映するようにしました。

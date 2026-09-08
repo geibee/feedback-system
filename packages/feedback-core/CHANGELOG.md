@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-09-08
+
+- 削除済みの`manifest`、`telemetry`、`transport`出力が障害復旧時のRC.1 tarballへ混入した問題を修正し、現行sourceだけからclean buildする。
+
 ## 1.0.0-alpha.7 - 2026-08-30
 
 - page／名前付きscroll領域へ追従するtargetを厳密に検証し、custom targetの新fallbackを追加しました。

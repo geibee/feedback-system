@@ -98,9 +98,11 @@ npm run build:redmine
 
 if [[ "$npm_only" != true ]]; then
   release_builder=${FEEDBACK_REDMINE_RELEASE_BUILDER:-feedback-redmine-release-$$}
+  buildkit_image=moby/buildkit@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
   oci_root="$release_root/oci"
   mkdir -p "$oci_root"
-  docker buildx create --driver docker-container --name "$release_builder" >/dev/null
+  docker buildx create --driver docker-container --driver-opt "image=$buildkit_image" \
+    --name "$release_builder" >/dev/null
   cleanup_builder() {
     docker buildx rm "$release_builder" >/dev/null 2>&1 || true
   }
@@ -163,6 +165,7 @@ done
 images_file="$release_root/images.json"
 echo '[]' >"$images_file"
 revision=$(git rev-parse HEAD 2>/dev/null || echo unknown)
+source_date_epoch=$(git show -s --format=%ct "$revision" 2>/dev/null || echo 0)
 build_image() {
   local image_name=$1 dockerfile=$2
   local layout="$oci_root/$image_name"
@@ -173,9 +176,10 @@ build_image() {
     --platform linux/amd64,linux/arm64 \
     --build-arg "VERSION=$version" \
     --build-arg "REVISION=$revision" \
+    --build-arg "SOURCE_DATE_EPOCH=$source_date_epoch" \
     --file "$dockerfile" \
     --provenance=false \
-    --output "type=oci,dest=$layout,tar=false" \
+    --output "type=oci,dest=$layout,tar=false,rewrite-timestamp=true,compatibility-version=30" \
     .
   local reports='[]'
   for platform in linux/amd64 linux/arm64; do

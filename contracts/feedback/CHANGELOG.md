@@ -1,5 +1,9 @@
 # Changelog
 
+## npm package 1.0.0-rc.3 - 2026-09-09
+
+- RC.2で判明したOCI imageのbuild時刻依存を除去した。Feedback v2契約内容は変更しない。
+
 ## npm package 1.0.0-rc.2 - 2026-09-08
 
 - RC.1 release集合の一部にstale build出力が混入したため、公開対象`dist`を削除して再生成した。Feedback v2契約内容は変更しない。

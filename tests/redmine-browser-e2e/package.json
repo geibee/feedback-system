@@ -1,6 +1,6 @@
 {
   "name": "@geibee/redmine-browser-e2e",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "Feedback rendererとRedmine pluginのbrowser lifecycle smoke",
   "private": true,
   "type": "module",

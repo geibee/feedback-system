@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-service",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "DBレスFeedback Service composition root skeleton",
   "private": true,
   "type": "module",
@@ -24,10 +24,10 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-connector-sdk": "1.0.0-rc.2",
-    "@geibee/feedback-contracts": "1.0.0-rc.2",
-    "@geibee/feedback-envelope": "1.0.0-rc.2",
-    "@geibee/feedback-gateway": "1.0.0-rc.2"
+    "@geibee/feedback-connector-sdk": "1.0.0-rc.3",
+    "@geibee/feedback-contracts": "1.0.0-rc.3",
+    "@geibee/feedback-envelope": "1.0.0-rc.3",
+    "@geibee/feedback-gateway": "1.0.0-rc.3"
   },
   "devDependencies": {
     "@types/node": "26.1.0",

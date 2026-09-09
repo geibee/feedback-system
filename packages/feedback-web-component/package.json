@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-web-component",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "Headless Feedback Controller向け標準Web Componentとframework非依存plugin",
   "private": true,
   "type": "module",
@@ -27,7 +27,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-controller": "1.0.0-rc.2"
+    "@geibee/feedback-controller": "1.0.0-rc.3"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

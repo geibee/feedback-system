@@ -1,6 +1,6 @@
 {
   "name": "@geibee/feedback-connector-backlog",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "Feedback Backlog API v2 Connector",
   "private": true,
   "type": "module",
@@ -27,8 +27,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@geibee/feedback-connector-sdk": "1.0.0-rc.2",
-    "@geibee/feedback-envelope": "1.0.0-rc.2"
+    "@geibee/feedback-connector-sdk": "1.0.0-rc.3",
+    "@geibee/feedback-envelope": "1.0.0-rc.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

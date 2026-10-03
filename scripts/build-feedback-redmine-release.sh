@@ -189,7 +189,7 @@ build_image() {
     trivy image --quiet --input "$layout" --platform "$platform" --scanners vuln \
       --severity HIGH,CRITICAL --exit-code 0 --format sarif --output "$output/$vulnerability"
     trivy image --quiet --input "$layout" --platform "$platform" --scanners vuln \
-      --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --format json --output /dev/null
+      --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --format table
     trivy image --quiet --input "$layout" --platform "$platform" \
       --format cyclonedx --output "$output/$sbom"
     reports=$(jq -c --arg platform "$platform" --arg vulnerability "$vulnerability" --arg sbom "$sbom" \

@@ -34,7 +34,7 @@ grep -Fq 'FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:' apps
 grep -Fq 'USER 101' apps/feedback-redmine-demo/Dockerfile || fail "demoがnon-rootではありません"
 
 # digest固定のベースに残る脆弱なBrotliへ戻らないことを検証する。
-grep -Eq "^RUN apk upgrade --no-cache .*'brotli-libs>=1\.2\.1-r0'" apps/feedback-redmine-demo/Dockerfile || \
+grep -Eq "^[[:space:]]*&& apk add --upgrade --no-cache 'brotli-libs>=1\.2\.1-r0'" apps/feedback-redmine-demo/Dockerfile || \
   fail "demo runtimeでCVE-2026-111497の修正版Brotliを要求していません"
 
 echo "[feedback-redmine-container-platform] PASS"

@@ -50,7 +50,7 @@ RUN npm --workspace @geibee/feedback-contracts run build \
  && npm --workspace @geibee/feedback-service run build \
  && npm --workspace @geibee/feedback-service-runtime run build
 
-FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:ec2313763dd43931543bd03830466e0c409ce73a487e8d46f10db72d3b816c1c
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:1b90ca047c3a1046ad3527998c747c25b6a88dde91ba8c71b98669d5813aaa21
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Feedback Service runtime" \

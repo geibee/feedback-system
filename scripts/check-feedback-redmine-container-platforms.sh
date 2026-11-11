@@ -56,4 +56,8 @@ grep -Eq "^[[:space:]]*'curl>=8\\.23\\.0-r0' 'libcurl>=8\\.23\\.0-r0'" apps/feed
 grep -Eq "^[[:space:]]*'musl>=1\\.2\\.6-r3' 'musl-utils>=1\\.2\\.6-r3'" apps/feedback-redmine-demo/Dockerfile || \
   fail "demo runtimeでCVE-2026-107891の修正版musl/musl-utilsを要求していません"
 
+# digest固定のベースに残る脆弱なlibxsltへ戻らないことを検証する。
+grep -Eq "^[[:space:]]*'libxslt>=1\\.1\\.43-r4'([[:space:]]|$)" apps/feedback-redmine-demo/Dockerfile || \
+  fail "demo runtimeでCVE-2026-87636/CVE-2026-9947の修正版libxsltを要求していません"
+
 echo "[feedback-redmine-container-platform] PASS"

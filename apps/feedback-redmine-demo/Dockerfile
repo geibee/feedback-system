@@ -60,7 +60,8 @@ USER root
 RUN apk upgrade --no-cache libcrypto3 libssl3 libexpat libuuid pcre2 tiff libx11 \
   && apk add --upgrade --no-cache 'brotli-libs>=1.2.1-r0' \
     'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' \
-    'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3'
+    'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3' \
+    'libxslt>=1.1.43-r4'
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Feedback Redmine local demo" \
